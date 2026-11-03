@@ -91,6 +91,19 @@ capabilities: [
 2. **事件流单独一个集合**，并在 manifest 里用 `events_scope` 指出来。`event_absent` 靠它判断"能不能断言某件事没发生"。
 3. **别在视图里放账号、令牌、主机名。** 视图是给人写断言用的，不是 dump。
 
+把这三条落成代码，就是 manifest 里的 `view`：
+
+```js
+view: {
+  version: 'agent-web/view/1',
+  collections: {
+    pickings: { kind: 'list', required: ['id', 'sku', 'qty', 'status', 'owner'] },
+  },
+}
+```
+
+声明之后，适配器漏投影一个集合会得到 `unknown / invalid_environment`（"你接错了"），而不是每条断言各自报 `missing_observation`（"系统里没有"）。这两件事混在一起，排查会往错误的方向走很远。
+
 ---
 
 ## 第四步：`execute` 里唯一容易错的事——身份

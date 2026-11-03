@@ -264,10 +264,12 @@ async function cmdCompare(args, flags) {
 
   const ids = [...matrix.keys()].sort();
   const pad = (t, w) => t + " ".repeat(Math.max(0, w - [...t].length));
+  // 路径形态的适配器名会把表格撑爆，显示时只留文件名；查找仍用全名。
+  const disp = names.map((n) => (n.length > 24 ? path.basename(n).replace(/\.(mjs|cjs|js)$/, '') : n));
   const width = Math.max(...ids.map((i) => [...i].length), 8) + 2;
-  const colW = Math.max(...names.map((n) => n.length), 9) + 2;
+  const colW = Math.max(...disp.map((n) => [...n].length), 9) + 2;
 
-  console.log(pad("案例", width) + names.map((n) => pad(n, colW)).join("") + "判决一致");
+  console.log(pad("案例", width) + disp.map((n) => pad(n, colW)).join("") + "判决一致");
   console.log("-".repeat(width + colW * names.length + 8));
 
   let same = 0;
@@ -307,11 +309,11 @@ async function cmdCompare(args, flags) {
         for (const k of d.onlyA) console.log(`    - ${k} 只在 ${base} 声明`);
         for (const k of d.onlyB) console.log(`    - ${k} 只在 ${other} 声明`);
         for (const line of d.differences) console.log(`    - ${line}`);
-        console.log("    视图不同而判决相同，说明这份一致是碰巧，不是等价。");
       }
     }
     if (incompatible > 0 && same === ids.length) {
-      console.log("  提示：先统一视图契约，再谈跨实现对照。");
+      // 只有「判决全同 + 视图不同」才是危险组合：绿得整齐，但没有可比性。
+      console.log("  视图不同而判决相同：这份一致是碰巧，不是等价。先统一视图契约再对照。");
     }
   }
 

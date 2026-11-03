@@ -227,6 +227,7 @@ memory                                   内置名
 - `events_complete`：`true` 表示事件流水是完整记录。为 `false` 时 `event_absent` 类断言必须判 `unknown`——没记全就不能说"没发生过"。
 - `evidence_level`：`observed`（亲眼看到）/ `inferred`（从接口推出来）/ `validated`（端到端验证过）。**这是给人看的诚实标记，判决不用它。**
 - `roles`：适配器能绑定的全部角色。案例里的 `as` 必须落在这个列表里，否则适配器返回 `rejected / unknown_role`（见 6.2）。
+- `view`：视图契约，声明观测结果的形状。可选，但一旦声明就必须合法，运行器会拿它核对初态与终态（见 6.3）。
 
 manifest 校验失败 → `unknown / invalid_environment`。
 
@@ -243,6 +244,48 @@ manifest 校验失败 → `unknown / invalid_environment`。
 运行器校验这张表**必须是单射**：任意两个角色指向同一个身份 → `unknown / invalid_environment`。理由见 `docs/FINDING-001.md`：角色塌缩会让案例测的变成另一个人的行为，而判决依然是绿色。
 
 `as` 用了 `manifest.roles` 之外的角色 → 适配器返回 `rejected / unknown_role`。**不允许**回落到某个默认身份。
+
+---
+
+### 6.3 视图契约
+
+视图是可声明的。断言写在视图上，所以视图形状不能靠默契。
+
+```json
+"view": {
+  "version": "agent-web/view/1",
+  "collections": {
+    "orders":     { "kind": "list", "required": ["id", "status", "totalAmount", "items"], "semantics": "订单" },
+    "status_log": { "kind": "list", "required": ["type", "orderId", "from", "to"],      "semantics": "状态流水" }
+  }
+}
+```
+
+| 字段 | 必须 | 说明 |
+| --- | --- | --- |
+| `version` | 是 | 固定 `agent-web/view/1` |
+| `collections` | 是 | 非空对象，键是观测域里的集合名，支持点号路径 |
+| `collections[].kind` | 是 | `list` / `object` / `scalar` |
+| `collections[].required` | 否 | 每个实体必须具备的字段名数组 |
+| `collections[].semantics` | 否 | 一句话说明这个集合是什么，给人读 |
+
+**`view` 整体可选，但一旦声明就必须合法。** 半份契约比没有契约更危险：读的人会以为已经校验过了。
+
+校验时机：`reset()` 后的初态、轨迹结束后的终态，各校验一次。不合规判 `unknown / invalid_environment`，`detail` 写明缺哪个集合、哪个字段，并附 `view_errors` 明细。
+
+这条判决必须和「集合里没有实体」分开：
+
+| 情况 | 判决 | 含义 |
+| --- | --- | --- |
+| 集合缺失 / kind 不符 / 缺 required 字段 | `unknown / invalid_environment` | 适配器没按约定投影，是**仪器问题** |
+| 集合存在但为空 | 由断言各自报 `missing_observation` | 观测到了，被测系统真的没有数据 |
+| 字段值不等于期望 | `fail` | 这才是被测系统的**行为** |
+
+三者混在一起时，「我接错字段了」会看起来像「这个系统什么都没有」，然后你去改断言——越改越错。
+
+集合的值显式为 `null` 表示"这个域这次没有"，不算违约。`undefined` 才算。
+
+`agent-web compare` 会比对两个适配器的 `view`：判决一致而契约不同，说明这份一致是碰巧，不是等价。
 
 ---
 

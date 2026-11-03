@@ -282,3 +282,85 @@ test('不符合契约的模块：报错列出缺哪个方法', async () => {
   await assert.rejects(() => loadAdapter(file), (e) => /不符合契约/.test(e.message) && /reset/.test(e.message));
   fs.rmSync(dir, { recursive: true, force: true });
 });
+
+// ---------------------------------------------------------------- 视图契约
+// 视图从默契变成声明。断言写在视图上，所以视图形状必须可校验。
+
+const { validateViewContract, checkStateAgainstView, diffViews, VIEW_VERSION } = await import('../src/view.mjs');
+
+const goodView = {
+  version: VIEW_VERSION,
+  collections: {
+    orders: { kind: 'list', required: ['id', 'status'], semantics: '订单' },
+    menu: { kind: 'list', required: ['id'] },
+  },
+};
+
+test('视图契约：版本、kind、required 都要校验', () => {
+  assert.deepEqual(validateViewContract(undefined), []);
+  assert.deepEqual(validateViewContract(goodView), []);
+  assert.match(validateViewContract({ ...goodView, version: 'v0' })[0], /version/);
+  assert.match(validateViewContract({ version: VIEW_VERSION, collections: {} })[0], /不能为空/);
+  assert.match(
+    validateViewContract({ version: VIEW_VERSION, collections: { a: { kind: 'map' } } })[0],
+    /kind/,
+  );
+  assert.match(
+    validateViewContract({ version: VIEW_VERSION, collections: { a: { kind: 'list', required: 'id' } } })[0],
+    /required/,
+  );
+});
+
+test('视图契约：缺集合 / kind 不符 / 缺字段都要报出来', () => {
+  const ok = checkStateAgainstView({ orders: [{ id: 1, status: 'A' }], menu: [{ id: 1 }] }, goodView);
+  assert.equal(ok.ok, true);
+
+  const missing = checkStateAgainstView({ menu: [] }, goodView);
+  assert.equal(missing.ok, false);
+  assert.equal(missing.errors[0].code, 'missing_collection');
+  assert.match(missing.errors[0].detail, /orders/);
+
+  const wrongKind = checkStateAgainstView({ orders: { id: 1 }, menu: [] }, goodView);
+  assert.equal(wrongKind.errors[0].code, 'wrong_kind');
+
+  const missingField = checkStateAgainstView({ orders: [{ id: 1 }], menu: [] }, goodView);
+  assert.equal(missingField.errors[0].code, 'missing_field');
+  assert.match(missingField.errors[0].detail, /status/);
+});
+
+test('视图契约：集合明确给 null 表示这次没有，不算违约', () => {
+  const r = checkStateAgainstView({ orders: null, menu: [] }, goodView);
+  assert.equal(r.ok, true);
+});
+
+test('视图契约差异：required 不同就是不可比', () => {
+  const same = diffViews(goodView, structuredClone(goodView));
+  assert.equal(same.compatible, true);
+
+  const narrower = structuredClone(goodView);
+  narrower.collections.orders.required = ['id'];
+  const d = diffViews(goodView, narrower);
+  assert.equal(d.compatible, false);
+  assert.ok(d.differences.some((x) => /orders/.test(x)));
+
+  const extra = structuredClone(goodView);
+  extra.collections.pickings = { kind: 'list' };
+  const e = diffViews(goodView, extra);
+  assert.deepEqual(e.onlyB, ['pickings']);
+});
+
+test('契约不满足判 invalid_environment，而不是逐条断言报没观测到', async () => {
+  const broken = createMemoryAdapter();
+  const realObserve = broken.observe;
+  broken.observe = async (runId) => {
+    const out = await realObserve(runId);
+    // 模拟"接错字段"：适配器把 status_log 投影成了 logs
+    const { status_log, ...rest } = out.state;
+    return { ...out, state: { ...rest, logs: status_log } };
+  };
+  const r = await judge({ case: tinyCase, adapter: broken, adapterName: 'memory' });
+  assert.equal(r.status, 'unknown');
+  assert.equal(r.reason_code, 'invalid_environment');
+  assert.match(r.detail, /视图契约/);
+  assert.match(r.detail, /status_log/);
+});

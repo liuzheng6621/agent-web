@@ -94,6 +94,9 @@ memory/skip-ready-stage      fail          fail          ✓
 memory/unknown-capability    unknown       unknown       ✓
 
 跨适配器判决一致率 100.0% (7/7)
+
+视图契约
+  memory 与 taixianglian：兼容（3 个集合逐字相同）
 ```
 
 左边是几十行内存代码写的假系统，右边是真实的 Spring Boot + H2 后端。同一份案例，七个判决全对上。
@@ -215,6 +218,36 @@ const token = route.who === 'staff' ? ctx.staff.token : ctx.customer.token;
 
 ---
 
+## 视图是声明，不是默契
+
+断言写在视图上，所以视图形状必须能校验。适配器在 manifest 里声明它：
+
+```json
+"view": {
+  "version": "agent-web/view/1",
+  "collections": {
+    "orders":     { "kind": "list", "required": ["id", "status", "totalAmount", "items"] },
+    "status_log": { "kind": "list", "required": ["type", "orderId", "from", "to"] }
+  }
+}
+```
+
+运行器在初态和终态各校验一次。不合格判 `unknown / invalid_environment`，写明缺哪个集合、哪个字段。
+
+**这一条必须和「集合里没有实体」分开：**
+
+| 情况 | 判决 | 是什么问题 |
+| --- | --- | --- |
+| 集合缺失、kind 不符、缺 required 字段 | `unknown / invalid_environment` | 适配器没按约定投影——**仪器坏了** |
+| 集合在，但是空的 | 断言各自报 `missing_observation` | 观测到了，系统真的没数据 |
+| 字段值不等于期望 | `fail` | 被测系统的**行为** |
+
+三者混在一起时，"我接错字段了"会看起来像"这个系统什么都没有"，然后人去改断言，越改越错。
+
+声明之后还有个副产品：`compare` 会比对两个适配器的视图契约。判决一致而契约不同，说明这份一致是碰巧——它们各自在不同的字段上被判，恰好结论相同。真正可比的一致，需要契约逐字相同。
+
+---
+
 ## 身份是显式的
 
 案例不写"用 token A"，写的是角色：
@@ -280,7 +313,7 @@ const token = route.who === 'staff' ? ctx.staff.token : ctx.customer.token;
 写出来是为了让人知道边界在哪，不是自谦。
 
 1. **适配器要手写。** 目前没有"给个 URL 自动生成适配器"这种功能。有骨架可抄（[examples/adapter-template](examples/adapter-template/)），但"你的状态怎么投影成规范视图""哪条能力算 validated"这些判断仍然只能人来想。真实后端那个适配器是照着接口文档一条条写出来的，约 11KB。这是眼下最贵的一步。
-2. **规范视图是固定的四个集合**（menu / orders / status_log）。换到别的业务域要改视图定义，属于尚未抽象的部分。
+2. **视图契约要手写，且没有跨视图的映射层。** 视图现在可以声明（`manifest.view`）并校验，但声明本身得人来写；两个适配器用了不同集合名时（一个叫 `orders`、一个叫 `tickets`），案例不会自动换算过去，只能各写一份。真正的可移植还差这一层。
 3. **只判终态和流水，不判中间过程。** `event_absent` 能查事件，但"Agent 点了三次才点对"这类过程质量现在量不出来。
 4. **`inferred` 证据等级没有提级路径。** manifest 里标了 `inferred` 的能力（比如需要 multipart 的图片上传）只能一直诚实地标着，没有从推断升到验证的流程。
 5. **单适配器单 run 串行跑。** 没有并发，也没有跨机器分发。
@@ -302,6 +335,7 @@ agent-web/
 │   ├── case.mjs               案例格式校验、绑定解析、标签推导
 │   ├── runner.mjs             六步判决流水线
 │   ├── report.mjs             Wilson 区间、汇总指标、一致性、文本输出
+│   ├── view.mjs               视图契约：声明校验、状态核对、跨实现差异
 │   └── adapter/
 │       ├── contract.mjs       适配器契约（manifest 校验、四种执行结果、证据等级）
 │       ├── load.mjs           适配器加载（内置名 / 文件路径 / 包名）
@@ -316,7 +350,7 @@ agent-web/
 ├── docs/
 │   ├── SPEC.md                案例格式规范
 │   └── FINDING-001.md         身份塌缩导致的假通过
-└── test/engine.test.mjs       27 个单元测试（node --test，零依赖）
+└── test/engine.test.mjs       32 个单元测试（node --test，零依赖）
 ```
 
 ---
