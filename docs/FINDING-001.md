@@ -4,6 +4,8 @@
 状态：已修复
 发现方式：跨适配器判决对照（`agent-web compare`）
 
+**中文** · [English](FINDING-001.en.md)
+
 ---
 
 ## 1. 现象

@@ -2,6 +2,8 @@
 
 **给 Agent 写机器可判的集成测试。一份案例，多个实现，判决必须一致。**
 
+> Machine-judgeable integration tests for agents. One case, many implementations, verdicts must agree.
+
 **中文** · [English](README.en.md)
 
 Agent 干活的质量问题，最后都会落到一句话上：谁来判它做对了没有。
@@ -351,7 +353,8 @@ agent-web/
 │   └── adapter-template/      能直接跑的适配器骨架 + 四条示例案例
 ├── docs/
 │   ├── SPEC.md                案例格式规范
-│   └── FINDING-001.md         身份塌缩导致的假通过
+│   ├── FINDING-001.md         身份塌缩导致的假通过
+│   └── FINDING-001.en.md      同上，英文版
 └── test/engine.test.mjs       32 个单元测试（node --test，零依赖）
 ```
 
@@ -383,4 +386,5 @@ MIT。见 [LICENSE](LICENSE)。
 ## 参考
 
 - 案例格式规范：[docs/SPEC.md](docs/SPEC.md)
-- 假通过事故复盘：[docs/FINDING-001.md](docs/FINDING-001.md)
+- 假通过事故复盘：[docs/FINDING-001.md](docs/FINDING-001.md) · [English](docs/FINDING-001.en.md)
+- English README: [README.en.md](README.en.md)

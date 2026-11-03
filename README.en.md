@@ -179,7 +179,7 @@ It picked a token by "does this run down the staff lane or the customer lane", c
 
 This is why cross-implementation agreement is the core and not an optional control experiment. Assertion sets can be wrong, adapters can lie, models can hallucinate; **making two independent implementations return the same verdict on the same case** is the only honest check this thing has.
 
-After the fix, all seven agree. Full write-up: [docs/FINDING-001.md](docs/FINDING-001.md).
+After the fix, all seven agree. Full write-up: [docs/FINDING-001.en.md](docs/FINDING-001.en.md).
 
 ---
 
@@ -351,7 +351,8 @@ agent-web/
 │   └── adapter-template/      a runnable adapter skeleton + four example cases
 ├── docs/
 │   ├── SPEC.md                case format specification
-│   └── FINDING-001.md         the false pass caused by collapsed identities
+│   ├── FINDING-001.md         the false pass caused by collapsed identities
+│   └── FINDING-001.en.md      same, in English
 └── test/engine.test.mjs       32 unit tests (node --test, zero dependencies)
 ```
 
@@ -382,5 +383,6 @@ MIT. See [LICENSE](LICENSE).
 
 ## References
 
-- Case format specification: [docs/SPEC.md](docs/SPEC.md)
-- False-pass post-mortem: [docs/FINDING-001.md](docs/FINDING-001.md)
+- Case format specification: [docs/SPEC.md](docs/SPEC.md) (Chinese)
+- False-pass post-mortem: [docs/FINDING-001.en.md](docs/FINDING-001.en.md) · [中文](docs/FINDING-001.md)
+- Chinese README: [README.md](README.md)
