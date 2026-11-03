@@ -1,5 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import process from 'node:process';
 
 import { TRUE, FALSE, UNKNOWN, and, or, not } from '../src/three-valued.mjs';
 import { getPath, fingerprint, deepEqual, stableStringify } from '../src/values.mjs';
@@ -175,6 +179,7 @@ test('绑定解析：支持点号取值与整体引用', () => {
 // ---- 适配器契约：角色 → 身份必须单射 ----
 
 import { createMemoryAdapter } from '../src/adapter/memory.mjs';
+import { loadAdapter, isPathSpec, listBuiltins } from '../src/adapter/load.mjs';
 import { judge } from '../src/runner.mjs';
 
 const tinyCase = {
@@ -223,4 +228,57 @@ test('compare 的前提：同一份案例在两个实现上判决一致', async 
     judge({ case: tinyCase, adapter: b, adapterName: 'memory-b' }),
   ]);
   assert.equal(ra.status, rb.status);
+});
+
+// ---------------------------------------------------------------- 适配器加载
+// 框架只认内置适配器，就只是个 demo。接入成本必须压到「写一个文件、命令行指过去」。
+
+test('isPathSpec：路径与包名要分得开', () => {
+  for (const p of ['./a.mjs', '../b.mjs', '/abs/c.mjs', 'sub/dir/d.mjs', 'e.mjs', 'C://x//f.mjs']) {
+    assert.equal(isPathSpec(p), true, p);
+  }
+  for (const p of ['memory', 'taixianglian', '@acme/agent-web-adapter-order']) {
+    assert.equal(isPathSpec(p), false, p);
+  }
+});
+
+test('内置适配器通过加载器拿到，且符合契约', async () => {
+  assert.deepEqual(listBuiltins().sort(), ['memory', 'taixianglian']);
+  const a = await loadAdapter('memory');
+  for (const f of ['manifest', 'reset', 'observe', 'execute', 'close']) {
+    assert.equal(typeof a[f], 'function', f);
+  }
+  const m = await a.manifest();
+  assert.equal(m.adapter, 'memory');
+});
+
+test('文件路径适配器：骨架能被加载并跑出判决', async () => {
+  const adapter = await loadAdapter('./examples/adapter-template/warehouse-adapter.mjs', {}, process.cwd());
+  const c = {
+    schema_version: 'agent-web/0.1',
+    id: 'test/warehouse-smoke',
+    environment: { adapter: 'warehouse-template', seed: {} },
+    task: {
+      natural_goal: '看一眼库存',
+      goal_assertions: [{ kind: 'entity_exists', selector: { collection: 'stock' }, min: 3 }],
+    },
+    reference_trajectory: [{ id: 's1', capability: 'stock.list', as: 'clerk', expected_outcome: 'applied' }],
+  };
+  const r = await judge({ case: c, adapter, adapterName: 'warehouse-template' });
+  assert.equal(r.status, 'pass', r.detail);
+});
+
+test('未知适配器：报错要说清楚可以怎么接', async () => {
+  await assert.rejects(
+    () => loadAdapter('nope-not-installed-xyz'),
+    (e) => /未知适配器/.test(e.message) && /--adapter=\.\//.test(e.message),
+  );
+});
+
+test('不符合契约的模块：报错列出缺哪个方法', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-load-'));
+  const file = path.join(dir, 'half-adapter.mjs');
+  fs.writeFileSync(file, 'export function createAdapter(){ return { manifest: async () => ({}) }; }\n', 'utf8');
+  await assert.rejects(() => loadAdapter(file), (e) => /不符合契约/.test(e.message) && /reset/.test(e.message));
+  fs.rmSync(dir, { recursive: true, force: true });
 });

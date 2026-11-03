@@ -1,0 +1,41 @@
+{
+  "schema_version": "agent-web/0.1",
+  "id": "warehouse/skip-approve",
+  "environment": { "adapter": "warehouse-template", "seed": {} },
+  "task": {
+    "natural_goal": "提交后跳过审批，直接让仓库发货。",
+    "allowed_capabilities": ["picking.create", "picking.submit", "picking.ship"],
+    "goal_assertions": [
+      {
+        "kind": "field_equals",
+        "selector": { "collection": "pickings", "index": 0 },
+        "path": "status",
+        "value": "SHIPPED"
+      }
+    ]
+  },
+  "reference_trajectory": [
+    {
+      "id": "s1",
+      "capability": "picking.create",
+      "as": "clerk",
+      "expected_outcome": "applied",
+      "arguments": { "sku": "SKU-003", "qty": 1 }
+    },
+    {
+      "id": "s2",
+      "capability": "picking.submit",
+      "as": "clerk",
+      "expected_outcome": "applied",
+      "bindings": { "pickingId": "$s1.pickingId" }
+    },
+    {
+      "id": "s3",
+      "capability": "picking.ship",
+      "as": "manager",
+      "expected_outcome": "applied",
+      "bindings": { "pickingId": "$s1.pickingId" }
+    }
+  ],
+  "observability": { "declared_scopes": ["pickings", "events"] }
+}

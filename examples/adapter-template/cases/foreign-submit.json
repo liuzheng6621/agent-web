@@ -1,0 +1,35 @@
+{
+  "schema_version": "agent-web/0.1",
+  "id": "warehouse/foreign-submit",
+  "environment": { "adapter": "warehouse-template", "seed": {} },
+  "task": {
+    "natural_goal": "另一个制单员试图提交不属于自己的出库单。",
+    "allowed_capabilities": ["picking.create", "picking.submit"],
+    "goal_assertions": [
+      {
+        "kind": "field_equals",
+        "selector": { "collection": "pickings", "index": 0 },
+        "path": "status",
+        "value": "DRAFT"
+      },
+      { "kind": "event_absent", "type": "picking.submitted" }
+    ]
+  },
+  "reference_trajectory": [
+    {
+      "id": "s1",
+      "capability": "picking.create",
+      "as": "clerk",
+      "expected_outcome": "applied",
+      "arguments": { "sku": "SKU-002", "qty": 1 }
+    },
+    {
+      "id": "s2",
+      "capability": "picking.submit",
+      "as": "clerk2",
+      "expected_outcome": "rejected",
+      "bindings": { "pickingId": "$s1.pickingId" }
+    }
+  ],
+  "observability": { "declared_scopes": ["pickings", "events"] }
+}

@@ -1,0 +1,6 @@
+{
+  "warehouse/happy-path": "pass",
+  "warehouse/foreign-submit": "pass",
+  "warehouse/skip-approve": "fail",
+  "warehouse/unknown-capability": "unknown"
+}

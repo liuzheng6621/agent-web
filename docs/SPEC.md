@@ -45,6 +45,16 @@
 
 **案例不得写死具体账号、令牌、主机名。** 身份一律走第 6 节的角色寻址。
 
+`--adapter=` 接受三种写法，同一份案例换个写法就能打到不同实现上：
+
+```
+memory                                   内置名
+./my-adapter.mjs                         文件路径（相对当前工作目录）
+@acme/agent-web-adapter-order            包名
+```
+
+模块需导出 `createAdapter(options)`；也接受 `default` 导出或直接导出 `manifest/reset/observe/execute`。加载后按第 6 节校验契约，不合格直接报错而不是带着半个适配器往下跑。
+
 ---
 
 ## 3. `task`

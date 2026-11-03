@@ -18,15 +18,10 @@ import { fileURLToPath } from 'node:url';
 
 import { judge } from '../src/runner.mjs';
 import { summarize, agreement, formatText, countFailedAssertions } from '../src/report.mjs';
+import { loadAdapter, listBuiltins } from '../src/adapter/load.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..');
-
-const ADAPTERS = {
-  memory: () => import('../src/adapter/memory.mjs').then((m) => m.createMemoryAdapter()),
-  taixianglian: () =>
-    import('../src/adapter/taixianglian.mjs').then((m) => m.createTaixianglianAdapter()),
-};
 
 function parseArgs(argv) {
   const out = { _: [], flags: {} };
@@ -62,9 +57,9 @@ function readExpected(dirOrFile) {
 }
 
 async function makeAdapter(name) {
-  const factory = ADAPTERS[name];
-  if (!factory) throw new Error(`未知适配器 ${name}；可用：${Object.keys(ADAPTERS).join(', ')}`);
-  return factory();
+  // 内置名 / 文件路径 / 包名都走同一个加载器：
+  // 接自己的应用只需要写一个 .mjs，不必改本仓库的任何一行。
+  return loadAdapter(name, {}, process.cwd());
 }
 
 async function runOne(caseFile, adapter) {
@@ -136,7 +131,10 @@ async function cmdVerify(args, flags) {
     console.log(JSON.stringify(verdicts, null, 2));
   } else {
     for (const v of verdicts) {
-      console.log(`${v.status.padEnd(7)} ${v.case_id.padEnd(32)} ${v.reason_code}`);
+      // 有 expected.json 就打 ✓/✗，没有就打 · —— 判决本身仍然照常输出。
+      const exp = expected[v.case_id];
+      const mark = exp === undefined ? '·' : exp === v.status ? '✓' : '✗';
+      console.log(`${mark} ${v.status.padEnd(7)} ${v.case_id.padEnd(32)} ${v.reason_code}`);
       console.log(`  └ ${v.detail}`);
     }
     console.log('');
@@ -180,22 +178,27 @@ async function cmdCapabilities(args, flags) {
   return 0;
 }
 
-function cmdInit(args) {
+function cmdInit(args, flags) {
   if (args.length === 0) {
-    console.error('用法：agent-web init <目录>');
+    console.error('用法：agent-web init <目录> [--adapter=memory]');
     return 2;
   }
   const dir = path.resolve(args[0]);
+  const adapterName = typeof flags.adapter === 'string' ? flags.adapter : 'memory';
   fs.mkdirSync(dir, { recursive: true });
   const file = path.join(dir, 'example.json');
   if (fs.existsSync(file)) {
     console.error(`已存在：${file}`);
     return 2;
   }
-  fs.writeFileSync(file, JSON.stringify(TEMPLATE, null, 2) + '\n', 'utf8');
-  fs.writeFileSync(path.join(dir, 'expected.json'), JSON.stringify({ 'example/todo': 'pass' }, null, 2) + '\n', 'utf8');
+  const tpl = structuredClone(TEMPLATE);
+  tpl.environment.adapter = adapterName;
+  fs.writeFileSync(file, JSON.stringify(tpl, null, 2) + '\n', 'utf8');
   console.log(`已生成 ${file}`);
-  console.log('下一步：改成你的能力与断言，然后 agent-web verify ' + dir);
+  console.log('下一步：');
+  console.log('  1. 把 capabilities / 断言改成你的系统真实具备的东西');
+  console.log(`  2. agent-web verify ${args[0]} --adapter=${adapterName}`);
+  console.log('  3. 看判决，再决定这条案例「应该」是什么。先跑后写 expected.json，别先写答案。');
   return 0;
 }
 
@@ -213,7 +216,8 @@ const TEMPLATE = {
     allowed_capabilities: ['order.create', 'order.pick'],
   },
   reference_trajectory: [
-    { id: 's1', capability: 'order.create', as: 'alice', expected_outcome: 'applied', arguments: {} },
+    // as 写角色，不写具体账号：角色到身份的映射是适配器的责任。
+    { id: 's1', capability: 'order.create', as: 'customer', expected_outcome: 'applied', arguments: {} },
   ],
   observability: { declared_scopes: ['orders'] },
 };
@@ -271,12 +275,18 @@ async function cmdCompare(args, flags) {
 const HELP = `agent-web —— 给 Agent 写机器可判的集成测试
 
   agent-web selftest [--json]                 零依赖自测：内置适配器 + 内置案例
-  agent-web verify <目录或文件> --adapter=NAME 跑案例出判决
+  agent-web verify <目录或文件> --adapter=SPEC 跑案例出判决
   agent-web report <results.jsonl>            由判决结果出指标
-  agent-web capabilities [--adapter=NAME]     打印能力清单与证据等级
-  agent-web init <目录>                       生成案例模板
+  agent-web capabilities [--adapter=SPEC]     打印能力清单与证据等级
+  agent-web compare <案例> --adapters=A,B     同一份案例喂多个实现，比判决
+  agent-web init <目录>                       生成案例模板（--adapter 写进 environment）
 
-适配器：${Object.keys(ADAPTERS).join(' / ')}
+适配器 SPEC 可以是：
+  内置名        ${listBuiltins().join(' / ')}
+  文件路径      ./my-adapter.mjs（相对当前工作目录）
+  包名          @acme/agent-web-adapter-order
+
+  接自己的应用只需写一个 .mjs，导出 createAdapter()。见 examples/adapter-template/。
 
 断言：entity_exists / field_equals / count_delta / status_transition /
       unchanged / event_absent / composite
@@ -307,7 +317,7 @@ async function main() {
       case 'capabilities':
         return await cmdCapabilities(args, flags);
       case 'init':
-        return cmdInit(args);
+        return cmdInit(args, flags);
       default:
         console.error(`未知命令 ${cmd}`);
         console.log(HELP);

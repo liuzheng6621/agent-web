@@ -1,0 +1,29 @@
+{
+  "schema_version": "agent-web/0.1",
+  "id": "warehouse/unknown-capability",
+  "environment": { "adapter": "warehouse-template", "seed": {} },
+  "task": {
+    "natural_goal": "让审批员做一次盘点调整。",
+    "allowed_capabilities": ["picking.create", "stock.adjust"],
+    "goal_assertions": [
+      { "kind": "entity_exists", "selector": { "collection": "stock" } }
+    ]
+  },
+  "reference_trajectory": [
+    {
+      "id": "s1",
+      "capability": "picking.create",
+      "as": "clerk",
+      "expected_outcome": "applied",
+      "arguments": { "sku": "SKU-001", "qty": 1 }
+    },
+    {
+      "id": "s2",
+      "capability": "stock.adjust",
+      "as": "manager",
+      "expected_outcome": "applied",
+      "arguments": { "sku": "SKU-001", "delta": -3 }
+    }
+  ],
+  "observability": { "declared_scopes": ["stock", "pickings"] }
+}

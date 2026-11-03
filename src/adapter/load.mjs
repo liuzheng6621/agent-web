@@ -1,0 +1,108 @@
+/**
+ * 适配器加载器。
+ *
+ * 一个测试框架如果只认自己内置的两个适配器，它就只是一个 demo。
+ * 接入成本必须压到「写一个文件、命令行指过去」这个量级，
+ * 否则没人会把自己公司的系统接进来，仓库也就停在作者自己的机器上。
+ *
+ * 支持三种写法：
+ *   memory                              内置名
+ *   ./my-adapter.mjs                    文件路径（相对当前工作目录）
+ *   @acme/agent-web-adapter-order       包名
+ *
+ * 模块导出解析顺序：
+ *   1. createAdapter(options)           首选，工厂函数
+ *   2. default 是函数                    当作工厂
+ *   3. default 是对象                    当作适配器实例
+ *   4. 模块自身有 manifest/reset/observe/execute  直接当实例
+ */
+
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { validateAdapter } from './contract.mjs';
+
+const BUILTINS = {
+  memory: async () => {
+    const m = await import('./memory.mjs');
+    return m.createMemoryAdapter();
+  },
+  taixianglian: async () => {
+    const m = await import('./taixianglian.mjs');
+    return m.createTaixianglianAdapter();
+  },
+};
+
+export function listBuiltins() {
+  return Object.keys(BUILTINS);
+}
+
+/** 判断一个字符串该被当成文件路径还是包名。 */
+export function isPathSpec(spec) {
+  // scoped 包名带斜杠，但不是路径。漏了这一条，@acme/xxx 会被当成文件去解析。
+  if (spec.startsWith('@')) return false;
+  return (
+    spec.startsWith('.') ||
+    spec.startsWith('/') ||
+    spec.startsWith('\\') ||
+    /^[A-Za-z]:[\\/]/.test(spec) ||
+    spec.includes('/') ||
+    spec.includes('\\') ||
+    /\.(mjs|cjs|js)$/.test(spec)
+  );
+}
+
+function pickFactory(mod, spec) {
+  if (typeof mod.createAdapter === 'function') return () => mod.createAdapter();
+  if (typeof mod.default === 'function') return () => mod.default();
+  if (mod.default && typeof mod.default === 'object') return () => mod.default;
+  if (typeof mod.manifest === 'function' && typeof mod.execute === 'function') return () => mod;
+  throw new Error(
+    `模块 ${spec} 没有导出可用的适配器：需要 createAdapter() 函数、default 导出，或直接导出 manifest/reset/observe/execute`,
+  );
+}
+
+/**
+ * 按 spec 解析出适配器实例。
+ * @param {string} spec 内置名 / 文件路径 / 包名
+ * @param {object} options 传给工厂的参数
+ * @param {string} cwd 解析相对路径的基准目录
+ */
+export async function loadAdapter(spec, options = {}, cwd = process.cwd()) {
+  const name = String(spec ?? '').trim();
+  if (name === '') throw new Error('适配器名字为空');
+
+  let factory;
+  if (BUILTINS[name]) {
+    factory = BUILTINS[name];
+  } else if (isPathSpec(name)) {
+    const abs = path.resolve(cwd, name);
+    let mod;
+    try {
+      mod = await import(pathToFileURL(abs).href);
+    } catch (e) {
+      if (e && e.code === 'ERR_MODULE_NOT_FOUND') {
+        throw new Error(`找不到适配器文件 ${abs}（相对路径按 ${cwd} 解析）`);
+      }
+      throw e;
+    }
+    factory = pickFactory(mod, name);
+  } else {
+    let mod;
+    try {
+      mod = await import(name);
+    } catch (e) {
+      throw new Error(
+        `未知适配器 ${name}：既不是内置名（${listBuiltins().join(', ')}），也加载不到同名包。` +
+          `接自己的应用请写一个 .mjs 并用 --adapter=./path/to/adapter.mjs`,
+      );
+    }
+    factory = pickFactory(mod, name);
+  }
+
+  const adapter = await factory(options);
+  const errors = validateAdapter(adapter);
+  if (errors.length > 0) {
+    throw new Error(`适配器 ${name} 不符合契约：${errors.join('；')}`);
+  }
+  return adapter;
+}

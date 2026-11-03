@@ -102,6 +102,40 @@ memory/unknown-capability    unknown       unknown       ✓
 
 ---
 
+## 接你自己的应用
+
+上面三条命令跑的是仓库自带的两个实现。要让 agent-web 考**你自己的系统**，写一个 `.mjs` 指过去就行，不用改本仓库任何一行：
+
+```bash
+node bin/agent-web.mjs verify my-cases --adapter=./my-adapter.mjs
+```
+
+适配器只有五个方法：
+
+```js
+{ manifest(), reset({ seed }), observe(runId), execute(runId, action), close(runId) }
+```
+
+`examples/adapter-template/` 是一个**能直接跑**的骨架，业务是仓库出库单（故意和咖啡店无关）：
+
+```bash
+node bin/agent-web.mjs verify examples/adapter-template/cases \
+  --adapter=./examples/adapter-template/warehouse-adapter.mjs
+```
+
+```
+pass    warehouse/foreign-submit         ok
+pass    warehouse/happy-path             ok
+fail    warehouse/skip-approve           unexpected_rejection
+unknown warehouse/unknown-capability     coverage_gap
+```
+
+四行覆盖四种判决形态：正常通过、负例被正确挡下、负例漏挡、能力缺口。骨架里 `createBackend()` 就是"你的系统"，换成 `fetch` 即可，其余不动。
+
+接入指南（含三条最容易踩的坑）见 [examples/adapter-template/README.md](examples/adapter-template/README.md)。
+
+---
+
 ## 两个实跑出来的数字
 
 **判决一致率 100%（7/7）**：`cases/memory-demo` 与 `cases/taixianglian` 除 `environment.adapter` 外字节完全相同，分别打到内存适配器和真实 HTTP 后端，判决向量完全一致。
@@ -245,7 +279,7 @@ const token = route.who === 'staff' ? ctx.staff.token : ctx.customer.token;
 
 写出来是为了让人知道边界在哪，不是自谦。
 
-1. **适配器要手写。** 目前没有"给个 URL 自动生成适配器"这种功能。真实后端那个适配器是照着接口文档一条条写出来的，约 11KB。这是眼下最贵的一步。
+1. **适配器要手写。** 目前没有"给个 URL 自动生成适配器"这种功能。有骨架可抄（[examples/adapter-template](examples/adapter-template/)），但"你的状态怎么投影成规范视图""哪条能力算 validated"这些判断仍然只能人来想。真实后端那个适配器是照着接口文档一条条写出来的，约 11KB。这是眼下最贵的一步。
 2. **规范视图是固定的四个集合**（menu / orders / status_log）。换到别的业务域要改视图定义，属于尚未抽象的部分。
 3. **只判终态和流水，不判中间过程。** `event_absent` 能查事件，但"Agent 点了三次才点对"这类过程质量现在量不出来。
 4. **`inferred` 证据等级没有提级路径。** manifest 里标了 `inferred` 的能力（比如需要 multipart 的图片上传）只能一直诚实地标着，没有从推断升到验证的流程。
@@ -270,15 +304,19 @@ agent-web/
 │   ├── report.mjs             Wilson 区间、汇总指标、一致性、文本输出
 │   └── adapter/
 │       ├── contract.mjs       适配器契约（manifest 校验、四种执行结果、证据等级）
+│       ├── load.mjs           适配器加载（内置名 / 文件路径 / 包名）
 │       ├── memory.mjs         确定性内存业务系统
 │       └── taixianglian.mjs   真实 Spring Boot 咖啡店后端适配器
 ├── cases/
 │   ├── memory-demo/           七条案例 + expected.json
 │   └── taixianglian/          与上面除 adapter 外字节相同的七条
+├── examples/
+│   ├── README.md              参考被测系统（咖啡店）说明
+│   └── adapter-template/      能直接跑的适配器骨架 + 四条示例案例
 ├── docs/
 │   ├── SPEC.md                案例格式规范
 │   └── FINDING-001.md         身份塌缩导致的假通过
-└── test/engine.test.mjs       18 个单元测试（node --test，零依赖）
+└── test/engine.test.mjs       27 个单元测试（node --test，零依赖）
 ```
 
 ---
