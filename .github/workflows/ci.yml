@@ -1,0 +1,49 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: ['20', '22', '24']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      # 零依赖：没有 npm install 这一步，跑不起来就是真跑不起来。
+      - name: 单元测试
+        run: node --test test/engine.test.mjs
+
+      - name: 自测（内置适配器 + 内置案例）
+        run: node bin/agent-web.mjs selftest
+
+      - name: 骨架适配器（证明第三方能接进来）
+        run: |
+          node bin/agent-web.mjs verify examples/adapter-template/cases \
+            --adapter=./examples/adapter-template/warehouse-adapter.mjs
+
+      - name: 判决一致率必须为 100%
+        run: |
+          node bin/agent-web.mjs selftest --json > /tmp/selftest.json
+          node -e '
+            const fs = require("node:fs");
+            const r = JSON.parse(fs.readFileSync("/tmp/selftest.json", "utf8"));
+            const a = r.agreement;
+            if (!a || a.rate.value !== 1) {
+              console.error("与预期标签不一致：", JSON.stringify(a));
+              process.exit(1);
+            }
+            console.log("一致率 100%，N =", a.checked);
+          '
+
+  # 真实后端那一半不在 CI 里：它需要一个跑着的 Spring Boot 实例。
+  # 这不是缺口，是边界——cross-implementation 对照要么两边都真，要么就不做。
+  # 本地跑法见 README「快速开始」第 3 条。

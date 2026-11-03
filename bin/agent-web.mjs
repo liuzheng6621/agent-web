@@ -147,7 +147,21 @@ async function cmdVerify(args, flags) {
     console.error(`已写入 ${out}`);
   }
 
-  return verdicts.some((v) => v.status === 'fail') ? 1 : 0;
+  // 退出码跟文档对齐：0 符合预期，1 存在不符。
+  // 注意「有 fail」不等于「不符」——负例本来就该 fail，
+  // 按 fail 判退出的写法会让任何带负例的案例集永远返回 1，CI 里直接卡死。
+  const declared = Object.keys(expected);
+  if (declared.length === 0) {
+    // 没写 expected.json：没有预期可比，只能按「出现了 fail」提示有人来看。
+    return verdicts.some((v) => v.status === 'fail') ? 1 : 0;
+  }
+  const mismatched = verdicts.filter((v) => expected[v.case_id] !== undefined && expected[v.case_id] !== v.status);
+  const undeclared = verdicts.filter((v) => expected[v.case_id] === undefined);
+  if (undeclared.length > 0) {
+    console.error(`提示：${undeclared.length} 条案例没有在 expected.json 里声明预期，按不符处理`);
+    return 1;
+  }
+  return mismatched.length === 0 ? 0 : 1;
 }
 
 async function cmdReport(args, flags) {
