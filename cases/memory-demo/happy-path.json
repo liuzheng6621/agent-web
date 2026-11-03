@@ -1,0 +1,122 @@
+{
+  "schema_version": "agent-web/0.1",
+  "id": "memory/happy-path",
+  "environment": {
+    "adapter": "memory",
+    "seed": {}
+  },
+  "task": {
+    "natural_goal": "顾客点一杯拿铁，店员接单、做好，顾客本人取走。",
+    "goal_assertions": [
+      {
+        "kind": "entity_exists",
+        "selector": {
+          "collection": "orders"
+        }
+      },
+      {
+        "kind": "field_equals",
+        "selector": {
+          "collection": "orders",
+          "index": 0
+        },
+        "path": "status",
+        "value": "PICKED"
+      },
+      {
+        "kind": "status_transition",
+        "selector": {
+          "collection": "orders",
+          "index": 0
+        },
+        "path": "status",
+        "transitions": [
+          [
+            "PENDING",
+            "MAKING"
+          ],
+          [
+            "MAKING",
+            "READY"
+          ],
+          [
+            "READY",
+            "PICKED"
+          ]
+        ]
+      },
+      {
+        "kind": "count_delta",
+        "selector": {
+          "collection": "orders"
+        },
+        "delta": 1
+      }
+    ],
+    "invariants": [
+      {
+        "kind": "count_delta",
+        "selector": {
+          "collection": "status_log",
+          "where": [
+            {
+              "field": "type",
+              "eq": "order.canceled"
+            }
+          ]
+        },
+        "delta": 0
+      }
+    ]
+  },
+  "reference_trajectory": [
+    {
+      "id": "s1",
+      "capability": "order.create",
+      "as": "customer",
+      "expected_outcome": "applied",
+      "arguments": {
+        "items": [
+          {
+            "dishName": "拿铁",
+            "qty": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "s2",
+      "capability": "kitchen.accept",
+      "as": "staff",
+      "expected_outcome": "applied",
+      "bindings": {
+        "orderId": "$s1.orderId"
+      }
+    },
+    {
+      "id": "s3",
+      "capability": "kitchen.ready",
+      "as": "staff",
+      "expected_outcome": "applied",
+      "bindings": {
+        "orderId": "$s1.orderId"
+      }
+    },
+    {
+      "id": "s4",
+      "capability": "order.pick",
+      "as": "customer",
+      "expected_outcome": "applied",
+      "bindings": {
+        "orderId": "$s1.orderId"
+      }
+    }
+  ],
+  "observability": {
+    "declared_scopes": [
+      "menu",
+      "orders",
+      "status_log"
+    ]
+  }
+}

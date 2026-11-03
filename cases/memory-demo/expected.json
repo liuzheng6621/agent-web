@@ -1,0 +1,9 @@
+{
+  "memory/happy-path": "pass",
+  "memory/cancel-before-pickup": "pass",
+  "memory/readonly-menu": "pass",
+  "memory/skip-ready-stage": "fail",
+  "memory/foreign-pickup": "fail",
+  "memory/goal-not-reached": "fail",
+  "memory/unknown-capability": "unknown"
+}

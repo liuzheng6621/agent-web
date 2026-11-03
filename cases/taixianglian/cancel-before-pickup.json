@@ -1,0 +1,68 @@
+{
+  "schema_version": "agent-web/0.1",
+  "id": "taixianglian/cancel-before-pickup",
+  "environment": {
+    "adapter": "taixianglian",
+    "seed": {}
+  },
+  "task": {
+    "natural_goal": "顾客下单后改主意，在店员接单前取消这一单。",
+    "goal_assertions": [
+      {
+        "kind": "field_equals",
+        "selector": {
+          "collection": "orders",
+          "index": 0
+        },
+        "path": "status",
+        "value": "CANCELED"
+      },
+      {
+        "kind": "status_transition",
+        "selector": {
+          "collection": "orders",
+          "index": 0
+        },
+        "path": "status",
+        "transitions": [
+          [
+            "PENDING",
+            "CANCELED"
+          ]
+        ]
+      }
+    ]
+  },
+  "reference_trajectory": [
+    {
+      "id": "s1",
+      "capability": "order.create",
+      "as": "customer",
+      "expected_outcome": "applied",
+      "arguments": {
+        "items": [
+          {
+            "dishName": "拿铁",
+            "qty": 2
+          }
+        ]
+      }
+    },
+    {
+      "id": "s2",
+      "capability": "order.cancel",
+      "as": "customer",
+      "expected_outcome": "applied",
+      "bindings": {
+        "orderId": "$s1.orderId"
+      }
+    }
+  ],
+  "observability": {
+    "declared_scopes": [
+      "menu",
+      "orders",
+      "status_log"
+    ]
+  }
+}

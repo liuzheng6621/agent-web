@@ -1,0 +1,7 @@
+node_modules/
+*.log
+results.jsonl
+.tmp-*
+.dbg.mjs
+.p*.mjs
+.DS_Store
