@@ -95,8 +95,9 @@ fi
 
 # token 只在这一条命令里出现，不落进 .git/config
 # ---------------------------------------------------------------- 3. 推
+# 不加 -u：main 的上游保持 origin（Gitee）。镜像不该抢走默认 push 目标。
 echo "推送 main…"
-git "${GIT_OPTS[@]}" -c "url.$URL.insteadOf=$CLEAN_URL" push -u github main
+git "${GIT_OPTS[@]}" -c "url.$URL.insteadOf=$CLEAN_URL" push github main
 
 if git tag | grep -q .; then
   echo "推送 tags…"
