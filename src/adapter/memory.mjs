@@ -40,6 +40,16 @@ const MANIFEST = {
   events_complete: true,
   events_scope: 'status_log',
   canonical_view: 'agent-web/canonical-view',
+  // 视图契约：断言写在这三个集合上，形状必须与 taixianglian 适配器一致，
+  // 否则同一份案例在两个实现上的判决就没有可比性。
+  view: {
+    version: 'agent-web/view/1',
+    collections: {
+      menu: { kind: 'list', required: ['id', 'dishName', 'price'], semantics: '可售菜品' },
+      orders: { kind: 'list', required: ['id', 'status', 'totalAmount', 'items'], semantics: '订单' },
+      status_log: { kind: 'list', required: ['type', 'orderId', 'from', 'to'], semantics: '状态流水' },
+    },
+  },
   capabilities: [
     { id: 'menu.list', kind: 'read', evidence_level: 'validated', args: {}, roles: ['customer', 'staff'] },
     {

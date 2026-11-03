@@ -35,6 +35,16 @@ const MANIFEST = {
   events_scope: 'events',
   events_complete: true,
   roles: ROLES,
+  // 视图契约：断言写在这些名字和字段上。声明之后，
+  // 适配器漏投影一个集合会得到 invalid_environment，而不是让每条断言各自报「没观测到」。
+  view: {
+    version: 'agent-web/view/1',
+    collections: {
+      stock: { kind: 'list', required: ['sku', 'onHand', 'reserved'], semantics: '库存' },
+      pickings: { kind: 'list', required: ['id', 'sku', 'qty', 'status', 'owner'], semantics: '出库单' },
+      events: { kind: 'list', required: ['id', 'type', 'pickingId'], semantics: '状态流水' },
+    },
+  },
   reset_note: 'snapshot：每次 reset 重建一份内存快照，案例之间不共享状态。',
   capabilities: [
     { id: 'stock.list', kind: 'read', evidence_level: 'validated', roles: ['clerk', 'manager'] },

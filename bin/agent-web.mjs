@@ -19,6 +19,7 @@ import { fileURLToPath } from 'node:url';
 import { judge } from '../src/runner.mjs';
 import { summarize, agreement, formatText, countFailedAssertions } from '../src/report.mjs';
 import { loadAdapter, listBuiltins } from '../src/adapter/load.mjs';
+import { diffViews } from '../src/view.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..');
@@ -248,8 +249,11 @@ async function cmdCompare(args, flags) {
     .filter(Boolean);
 
   const matrix = new Map();
+  const views = new Map();
   for (const name of names) {
     const adapter = await makeAdapter(name);
+    const m = await adapter.manifest();
+    views.set(name, m.view);
     for (const f of files) {
       const r = await runOne(f, adapter);
       const id = r.case_id ?? path.basename(f, '.json');
@@ -283,6 +287,34 @@ async function cmdCompare(args, flags) {
   if (same !== ids.length) {
     console.log("不一致本身就是信号：要么案例假设了某个实现的细节，要么两侧真的不同。");
   }
+
+  // 判决一致还不够：两个适配器的视图契约也得一致，否则这份一致只是碰巧
+  // ——它们各自在不同的字段上被判，恰好结论相同。
+  if (names.length >= 2) {
+    console.log("");
+    console.log("视图契约");
+    const base = names[0];
+    let incompatible = 0;
+    for (let i = 1; i < names.length; i += 1) {
+      const other = names[i];
+      const d = diffViews(views.get(base), views.get(other));
+      if (d.compatible) {
+        const n = Object.keys(views.get(base)?.collections ?? {}).length;
+        console.log(`  ${base} 与 ${other}：兼容（${n} 个集合逐字相同）`);
+      } else {
+        incompatible += 1;
+        console.log(`  ${base} 与 ${other}：不兼容`);
+        for (const k of d.onlyA) console.log(`    - ${k} 只在 ${base} 声明`);
+        for (const k of d.onlyB) console.log(`    - ${k} 只在 ${other} 声明`);
+        for (const line of d.differences) console.log(`    - ${line}`);
+        console.log("    视图不同而判决相同，说明这份一致是碰巧，不是等价。");
+      }
+    }
+    if (incompatible > 0 && same === ids.length) {
+      console.log("  提示：先统一视图契约，再谈跨实现对照。");
+    }
+  }
+
   return same === ids.length ? 0 : 1;
 }
 

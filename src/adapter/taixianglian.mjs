@@ -34,6 +34,16 @@ const MANIFEST = {
   description: '咖啡店后台（Spring Boot）：菜单 / 订单五态 / 顾客与店员 / 状态流水',
   scopes: ['menu', 'orders', 'status_log'],
   events_scope: 'status_log',
+  // 与 memory 适配器逐字相同：视图契约一致，案例才真的可移植。
+  // compare 会比对这两份声明，不一致会直接打出来。
+  view: {
+    version: 'agent-web/view/1',
+    collections: {
+      menu: { kind: 'list', required: ['id', 'dishName', 'price'], semantics: '可售菜品' },
+      orders: { kind: 'list', required: ['id', 'status', 'totalAmount', 'items'], semantics: '订单' },
+      status_log: { kind: 'list', required: ['type', 'orderId', 'from', 'to'], semantics: '状态流水' },
+    },
+  },
   roles: ['customer', 'customer2', 'staff'],
   events_complete: true,
   reset_note:

@@ -20,8 +20,9 @@
  * 把 unsupported 当 rejected，会让"覆盖不足"被记成"应用拒绝"，指标虚高。
  */
 
-export const OUTCOMES = Object.freeze(['applied', 'rejected', 'unsupported', 'infra_error']);
+import { validateViewContract } from '../view.mjs';
 
+export const OUTCOMES = Object.freeze(['applied', 'rejected', 'unsupported', 'infra_error']);
 export const CAPABILITY_KINDS = Object.freeze(['read', 'write', 'session']);
 
 export const EVIDENCE_LEVELS = Object.freeze(['observed', 'inferred', 'validated']);
@@ -64,6 +65,8 @@ export function validateManifest(m) {
   if (!Array.isArray(m.scopes) || m.scopes.length === 0) {
     errors.push('manifest.scopes 必须是非空数组（可观测作用域）');
   }
+  // 视图契约可选，但一旦声明就必须合法——半份契约比没有契约更危险。
+  errors.push(...validateViewContract(m.view));
   return errors;
 }
 

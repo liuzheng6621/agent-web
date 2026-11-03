@@ -15,6 +15,7 @@
 
 import { validateCase, resolveArguments, deriveLabels, BindingError } from './case.mjs';
 import { validateManifest } from './adapter/contract.mjs';
+import { checkStateAgainstView } from './view.mjs';
 import { evalAssertions, firstFailure, TRUE, FALSE, UNKNOWN } from './assert/index.mjs';
 import { getPath } from './values.mjs';
 
@@ -118,6 +119,18 @@ export async function judge({ case: c, adapter, adapterName = 'unknown' }) {
     if (state0 === null) {
       return makeVerdict(base, 'unknown', 'missing_observation', {
         detail: '复位后无法观测初态',
+        timing_ms: Date.now() - startedAt,
+      });
+    }
+
+    // 视图契约：适配器声明了就必须满足。这一条要和「集合里没有实体」分开——
+    // 前者是适配器没按约定投影（仪器问题），后者是被测系统真的没有数据（业务事实）。
+    // 混在一起会让"我接错字段了"看起来像"这个系统什么都没有"。
+    const viewCheck = checkStateAgainstView(state0, manifest.view);
+    if (!viewCheck.ok) {
+      return makeVerdict(base, 'unknown', 'invalid_environment', {
+        detail: `观测结果不满足视图契约：${viewCheck.errors[0].detail}`,
+        view_errors: viewCheck.errors,
         timing_ms: Date.now() - startedAt,
       });
     }
@@ -226,6 +239,18 @@ export async function judge({ case: c, adapter, adapterName = 'unknown' }) {
 
     const last = await observeState(adapter, runId, scopes);
     const final = last.state;
+
+    // 终态也过一次契约：初态合规、终态结构漂移，是适配器最容易出错的地方
+    // （比如列表接口返回空时把数组换成了 null 或 {}）。
+    const finalViewCheck = checkStateAgainstView(final, manifest.view);
+    if (!finalViewCheck.ok) {
+      return makeVerdict(base, 'unknown', 'invalid_environment', {
+        detail: `终态观测不满足视图契约：${finalViewCheck.errors[0].detail}`,
+        view_errors: finalViewCheck.errors,
+        timing_ms: Date.now() - startedAt,
+      });
+    }
+
     const ctx = {
       initial: state0,
       final,
