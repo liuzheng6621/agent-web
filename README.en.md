@@ -65,9 +65,11 @@ node bin/agent-web.mjs verify cases/memory-demo/happy-path.json --adapter=memory
 
 ---
 
-## Recommended: one log, three useful files
+## User guide: from action log to a formal verdict
 
-Already have a request log from one run of the assistant? Use `prepare` to create replayable steps, a draft checklist for review, and a flow-chart preview:
+![agent-web workflow: capture a log, prepare files, review rules, verify, and optionally compare systems](docs/prepare-flow.en.svg)
+
+Already have a request log from one run of the assistant? The short path is: log → `prepare` → human review → `verify`. `prepare` creates replayable steps, a draft checklist for review, and a flow-chart preview:
 
 ```bash
 node bin/agent-web.mjs prepare examples/agent-traces/memory-happy-path.jsonl \
@@ -125,87 +127,47 @@ The two demo routes intentionally produce different results from the reference a
 
 ---
 
-## See the steps as a flow chart
+## Advanced: run the prepare stages separately
 
-Turn saved results into an HTML page you can open in a browser:
-
-```bash
-node bin/agent-web.mjs flow cases/memory-demo/happy-path.json \
-  --result=candidate-results.jsonl \
-  --out=happy-path.flow.html
-```
-
-For a candidate route, the result file must have been created by checking that same route:
-
-```bash
-node bin/agent-web.mjs verify cases/memory-demo/happy-path.json \
-  --adapter=memory \
-  --trajectory=examples/candidate-trajectories \
-  --out=happy-path-candidate.jsonl
-
-node bin/agent-web.mjs flow cases/memory-demo/happy-path.json \
-  --trajectory=examples/candidate-trajectories \
-  --result=happy-path-candidate.jsonl \
-  --out=happy-path-candidate.flow.html
-```
-
-The HTML is one standalone file. Double-click it to open; no web server is needed. It shows who did each step, what was expected, what happened, how the status changed, and which checks passed. Filter failed or unrun steps, expand a step to see its inputs, and switch between light and dark themes.
-
-It works on desktop, tablet, and mobile, and supports keyboard operation. Sensitive inputs (such as tokens, passwords, and cookies) are hidden automatically. The flow chart displays saved data; it does not run the assistant again.
-
----
-
-## Turn request logs into action steps
-
-If your system can export the requests made by an assistant, use `record` to turn them into a step file:
-
-```bash
-node bin/agent-web.mjs record examples/agent-traces/happy-path.jsonl \
-  --adapter=taixianglian \
-  --out=examples/agent-traces/recorded/happy-path.json
-```
-
-Logs can be JSONL (one JSON object per line) or a JSON array. Each request needs the actor, request method, and URL. Include the request content and response when possible. Do not put login passwords or tokens in the log.
-
-`record` replaces order numbers returned by earlier steps with references to those steps. The route can then run with fresh test data. Requests it cannot understand or verify are listed as skipped; it does not guess.
-
-To inspect each stage yourself, run the commands separately:
+Use `prepare` for the normal workflow. Run `record`, `draft`, and `flow` separately when you want to inspect an intermediate file or replace one stage:
 
 ```bash
 # 1. Request log → replayable steps
 node bin/agent-web.mjs record examples/agent-traces/memory-happy-path.jsonl \
-  --adapter=memory --out=/tmp/coffee-trajectory.json
+  --adapter=memory \
+  --out=agent-web-output/coffee/trajectory.json
 
 # 2. Replayable steps → draft checklist
-node bin/agent-web.mjs draft /tmp/coffee-trajectory.json \
-  --adapter=memory --out=/tmp/coffee-case.draft.json
+node bin/agent-web.mjs draft agent-web-output/coffee/trajectory.json \
+  --adapter=memory \
+  --id=coffee/happy-path \
+  --goal="The customer places an order and picks it up" \
+  --out=agent-web-output/coffee/case.draft.json
 
 # 3. Draft case → flow-chart preview
-node bin/agent-web.mjs flow /tmp/coffee-case.draft.json \
-  --out=/tmp/coffee-case.flow.html
+node bin/agent-web.mjs flow agent-web-output/coffee/case.draft.json \
+  --out=agent-web-output/coffee/case.flow.html
 ```
 
-Use `prepare` for the normal path. Keep `record`, `draft`, and `flow` for when you want to inspect or replace one stage.
-
----
-
-## Turn completed steps into a case draft
+After confirming the checklist, remove the trailing `draft` note from the case JSON and run the formal check:
 
 ```bash
-node bin/agent-web.mjs draft examples/agent-traces/recorded/happy-path.json \
-  --adapter=memory \
-  --out=examples/agent-traces/drafts/happy-path.case.json
+node bin/agent-web.mjs verify agent-web-output/coffee/case.draft.json \
+  --adapter=memory --out=agent-web-output/coffee/results.jsonl
+
+# Refresh the flow chart with the formal verdict and observed events
+node bin/agent-web.mjs flow agent-web-output/coffee/case.draft.json \
+  --result=agent-web-output/coffee/results.jsonl \
+  --out=agent-web-output/coffee/case.flow.html
 ```
 
-The command runs the steps again and makes a checklist from the before-and-after states, such as “one more order” or “the order ended as picked up”. **The draft copies what happened in this run, so it will usually pass its own check. That does not mean the checklist is correct.**
+If checking a candidate route (the actions the assistant actually took), `--result` must come from that same candidate route. Do not attach the verdict for the reference route to candidate steps. See [checking an assistant's route](#check-what-the-assistant-actually-did) for the full command.
 
-A person still needs to confirm:
+These commands can also handle real HTTP logs. `record` needs the adapter to map request URLs to operations and convert request arguments. Each log entry needs the actor, request method, and URL; include request content and response when possible. Never log passwords or tokens. Later steps refer to IDs returned by earlier ones. Unrecognized requests are listed with reasons instead of guessed.
 
-- Are these the results the business actually requires?
-- Are important “must not happen” cases missing, such as another customer picking up the order?
-- Did the checklist accidentally include IDs, accounts, or other details that change on every run?
+The flow chart is a standalone HTML file. Double-click it to open. It shows steps, roles, expected and actual outcomes, status changes, and check results. It supports filtering, expandable arguments, keyboard operation, and light/dark themes. Sensitive inputs are redacted; the page only displays saved data and does not re-run actions.
 
-Anything the tool cannot safely infer appears in a “to confirm” list instead of becoming a rule.
+**A passing draft self-check does not prove the rules are right.** The checklist is inferred from what happened in that sample run, so a replay passing is expected. Before using it as a formal test, have a person confirm the goal, checks, negative cases, and permission boundaries.
 
 ---
 

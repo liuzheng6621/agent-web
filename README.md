@@ -65,9 +65,11 @@ node bin/agent-web.mjs verify cases/memory-demo/happy-path.json --adapter=memory
 
 ---
 
-## 推荐流程：一份日志，三个可检查的产物
+## 使用指南：从日志到正式判分
 
-助手已经跑过一次，并且你拿到了它发出的请求日志？用 `prepare` 一次生成可重放步骤、待确认案例草稿和流程预览：
+![agent-web 使用流程：收集日志、生成材料、人工审查、正式判分与系统对照](docs/prepare-flow.zh.svg)
+
+助手已经跑过一次，并且你拿到了它发出的请求日志？最短路径是：日志 → `prepare` → 人工检查 → `verify`。`prepare` 一次生成可重放步骤、待确认案例草稿和流程预览：
 
 ```bash
 node bin/agent-web.mjs prepare examples/agent-traces/memory-happy-path.jsonl \
@@ -123,87 +125,47 @@ node bin/agent-web.mjs verify cases/memory-demo \
 
 ---
 
-## 看流程图
+## 进阶：把 prepare 拆成单独步骤
 
-把判分结果变成可以打开的 HTML 页面：
-
-```bash
-node bin/agent-web.mjs flow cases/memory-demo/happy-path.json \
-  --result=candidate-results.jsonl \
-  --out=happy-path.flow.html
-```
-
-如果要画候选步骤，结果文件必须由同一条候选步骤跑出来：
-
-```bash
-node bin/agent-web.mjs verify cases/memory-demo/happy-path.json \
-  --adapter=memory \
-  --trajectory=examples/candidate-trajectories \
-  --out=happy-path-candidate.jsonl
-
-node bin/agent-web.mjs flow cases/memory-demo/happy-path.json \
-  --trajectory=examples/candidate-trajectories \
-  --result=happy-path-candidate.jsonl \
-  --out=happy-path-candidate.flow.html
-```
-
-生成的 HTML 是独立文件，双击就能打开，不需要网页服务器。它展示每一步是谁做的、原本预期是什么、实际发生了什么、状态如何变化、检查项是否通过。可以筛出出错或没执行的步骤，点开步骤看参数；也可以切换浅色和深色主题。
-
-页面适配电脑、平板和手机；支持键盘操作。敏感参数（例如 token、password、cookie）会自动遮盖。流程图只展示已有数据，不会再次执行助手的操作。
-
----
-
-## 把真实请求日志变成步骤
-
-如果系统能导出助手发出的请求，可以用 `record` 把日志整理成上面的步骤文件：
-
-```bash
-node bin/agent-web.mjs record examples/agent-traces/happy-path.jsonl \
-  --adapter=taixianglian \
-  --out=examples/agent-traces/recorded/happy-path.json
-```
-
-日志可以是 JSONL（每行一条 JSON）或 JSON 数组。每条请求至少要记录操作者、请求方法和地址；最好也保留请求内容与响应结果。登录密码和令牌不要放进日志。
-
-`record` 会把后续步骤用到的订单编号，改成「引用前一步创建的订单」。这样换一套测试数据后，步骤仍能接着跑。看不懂、无法确认结果的请求会列出来跳过，不会猜。
-
-如果想自己分开检查每一步，使用下面两个独立命令：
+平常直接使用 `prepare`。需要检查中间文件或替换某一步时，再分别运行 `record`、`draft` 和 `flow`：
 
 ```bash
 # 1. 请求日志 → 可重放步骤
 node bin/agent-web.mjs record examples/agent-traces/memory-happy-path.jsonl \
-  --adapter=memory --out=/tmp/coffee-trajectory.json
+  --adapter=memory \
+  --out=agent-web-output/coffee/trajectory.json
 
 # 2. 可重放步骤 → 待确认案例草稿
-node bin/agent-web.mjs draft /tmp/coffee-trajectory.json \
-  --adapter=memory --out=/tmp/coffee-case.draft.json
+node bin/agent-web.mjs draft agent-web-output/coffee/trajectory.json \
+  --adapter=memory \
+  --id=coffee/happy-path \
+  --goal="顾客下单后由本人取走" \
+  --out=agent-web-output/coffee/case.draft.json
 
-# 3. 草稿 → 流程预览
-node bin/agent-web.mjs flow /tmp/coffee-case.draft.json \
-  --out=/tmp/coffee-case.flow.html
+# 3. 案例草稿 → 流程预览
+node bin/agent-web.mjs flow agent-web-output/coffee/case.draft.json \
+  --out=agent-web-output/coffee/case.flow.html
 ```
 
-平常直接用 `prepare` 即可；`record`、`draft`、`flow` 留给想单独检查或替换其中一步的情况。
-
----
-
-## 从做过的步骤生成案例草稿
+确认草稿规则后，删除案例 JSON 最后的 `draft` 注记，再跑正式检查：
 
 ```bash
-node bin/agent-web.mjs draft examples/agent-traces/recorded/happy-path.json \
-  --adapter=memory \
-  --out=examples/agent-traces/drafts/happy-path.case.json
+node bin/agent-web.mjs verify agent-web-output/coffee/case.draft.json \
+  --adapter=memory --out=agent-web-output/coffee/results.jsonl
+
+# 用正式判分结果更新流程图，显示实际结果与事件
+node bin/agent-web.mjs flow agent-web-output/coffee/case.draft.json \
+  --result=agent-web-output/coffee/results.jsonl \
+  --out=agent-web-output/coffee/case.flow.html
 ```
 
-它会重新跑一遍这些步骤，根据前后状态写出检查清单，例如「订单多了一笔」「订单最后是已取走」。**草稿照抄的是这次实际发生的事，所以它自己检查时通常会通过；这不表示清单写对了。**
+如果检查的是候选轨迹（助手实际走过的步骤），`--result` 必须来自同一条候选轨迹；不要把参考步骤的判分贴到候选步骤上。参考 [候选步骤检查](#把助手做过的步骤拿来检查) 的完整命令。
 
-人工确认时重点看：
+这三个命令也可单独用来处理真实 HTTP 请求：`record` 需要适配器先声明 URL 与操作的对应关系，并提供参数转换方法。日志至少要记录操作者、请求方法和地址；最好保留请求内容与响应结果。不要记录密码或令牌。后续步骤引用前一步产生的订单编号；无法识别的请求会列出跳过原因，不会猜。
 
-- 这些结果是不是业务真正要求的？
-- 有没有「不该发生」的情况需要补测，例如别人不能取单？
-- 清单是否把测试编号、账号等每次都会变化的内容写死了？
+流程图是独立 HTML，双击即可打开。页面展示步骤、角色、预期与实际结果、状态变化和检查结果；支持筛选、展开参数、键盘操作和浅/深主题。敏感参数会遮盖，页面只展示数据，不会再次执行操作。
 
-猜不出来的内容会列在草稿的「待确认」中，不会自动变成检查规则。
+**草稿自检通过不代表规则正确。** 它从这次实际发生的事情生成检查项，所以重放通过并不意外。正式使用前，人工确认目标、检查规则、负例和权限边界。
 
 ---
 
