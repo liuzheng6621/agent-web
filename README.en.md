@@ -1,747 +1,132 @@
-# agent-web
+<p align="center">
+  <img src="docs/media/hero.png" alt="agent-web: integration tests an agent can be judged on" width="100%">
+</p>
 
-**Check whether an AI assistant really finished the job.**
+<h3 align="center">Integration tests written for agents</h3>
 
-[中文](README.md) · **English**
+<p align="center">
+  One case, two implementations, and the verdicts have to agree.
+  Where they disagree, either the implementation has a hole or the assertion is asleep.
+</p>
 
-AI assistants can place orders, handle support tickets, and update inventory. The hard part is knowing whether they actually did it right.
-
-agent-web works like a quality inspector with a checklist: decide what a correct result looks like, let the assistant do the work, then check what really happened. It does not judge by tone, gut feeling, or another model's score.
-
-**In one line: give different systems the same test, use the same rules, and compare their results.**
-
----
-
-## What this project actually governs
-
-Most evaluation tools build more tasks and more realistic environments. This project does something else: it makes **the verdict itself trustworthy**.
-
-All four pieces are needed. Drop one and an all-green verdict goes back to meaning nothing:
-
-| Mechanism | What it stops |
-| --- | --- |
-| Three outcomes, `unknown` stays in the denominator | "I don't know" being quietly counted as a pass |
-| An 18-row decision order, first match wins | The same case reporting different reasons on two implementations |
-| Cross-implementation comparison (`compare`) | The thing being measured being swapped out while every step stays legal |
-| False-green audit (`audit`) | A judge that under-reports its own misses |
-
-It also has to admit when it gets fooled. `docs/museum` collects six false passes, each of which can be run to show what happens without the mechanism that catches it — including a real incident: an adapter silently swapped "another customer" for the person who placed the order, so the case passed stably while never once testing what it claimed to test.
-
-```
-docs/museum/README.md
-```
+<p align="center">
+  <a href="https://github.com/liuzheng6621/agent-web/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/liuzheng6621/agent-web/actions/workflows/ci.yml/badge.svg"></a>
+  <img alt="node" src="https://img.shields.io/badge/node-%E2%89%A520-3fb950">
+  <img alt="license" src="https://img.shields.io/badge/license-MIT-58a6ff">
+  <img alt="deps" src="https://img.shields.io/badge/dependencies-0-d29922">
+</p>
 
 ---
 
-## Three possible results
+## The problem
 
-| Result | Plain meaning | Example |
-| --- | --- | --- |
-| `pass` | Passed | The order was placed and picked up by the right person |
-| `fail` | Did not pass | The assistant says an order is ready, but it is not |
-| `unknown` | Not enough information to decide | The system does not expose the needed data, or the test connection failed |
+Agents change code fast. "Did it change it correctly" still gets answered by clicking through the app.
 
-“I don't know” is not the same as “wrong” or “right”. So `unknown` is counted separately, never quietly counted as a pass:
+Unit tests miss state that crosses requests. End-to-end tests are slow and flaky. agent-web does this instead: a real business operation becomes a **case** (what to do, what the result must be), and the case runs against two implementations — a built-in in-memory one and your real system. The two verdicts have to agree.
 
-```text
-decidable rate = (pass + fail) / all cases
-unknown rate   = unknown / all cases
-```
+<p align="center">
+  <img src="docs/media/loop.png" alt="one case, two implementations, one comparison" width="100%">
+</p>
 
-That way, missing information cannot make the score look greener than it is.
+Agreement means the case is portable and the assertions are not pinned to one implementation. Disagreement points at one place to fix, and tells you which.
 
----
+## Sixty seconds
 
-## A cup of coffee explains it
-
-The task: a customer places an order, a staff member accepts and prepares it, and **the same customer** picks it up.
-
-A checklist might say:
-
-1. The number of orders increases by one.
-2. The final order status is “picked up”.
-3. The order goes through “making → ready → picked up”.
-4. A different customer must not be able to pick it up.
-
-The assistant may take different steps from the sample route. It passes if the final result meets the rules. A familiar-looking route with the wrong result does not pass.
-
----
-
-## Try it in 3 minutes
-
-You need Node.js 20 or later. No extra packages are required.
+<p align="center">
+  <img src="docs/media/demo.gif" alt="terminal: run the selftest, then compare against the incident archive" width="100%">
+</p>
 
 ```bash
-git clone https://github.com/liuzheng6621/agent-web.git
+git clone https://gitee.com/liu-everything_impossble/agent-web.git
 cd agent-web
-
-# Run built-in examples. No external service needed.
-node bin/agent-web.mjs selftest
-
-# Check one specific case
-node bin/agent-web.mjs verify cases/coffee/happy-path.json --adapter=memory
+node bin/agent-web.mjs selftest          # built-in cases + built-in implementation, zero config
+node bin/agent-web.mjs report results.jsonl
+node bin/agent-web.mjs recall            # compare against the incident archive
 ```
 
-`selftest` runs seven examples: normal completion, unauthorized pickup, a missing step, and cases with insufficient information. Passing these examples means the basic checking flow works; it does not mean every real system has been tested.
-
----
-
-## User guide: from action log to a formal verdict
-
-![agent-web workflow: capture a log, prepare files, review rules, verify, and optionally compare systems](docs/prepare-flow.en.svg)
-
-Already have a request log from one run of the assistant? The short path is: log → `prepare` → human review → `verify`. `prepare` creates replayable steps, a draft checklist for review, and a flow-chart preview:
+No dependencies. `node >= 20`. To point it at your service:
 
 ```bash
-node bin/agent-web.mjs prepare examples/agent-traces/memory-happy-path.jsonl \
-  --adapter=memory \
-  --id=coffee/happy-path \
-  --goal="The customer places an order and picks it up" \
-  --out-dir=agent-web-output/coffee-happy-path
+node bin/agent-web.mjs certify cases/coffee --adapter=memory
 ```
 
-You will get:
+## Three verdicts, not two
 
-```text
-agent-web-output/coffee-happy-path/
-├── trajectory.json     actions rebuilt from the log
-├── case.draft.json     a checklist based on what happened
-└── case.flow.html      an offline flow-chart preview
+<p align="center">
+  <img src="docs/media/verdicts.png" alt="pass / fail / unknown" width="100%">
+</p>
+
+The third one carries the weight. When observation is missing, or a capability is not declared, `unknown` stays in the denominator instead of turning into `pass`. So "how much was measured" and "how much was decided" are reported as two different numbers:
+
+```
+可判定率 87.5% (7/8)   CI95[53%, 98%]
 ```
 
-Review them in this order:
+More `unknown` means a lower decidability rate. That number says more than a clean 100%.
 
-1. Open `case.flow.html`. Check that each person and action is shown correctly.
-2. Review the goal, checks, and “to confirm” notes in `case.draft.json`. The draft describes what happened in this run; **passing its own check does not mean its rules are correct**.
-3. Add the real business goal and negative cases (for example, another customer must not pick up the order). Then run `verify`.
+## Incident archive
 
-`prepare` replays the write actions against the adapter you specify, so point it only at an isolated test system, **never production**. If it finds fields that look like passwords, tokens, or cookies, it stops without writing output. It also refuses to overwrite existing output files.
+<p align="center">
+  <img src="docs/media/recall.png" alt="agent-web recall output" width="100%">
+</p>
 
-The demo log uses a simple format: operation name, role, outcome, and arguments. It needs no network address. Real HTTP logs are supported too, but the adapter must first map request URLs to operations and translate request arguments. For your own service, replace `--adapter=memory` with your connector and use a dedicated test environment.
+`knowledge/` holds the eight mistakes this repository has actually made. One rule admits an entry:
 
-After reviewing the draft, add the real goal and any required negative cases. When a person has confirmed it, remove the trailing `draft` note from the case JSON and run:
+> An error that cannot be reproduced, or cannot be turned into a check, does not get in.
+
+Every entry therefore ships a minimal repro command and a check that already landed. `recall` compares a live run against the archive: the first hit prints a notice, the second hit **blocks** (exit 1, `--no-gate` to pass).
 
 ```bash
-node bin/agent-web.mjs verify agent-web-output/coffee-happy-path/case.draft.json --adapter=memory
+node bin/agent-web.mjs knowledge     # list all eight
+node bin/agent-web.mjs recall        # scan, see whether an old mistake came back
 ```
 
-This checks that the case is valid and runnable. A successful run does not prove that the business checklist is complete; a person must confirm that.
+"Deepening memory" here is a verifiable action, not a weight: it counts occurrences and it changes an exit code.
 
----
+## Commands
 
-## Check what the assistant actually did
+Twenty-one commands, grouped by what you have on hand. Full reference in [docs/GUIDE.md](docs/GUIDE.md).
 
-The steps stored with a case are a sample route, not necessarily the route the assistant took. To check the assistant's own actions:
-
-```bash
-node bin/agent-web.mjs verify cases/coffee \
-  --adapter=memory \
-  --trajectory=examples/candidate-trajectories \
-  --out=candidate-results.jsonl
-```
-
-`--trajectory` points to files containing the assistant's actions. `--out` saves the results for each case. The repository includes two sample routes: one stops after placing an order; the other takes an extra step and reaches the goal.
-
-**The check is about the result, not copying the sample actions.** The sample route may miss the goal while the assistant takes a different route and succeeds.
-
-The two demo routes intentionally produce different results from the reference answers. `verify` can therefore exit with code 1 and mark the differences; that is the demonstration, not a broken command.
-
----
-
-## Advanced: run the prepare stages separately
-
-Use `prepare` for the normal workflow. Run `record`, `draft`, and `flow` separately when you want to inspect an intermediate file or replace one stage:
-
-```bash
-# 1. Request log → replayable steps
-node bin/agent-web.mjs record examples/agent-traces/memory-happy-path.jsonl \
-  --adapter=memory \
-  --out=agent-web-output/coffee/trajectory.json
-
-# 2. Replayable steps → draft checklist
-node bin/agent-web.mjs draft agent-web-output/coffee/trajectory.json \
-  --adapter=memory \
-  --id=coffee/happy-path \
-  --goal="The customer places an order and picks it up" \
-  --out=agent-web-output/coffee/case.draft.json
-
-# 3. Draft case → flow-chart preview
-node bin/agent-web.mjs flow agent-web-output/coffee/case.draft.json \
-  --out=agent-web-output/coffee/case.flow.html
-```
-
-After confirming the checklist, remove the trailing `draft` note from the case JSON and run the formal check:
-
-```bash
-node bin/agent-web.mjs verify agent-web-output/coffee/case.draft.json \
-  --adapter=memory --out=agent-web-output/coffee/results.jsonl
-
-# Refresh the flow chart with the formal verdict and observed events
-node bin/agent-web.mjs flow agent-web-output/coffee/case.draft.json \
-  --result=agent-web-output/coffee/results.jsonl \
-  --out=agent-web-output/coffee/case.flow.html
-```
-
-If checking a candidate route (the actions the assistant actually took), `--result` must come from that same candidate route. Do not attach the verdict for the reference route to candidate steps. See [checking an assistant's route](#check-what-the-assistant-actually-did) for the full command.
-
-These commands can also handle real HTTP logs. `record` needs the adapter to map request URLs to operations and convert request arguments. Each log entry needs the actor, request method, and URL; include request content and response when possible. Never log passwords or tokens. Later steps refer to IDs returned by earlier ones. Unrecognized requests are listed with reasons instead of guessed.
-
-The flow chart is a standalone HTML file. Double-click it to open. It shows steps, roles, expected and actual outcomes, status changes, and check results. It supports filtering, expandable arguments, keyboard operation, and light/dark themes. Sensitive inputs are redacted; the page only displays saved data and does not re-run actions.
-
-**A passing draft self-check does not prove the rules are right.** The checklist is inferred from what happened in that sample run, so a replay passing is expected. Before using it as a formal test, have a person confirm the goal, checks, negative cases, and permission boundaries.
-
----
-
-## Give two systems the same test
-
-agent-web includes an in-memory demo system and can connect to a sample coffee-shop service. Run the same cases against both:
-
-```bash
-# Start the sample coffee-shop service on localhost port 8080 first
-TAIXIANGLIAN_BASE_URL=http://127.0.0.1:8080 \
-  node bin/agent-web.mjs compare cases/coffee \
-  --adapters=memory,taixianglian
-```
-
-Example output:
-
-```text
-case                          in-memory     coffee shop   same result
-coffee/happy-path             pass          pass          ✓
-coffee/foreign-pickup         fail          fail          ✓
-coffee/unknown-capability     unknown       unknown       ✓
-
-same result on 7 of 7 cases (100.0%)
-```
-
-Different answers do not immediately mean one system is broken. They tell you to check whether the rules are clear, whether the connection treated customer A and customer B as different people, or whether the systems really behave differently.
-
-This comparison once caught a real problem: the case said “customer B picks up the order”, but the result said pass. The coffee shop had not handed over the wrong drink. The connector had treated customers A and B as the same person, so it actually ran “A picks up A's order”. The test checked the wrong person but still looked perfectly green. Comparing it with an independent implementation exposed the mismatch. Full story: [incident report](docs/FINDING-001.en.md).
-
----
-
-## Use the real backend as a ruler: false-green audit
-
-"Two verdicts agree" is an observation, not proof. A real ruler has to be another implementation: a case the real backend judges `fail` must also be judged `fail` by the new one.
-
-```bash
-# 1. archive both runs
-TAIXIANGLIAN_BASE_URL=http://127.0.0.1:8080   node bin/agent-web.mjs verify cases/coffee --adapter=taixianglian --out=real.jsonl
-node bin/agent-web.mjs verify cases/coffee --adapter=memory --out=memory.jsonl
-
-# 2. audit one verdict set against the other served as oracle
-node bin/agent-web.mjs audit real.jsonl memory.jsonl --detail
-```
-
-The output is a confusion matrix:
-
-| Cell | Meaning | Risk |
-| --- | --- | --- |
-| agree·pass | both say it is fine | — |
-| agree·fail | both say it is broken | — |
-| **false green** | it is broken, the candidate says fine | worst: it stays green forever |
-| false red | it is fine, the candidate says broken | noisy, not dangerous |
-| blind | the oracle decides, the candidate cannot | insufficient evidence |
-
-One false green makes `audit` exit 1. This is not a style preference: a false red sends someone to look, a blind spot is honestly recorded as `unknown`, and only a false green makes an unusable verdict look perfect.
-
-## A draft must pass a human first
-
-`draft` derives a case from a real trajectory and marks it `draft.status: "unconfirmed"`. **Such a case produces no verdict** — it is recorded as `unknown / unconfirmed_draft`. A machine-written exam cannot grade anything until somebody has read it.
-
-Confirm it once and it becomes an exam:
-
-```bash
-node bin/agent-web.mjs accept cases/coffee/my-draft.json --by=YG
-# 已确认 cases/coffee/my-draft.json
-#   draft.status: unconfirmed → confirmed
-#   reviewed_by:  YG
-#   reviewed_at:  2026-11-04T07:41:16.195Z
-```
-
-Anonymous confirmation is rejected (`--by` is required): "somebody looked at it" that cannot be named is the same as nobody looking. Hand-written cases carry no `draft` field and are unaffected.
-
-## Health report: how many of these verdicts came from a blind spot
-
-`audit` needs a second implementation before it can say anything. `traps` does not: given the results plus the case files, it asks one question per verdict — was this verdict produced in a blind spot?
-
-A blind spot means the verdict looks conclusive, but the risk cannot be ruled out from the verdict itself. "The result is right but the process was not", or "someone else executed the step" — both produce a stable `pass`, and neither makes the judge complain.
-
-```bash
-agent-web verify cases/coffee --adapter=memory --out=r.jsonl
-agent-web traps r.jsonl --cases=cases/coffee --detail
-```
-
-```
-陷阱普查（7 条判决）
-
-  陷阱              涉及   有据可查   盲区   盲区率
-  身份塌缩                5          5      0   0.0%
-  事件词表缺失              0          0      0   —（分母为 0）
-  草稿闸门                0          0      0   —（分母为 0）
-  只看终态                5          0      5   100.0%
-
-  盲区风险点：5/10   盲区率 50.0%
-```
-
-The report is meant to look bad. Ours says five cases only assert the final state: **process games that land on the right end state are invisible to those five verdicts.**
-
-Four states, and they must not be conflated:
-
-| State | Meaning |
-|---|---|
-| not applicable | the case cannot hit this trap structurally |
-| guarded | it does, and the verdict carries checkable evidence |
-| blind | it does, and the verdict still looks conclusive |
-| unusable | the verdict itself is void (environment failure) |
-
-"Guarded" only means the verdict carries evidence. It does not mean safe — an adapter can lie. Same stance as the rest of this document: we only record what we can see.
-
-It reports by default and does not gate. Pass `--max-blind=0.2` to make it fail the build above a threshold. There is no default threshold because the blind rate is structural — "terminal state only" is often wrong for a whole batch — and a default would turn CI permanently red, get switched off by one flag, and never be looked at again.
-
-## Why an assertion earns its place: certification
-
-An assertion whose removal leaves the verdict unchanged is not a criterion, it is a comment.
-
-You cannot see "is it useful" by reading it. So ask a different question: **can it catch the bug?**
-Copy the correct implementation into several bodies that are broken in exactly one way — money off by
-a cent, status frozen at PENDING, the event log emptied, a foreign order appearing in the list, a
-cross-tenant write let through, a transition that should have been refused — then ask each assertion:
-
-> True on the correct implementation, false on this body?
-
-Two kinds of "true" do not count: still true on the body (it cannot see that bug), or turned
-*unknown* (it has nothing to say). The second is this project's three-valued discipline applied to
-itself: `unknown` is not "roughly right", and it cannot earn an assertion any credit.
-
-This repository's own account:
-
-```
-agent-web certify cases/coffee --adapter=memory --detail
-```
-
-| Body | Layer | What catches it |
-| --- | --- | --- |
-| `m-money-off-by-cent` | observation | `happy-path#goal[4]` (amount 28) |
-| `m-status-frozen` | observation | `cancel-before-pickup#goal[0]`, `happy-path#goal[1]`, and one more |
-| `m-history-empty` | observation | `happy-path#inv[1]` (four log entries) |
-| `m-extra-foreign-order` | observation | `happy-path#goal[3]` (order count +1) |
-| `m-foreign-write-allowed` | execution | verdict level — a negative step that stopped refusing |
-| `m-no-reject` | execution | verdict level — same |
-
-**The first run looked bad, and that bad result is the feature.** With 13 assertions and 6 bodies:
-10 could be evaluated, only 5 caught anything, and **four bodies walked through untouched** —
-nothing asserted about money, "there must be no `order.canceled` event" came out vacuously true
-on an emptied log, and the two execution-level bodies are only visible to negative steps that the
-cases did not have. After adding two assertions (amount = 28, four log entries), all six bodies are
-caught, 7 of 12 evaluable assertions are useful, and the **minimal set covering every
-assertion-caught body is 4**.
-
-That last number is the one worth repeating: of 12 assertions, 4 do the work. The other 8 are this
-repository writing notes to itself.
-
-Boundaries worth knowing:
-
-- **Exit code** is 1 when any body survives. `--strict` also fails when an assertion eats a slot and
-  catches nothing (off by default: being temporarily useless is a normal intermediate state, and a
-  blunt gate makes people switch the whole command off).
-- `unknown` on a body is not a kill. It only means the criterion had nothing to say.
-- `audit` needs two implementations to know true from false. `certify` needs one correct
-  implementation plus a set of ways to be wrong — no second implementation at all.
-- It does not prove the cases are right. Bodies only cover the bugs you thought of; the list of
-  bodies is itself something to review, which is why it lives in the repository and not inside CI.
-
-### Relations beat hard-coded values
-
-Asserting the amount on a single "one latte, quantity 1" order asserts nothing about the
-amount: "forgot to multiply by quantity" and "correct" produce the same number when the
-quantity is 1. That is the actual reason four mutants walked through this case set untouched.
-
-The eighth assertion kind, `relation`, is for exactly this:
-
-```json
-{"kind":"relation","op":"sum_equals","selector":{"collection":"orders","index":0},
- "items":"items","of":"subTotal","path":"totalAmount"}
-{"kind":"relation","op":"product_equals","selector":{"collection":"orders","index":0},
- "items":"items","left":"count","right":"unitPrice","path":"subTotal"}
-```
-
-The first says "the total equals the sum of the line items"; the second says "each subtotal
-equals unit price times quantity". Neither names an amount, so both survive a change of
-implementation.
-
-`draft` discovers those relations and proposes them — but **verifies before proposing**: a
-relation that does not hold on the observed trajectory is never emitted, and a relation seen
-on a single line item with quantity 1 is marked "almost trivially true, insufficient
-discriminating power" and goes to the todo list instead.
-
-Measured: adding one "two lattes plus three americanos" case took the catch rate from
-**8/12 to 11/12**. Deleting the hard-coded total from that case and keeping only the two
-relations still catches all four of those mutants — the relations are not decoration.
-
-### It does not just point at the hole, it tells you which assertion to add
-
-An escapee is not simply filed as debt. `certify` flattens the canonical view of the correct
-implementation and of each mutant, then diffs every leaf:
-
-| Status | Meaning | What to do |
-| --- | --- | --- |
-| `caught` | Some assertion or negative step kills it | nothing |
-| `killable` | **A visible difference exists, so it is killable — the assertion just is not written yet** | add it; `--suggest` prints it |
-| `undetermined` | No case produces any difference at all | check whether the case reaches that logic; it may be equivalent |
-
-Keeping `undetermined` apart from `killable` matters. Mutation testing has a forty-year-old open
-problem called the *equivalent mutant*: some broken versions are semantically identical to the
-original and can never be killed. Filing those as debt leaves an entry in the ledger that can never
-be cleared, and after a while nobody reads the ledger.
-
-`--suggest` emits assertions that have **already been verified** — true on the correct
-implementation, false on this mutant — ready to paste into a case:
-
-```
-$ node bin/agent-web.mjs certify cases/coffee --adapter=memory --suggest
-// coffee/cancel-before-pickup (4, each verified to kill its mutant)
-//   kills m-total-single-unit  <- difference at orders.0.totalAmount
-   {"kind":"field_equals","path":"totalAmount","selector":{"collection":"orders","index":0},"value":56},
-//   kills m-pickup-no-offset  <- difference at orders.0.pickupNo
-   {"kind":"field_equals","path":"pickupNo","selector":{"collection":"orders","index":0},"value":1101},
-```
-
-Those lines were not authored — they were produced by running the thing, and each one was checked
-against both implementations before it was allowed into the output.
-
-### The list of bodies is open for contribution
-
-The six bodies live in `docs/mutants/`, one file each, carrying `symptom` (what the user complains
-about), `mechanism` (what was changed) and `catch_hint` (which assertion can see it, and which
-cannot). List them all: `agent-web mutants`.
-
-The four acceptance rules are in [docs/mutants/README.md](docs/mutants/README.md): it maps to a real
-failure, you can name what catches it, it is not a duplicate of the existing six, and the places it
-cannot be caught are admitted.
-
-**This list is the one thing other people can contribute.** Cases must fit a specific system and the
-spec has to stay stable, but "here is another way a system can be wrong" is something everyone can
-speak about.
-
-### Swap the implementation; the admission verdict should not move a single field
-
-Same cases, `--adapter` switched from the built-in implementation to a real backend (a Spring Boot
-coffee shop on port 8180). The two reports agree **field by field**: the same seven verdicts, the
-same six bodies caught, 12 evaluable assertions with 7 useful, and the same four assertions in the
-minimal set.
-
-That is stronger than "100% verdict agreement": it says *which assertions do the work* does not
-depend on the implementation either.
-
-One real lesson from doing it: the log assertion was first written as "four log entries" — true on
-the built-in implementation (which also records order creation), false on the real backend (which
-records only transitions, three entries). Rewritten as "exactly one `order.picked` event", it holds
-on both. **Assert event types, not totals** — totals are the implementation's freedom, event types
-are the business fact.
-
-## Drills: labels produced by a mechanism, not a model
-
-Training and evaluation both need labels, and a model cannot be the labeler — a label from a model
-has to be reviewed by another model, and after the review nobody knows who was right. There is one
-that needs no model: **whether an assertion is sharp enough is answered by running it.**
-
-```
-agent-web drill cases/coffee --adapter=memory            # set the questions
-agent-web drill grade drills --submissions=<dir>         # mark them
-```
-
-The 42 "case x mutant" pairs fall into four buckets:
-
-| Bucket | Count | Meaning |
-| --- | --- | --- |
-| already caught by the case | 5 | the assertions already see a difference; no question here |
-| supposed to fail / undecidable | 24 | witness cases are not meant to pass; setting them as questions would be cheating |
-| nothing observable changed | 10 | the mutant changed something outside this case's view — a boundary, not a hole |
-| **real blind spot** | **3** | visible, but nothing asserts it |
-
-Only the last three become questions. **The number of questions is not the number of bugs** — mixing
-the first three buckets in and claiming 34 holes is easy, and it is counting a case's scope as your
-own score.
-
-Each question (`<id>.task.md`) says the case still passes on a broken implementation, what is broken,
-and which assertions it currently uses; it asks for a new set. **The answer is not in the sheet** —
-the `.json` holds it for the grader.
-
-Marking looks only at what the submission *does when run*:
-
-- every submitted assertion must be true on the **correct** implementation, else `unarmed`
-- at least one must be false on the **broken** one, else `missed`
-- true on both = it cannot see the failure; undecidable on both = `blind`
-
-`examples/drills/` ships two submissions to compare:
-
-```
-solved 3 / gradable 3 -> 100.0%   (good: every assertion watches one concrete value)
-solved 0 / gradable 3 ->  0.0%    (lazy: copies the case's own assertions back)
-```
-
-The `lazy` one is worth reading: **every assertion it submits is a true assertion.** Judged as "did you
-write assertions", it is not noise; judged as "did you catch the failure", it scores nothing. That
-difference cannot be read off the code — only run.
-
-That is why this works as a training target: the label comes from the mechanism, not from a rater.
-Any model solving the same mutants gets a comparable score, because the grader only honours results.
-
-## Portability has a cost: a hole we dug ourselves
-
-A new case ("two lattes plus three americanos") passed on the mock and returned
-`unknown / infrastructure_error` against the real backend: **there is no 美式 on the menu**.
-
-The mock's menu was invented (`美式`, `手冲`); the real shop sells `美式咖啡` and
-`太相恋特调`. Cases address dishes by name, so the same case meant different dishes on
-each side. That is not a bad case — it is a missing alignment contract between the
-reference implementation and the real one. The fix was to make the mock's menu match
-verbatim, and write the reason into `memory.mjs` so nobody "tidies up" a dish name later.
-
-After aligning: certification 11/12 on both implementations with the **same** survivor,
-and 100% (8/8) cross-adapter verdict agreement. Before: 11/12 versus 8/12 — the missing
-three were not caught, they were blocked by a dish name.
-
-### A subtler hole closed at the same time
-
-Suggested assertions once included `field_equals id = 1`. It verified on the spot (in that
-process the id *was* 1), so the mechanism did not stop it — but it is guaranteed to fail
-on any other implementation. Fields decided by insertion order, clock, or local numbering
-(`id`, `*At`, `pickupNo`, `username`) now yield no suggestion at all, and `--suggest` says
-so explicitly rather than staying silent, because silence reads as "found nothing".
-
-### Why there is no concurrency switch
-
-Tried it: 12 mutants by 8 cases against the real backend took 77s serially and 8s at six
-ways — but the conclusions drifted (a mutant moved from "caught by assertion 4" to
-"verdict-level", another moved from owed to missed). Serial repeated runs are identical.
-Concurrency puts machine-local timing into the system under test, and the whole value of
-cross-implementation comparison is that both sides ran the same thing. A 9x faster
-evaluator with a different answer is worth less than the slow one.
-
-## One copy of the cases
-
-`cases/coffee/` is not duplicated per implementation. The same directory hits different systems by switching `--adapter`:
-
-```bash
-node bin/agent-web.mjs verify cases/coffee --adapter=memory
-node bin/agent-web.mjs verify cases/coffee --adapter=taixianglian
-```
-
-A case describes "what a coffee ordering system should do", independent of who implements it. Copying it per implementation gives you two truths that slowly diverge — FINDING-001 started exactly there: two copies treated as one comparison.
-
----
-
-## Check whether the system changed
-
-The system may have different starting data after an update. Save the results from before and after, then compare them:
-
-```bash
-node bin/agent-web.mjs verify cases/coffee --adapter=memory --out=before.jsonl
-# After the update, run it again and save the results as after.jsonl
-node bin/agent-web.mjs verify cases/coffee --adapter=memory --out=after.jsonl
-node bin/agent-web.mjs drift before.jsonl after.jsonl
-```
-
-`drift` checks whether the data visible at the start of a test changed. If it did, review whether the case still fits the new version. This does not mean the verdict itself was wrong.
-
----
-
-## Connect your own system
-
-Point `--adapter` at a small connector program:
-
-```bash
-node bin/agent-web.mjs verify my-cases --adapter=./my-adapter.mjs
-```
-
-`examples/adapter-template/` contains a working sample. The connector has five jobs:
-
-| Method | What it does |
+| Group | Commands |
 | --- | --- |
-| `manifest()` | Lists the operations and data the tool can use |
-| `reset()` | Prepares fresh test data |
-| `observe()` | Reads the current orders, inventory, and other state |
-| `execute()` | Performs one operation in the system |
-| `close()` | Ends and cleans up the test run |
+| You have a system, want tests | `init` `prepare` `record` `draft` `accept` `verify` `report` `drift` |
+| You have two implementations | `compare` `audit` `probe` `coverage` `traps` |
+| You want to check the tests themselves | `certify` `certify --suggest` `mutants` `drill` `drill grade` `knowledge` `recall` |
+| Odds and ends | `selftest` `capabilities` `flow` |
 
-See the [working connector example](examples/adapter-template/README.md) and [case format](docs/SPEC.md) for the details.
+## Design choices
 
----
+**No LLM judge.** Seven structured predicates (`entity_exists`, `field_equals`, `count_delta`, `status_transition`, `unchanged`, `event_absent`, `relation`) evaluated in three-valued logic. The same input always yields the same verdict.
 
-## How much of the system do these cases actually touch
+**Adapters project observation into one canonical view.** Field mapping lives in the adapter, not in the case. Swapping an implementation changes nothing in the cases — that is the precondition for cross-implementation comparison.
 
-A verdict answers "how did these cases go", not "have these cases covered the system". `coverage` reconciles what the manifest declares with what the cases actually use:
+**"Who does it" is part of the case.** Every step says `as: customer2`, and the runner checks that the adapter really switched identity. When identities collapse into one, the verdict can still be `pass` while the evidence shows the switch never happened. That incident is `FINDING-001`.
 
-```bash
-node bin/agent-web.mjs coverage cases/coffee --adapter=memory --detail
-```
+**Suggested assertions are verified on the spot.** Every assertion `--suggest` emits is evaluated on both the correct implementation and the mutant; it only appears if both come out as expected.
 
-```text
-一、能力对账
-  声明能力        9
-  被案例用到      6
-  从未被用到      3   ← not a bug, just cases that have not reached it yet
-  案例要但没声明  1   ← a real gap: those steps can only ever be unknown
-  覆盖率          66.7%   = used / declared
-```
+## What it does not do
 
-Keep the two apart: **unused** means the cases are not demanding enough, **missing** means a verdict can never get evidence. The bundled `unknown-capability` case is a deliberate gap (it is what demonstrates `coverage_gap`), so running against `cases/coffee` always reports one missing capability and exits 1 — that is not dirty data.
+1. **Every target system needs an adapter.** The adapter is code, `load` imports it, and loading it runs it with your privileges. The CLI warns once; that is not a sandbox.
+2. **Field mapping is written by hand.** No automatic derivation.
+3. **Legality, not quality.** It can say a flow is legal, not that it is good.
+4. **Negative cases are hand-written.** `draft` lists where they are missing and refuses to invent them: the standard is "what should be allowed", so copying what actually happened admits everything.
+5. **Twelve mutants, all of them ours.** The mutant list is open precisely so others can add the ones we did not think of.
+6. **Equivalent mutants are unsolved.** They became explicit states: killable, owed, undetermined.
+7. **Limited assertion vocabulary.** Seven predicates; no composite constraints like "sorted by creation time with correct paging".
+8. **An adapter can lie.** `probe` checks six mechanical properties, not intent. What is guaranteed is "given this observation, here is how the verdict follows".
+9. **Validated in one domain only.** A coffee shop: menu, orders, state machine, two roles.
 
-`--min=0.8` turns it into a gate: no gaps and the rate must clear the bar. Observation scopes get their own line — if a case reads a collection the manifest never declares, those assertions can only be `unknown`.
+## Docs
 
-## First ask whether the adapter is lying
-
-Every command above assumes the adapter reports the truth. Nothing used to check that.
-
-A lying adapter does not raise. It is quietly precise: `observe` keeps returning the same
-cached view after a write, `reset` claims to reset while the last run's rows are still there,
-the view carries a timestamp. Verdicts stay stable and stop measuring what you think.
-
-```
-agent-web probe --adapter=memory --detail
-```
-
-Six things a machine can decide: five-method contract, reset idempotence, observation
-stability, no state leakage across resets, empty-argument calls that must not throw, and a
-write that claims success while the view does not change (warning only, since notifications
-and audit writes legitimately leave the canonical view untouched).
-
-It cannot see a trimmed view (a whole field omitted), an inverted semantic mapping, or a lie
-that only shows up under specific arguments. The conclusion is "no contradiction in these
-mechanically checkable respects", never "this adapter is trustworthy".
-
-## An adapter is executable code
-
-`--adapter=./xxx.mjs` does not read a config file; it imports that file as a plain Node module. It runs on your machine, as you: it can read environment variables (tokens included), touch the filesystem, and make network calls.
-
-So:
-
-- Only load adapters you trust, especially ones shipped inside a case set somebody gave you
-- Read the file once before the first run. It is a few hundred lines; `fetch` and `fs` are easy to spot
-- agent-web prints a warning before loading an external adapter; set `AGENT_WEB_QUIET_ADAPTER_WARNING=1` once you have acknowledged it
-
-The built-in `memory` and `taixianglian` adapters load internally and never trigger that warning.
-
-## A short glossary
-
-The code keeps fixed English names. Here is what they mean in everyday terms:
-
-| Code term | Plain meaning |
+| File | Contents |
 | --- | --- |
-| Case | A test question: the goal, checklist, and sample route |
-| Trajectory | The sequence of actions the assistant took |
-| Adapter | A small connector between the test tool and a real system |
-| Assertion | A clear rule that can be checked as right or wrong |
-| `unknown` | There is not enough information to score this run |
-| Reset | Prepare fresh data so an earlier test cannot affect the next one |
+| [docs/GUIDE.md](docs/GUIDE.md) | Full guide in Chinese |
+| [docs/SPEC.md](docs/SPEC.md) | Format spec: cases, assertions, adapter contract, verdict order |
+| [docs/FINDING-001.en.md](docs/FINDING-001.en.md) | Anatomy of one false pass |
+| [docs/museum/](docs/museum/) | Six reproducible failure exhibits |
+| [docs/mutants/](docs/mutants/) | Twelve mutants; submission rules in its README |
+| [docs/media/promo.mp4](docs/media/promo.mp4) | 42-second introduction |
 
----
+## License
 
-## What it can check
-
-| Check | Plain meaning |
-| --- | --- |
-| `entity_exists` | Does a requested record exist? |
-| `field_equals` | Does a field contain the expected value? |
-| `count_delta` | How many records were added or removed? |
-| `unchanged` | Did specified data stay the same? |
-| `status_transition` | Did the status go through the required changes? |
-| `event_absent` | Did a forbidden event happen at any point? |
-| `composite` | Combine checks with “and”, “or”, or “not” |
-
-It checks concrete facts such as order status, record counts, and recorded events. It does not judge whether a page looks nice, prose sounds elegant, or something “feels right”. If there is no clear rule, it will not pretend that a machine can score it.
-
----
-
-## Current limits
-
-- Each real system needs a connector written by a person; giving the tool a URL is not enough yet.
-- Data names must be lined up by the connector. The tool does not automatically know that `orders` in one system means the same thing as `tickets` in another.
-- It mainly checks the final result and recorded events. It cannot yet measure process quality such as “the assistant clicked three times before getting it right”.
-- Cases run in order; running them across multiple machines at once is not supported yet.
-- A draft can list what happened. A person still has to add rules for forbidden actions, permissions, and time limits.
-
----
-
-## Project files
-
-```text
-bin/agent-web.mjs       Command-line entry point
-src/                   Checking, cases, logs, drafts, and flow-chart code
-cases/                 Built-in test cases
-examples/              Working connectors and sample action logs
-  agent-traces/memory-happy-path.jsonl   simple log for trying prepare
-docs/SPEC.md            Detailed case-file format
-test/engine.test.mjs    Automated tests (49 cases)
-```
-
-Common commands: `prepare` (create steps, a draft case, and a flow preview in one run), `selftest` (run the built-in checks), `verify` (check cases), `compare` (compare systems), `record` (organize request logs), `draft` (make a case draft separately), `flow` (make a flow chart), and `drift` (compare whether the starting data changed). Run `node bin/agent-web.mjs help` for the full list.
-
----
-
-## Pushing to the GitHub mirror
-
-The repo lives on both Gitee and GitHub. On a machine whose `hosts` file points `github.com` at `127.0.0.1` (symptom: `curl https://github.com` returns `000` while `dns` and `conn` take a few milliseconds and `tls` is `0`), `git push github` dies in the TLS handshake. Editing `hosts` needs admin rights and may be overwritten by whatever script wrote those lines.
-
-`scripts/gh-proxy.mjs` routes around it: resolve the name once through DNS (bypassing `hosts`), then relay the tunnel byte for byte. TLS is still negotiated end to end between git and GitHub with the same SNI, so certificate validation stays on and nothing gets disabled.
-
-```bash
-node scripts/gh-proxy.mjs &                                     # 127.0.0.1:8899
-git -c http.proxy=http://127.0.0.1:8899 push github main
-# or set it for this remote only, and delete the config once the proxy is gone
-git config --local http.https://github.com.proxy http://127.0.0.1:8899
-```
-
-Addresses are tried in order (DNS results plus a small fallback list); GitHub's IPs come and go, so `node scripts/gh-proxy.mjs --ip=140.82.114.4` pins one when needed. It binds to loopback only; shut it down when you are done. **This is not a feature for users** — it is a maintainer's temporary channel on this particular machine.
-
----
-
-## Version and next steps
-
-Current version: `0.16` (the number in `package.json` is authoritative and the docs track it).
-`verify`/`selftest` runs cases and emits three-valued verdicts; `compare` runs one case set
-against several implementations; `audit` uses one implementation as a ruler for another and
-reports false greens; `traps` asks whether a verdict was produced inside a blind spot;
-`coverage` measures how much of the system the case set touches; `certify` asks whether an
-assertion can kill a mutant and hands back the fix for every survivor; `mutants` lists the
-mutant catalogue; `drill` turns mutants into machine-graded questions; `record`/`prepare`/`draft`
-recover replayable steps from a request log; `accept` promotes a draft under a signature.
-
-## What it cannot do
-
-This section matters more than the table above.
-
-1. **Every target system needs its own adapter.** There is no "point it at a URL". An adapter
-   is code, and loading one executes it with your privileges (SPEC 6.4).
-2. **Field-name differences are mapped by hand.** The canonical view is that mapping layer.
-   Keeping it in the adapter is deliberate: one place to map, so cases stay portable. Automatic
-   mapping inference has no trustworthy method today.
-3. **It judges whether the process was legal, not whether it was good.** There is
-   `status_transition` (path), `traps` (reports the blind-spot rate of terminal-only
-   assertions), and `relation` (terminal relations) — but no "was the number of steps
-   economical", no "did it take a detour", no cost. Judging quality needs a scoring model,
-   and that door stays shut.
-4. **Serial execution.** No concurrency, not even in `compare`.
-5. **Negative cases are written by hand.** `draft` lists them as todo and says why: the
-   criterion for a negative case is "what should be allowed", not "what was actually used",
-   and copying the latter is how you let everything through.
-6. **Twelve mutants, all of them ones we thought of.** That is the fundamental limit of
-   mutation testing: it cannot find the mistake you did not imagine. The catalogue is open
-   source precisely so other people can add their own blind spots.
-7. **The equivalent-mutant problem is not solved**, only turned into a state (`undetermined`)
-   that demands evidence when you claim equivalence. `m-pickup-no-offset` is the live example:
-   the observation shows it, but "offset by 100" is each implementation's own convention.
-8. **Adapters can lie.** `probe` catches the mechanically checkable contradictions: a reset
-   that does not reset, an observation that drifts, state leaking across runs. It does not
-   catch a trimmed view (a whole field omitted), an inverted mapping, or a lie that only
-   appears under specific arguments. The guarantee is "given this observation, this is how
-   the verdict followed".
-9. **Validated in one domain only** (a coffee shop: menu, orders, state machine, two roles).
-
-Next: make it easier for different systems to share cases, turn the reference-versus-real-backend
-comparison into a subscribable regression, promote inferred capabilities to verified ones, and
-grow the mutant catalogue with other people's contributions.
-
-MIT license. See [LICENSE](LICENSE).
+MIT. Cases, mutants and incident entries are all open to contributions — their value is in the count.

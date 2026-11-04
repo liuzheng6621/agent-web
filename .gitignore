@@ -16,3 +16,5 @@ agent-web-output/
 # 写成 drills/ 会连带忽略 examples/drills/，那份是人写的示例提交，
 # 是 CI 里「好提交必须满分」那一步的输入，漏提交等于让 CI 在新克隆上必挂。
 /drills/
+.agent-web/
+.tmp-frames/

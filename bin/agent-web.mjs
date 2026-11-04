@@ -5,11 +5,11 @@
  *   agent-web selftest                 零依赖自测：内置适配器 + 内置案例
  *   agent-web verify <目录或文件>       对指定适配器跑案例，出判决
  *   agent-web report <results.jsonl>   由判决结果出指标
-  agent-web accept <文件> --by=NAME     确认草稿，确认后才能判决
-  agent-web audit <可信.jsonl> <被审.jsonl>  用真实判决当尺子，量假绿/假红
-  agent-web traps <结果.jsonl> --cases=目录  陷阱普查：这批判决有多少条在盲区里
-  agent-web certify <案例目录> --adapter=SPEC  判据准入：哪些断言真的抓得住东西
-  agent-web mutants                          变异体目录：实现能坏成什么样
+ *  agent-web accept <文件> --by=NAME     确认草稿，确认后才能判决
+ *  agent-web audit <可信.jsonl> <被审.jsonl>  用真实判决当尺子，量假绿/假红
+ *  agent-web traps <结果.jsonl> --cases=目录  陷阱普查：这批判决有多少条在盲区里
+ *  agent-web certify <案例目录> --adapter=SPEC  判据准入：哪些断言真的抓得住东西
+ *  agent-web mutants                          变异体目录：实现能坏成什么样
  *   agent-web capabilities             打印适配器的能力清单与证据等级
  *   agent-web prepare <动作日志>       一次生成轨迹、案例草稿与流程预览
  *   agent-web draft <轨迹文件>          回放一条轨迹，反推案例草稿
@@ -32,6 +32,8 @@ import { validateCase, validateSteps, acceptCase, draftBlocker } from '../src/ca
 import { renderFlowHtml } from '../src/flow.mjs';
 import { summarize, agreement, formatText, countFailedAssertions } from '../src/report.mjs';
 import { loadAdapter, listBuiltins } from '../src/adapter/load.mjs';
+import { ENTRIES, KNOWLEDGE_VERSION, validateAll } from '../knowledge/index.mjs';
+import { signalsFromCertify, signalsFromProbe, recallSignals, loadState, saveState, bump, recallExit, formatRecall } from '../src/recall.mjs';
 import { diffViews } from '../src/view.mjs';
 import { auditRuns, formatAudit } from '../src/audit.mjs';
 import { summarizeTraps, formatTraps, trapVerdict } from '../src/traps.mjs';
@@ -332,6 +334,66 @@ function cmdMutants(args, flags) {
   }
   console.log('投稿：复制 docs/mutants/ 里任一文件，改 id 与 wrap，登记到 index.mjs 的 ENTRIES，跑 npm test。');
   return 0;
+}
+
+async function cmdKnowledge(flags) {
+  const check = validateAll();
+  if (flags.json) {
+    console.log(JSON.stringify({ version: KNOWLEDGE_VERSION, ok: check.ok, problems: check.problems, entries: ENTRIES }, null, 2));
+    return check.ok ? 0 : 1;
+  }
+  console.log(`事故档案 ${KNOWLEDGE_VERSION} · ${ENTRIES.length} 条`);
+  for (const e of ENTRIES) {
+    console.log("");
+    console.log(`  ${e.id}  ${e.title}`);
+    console.log(`    症状：${e.symptom}`);
+    console.log(`    判据：${e.guard.kind} ${e.guard.ref}`);
+    console.log(`    复现：${e.repro}`);
+  }
+  if (!check.ok) {
+    console.error("");
+    console.error("档案自身不合法：");
+    for (const p of check.problems) console.error(`  ${p}`);
+    return 1;
+  }
+  return 0;
+}
+
+async function cmdRecall(args, flags) {
+  const dir = args[0] ?? "cases/coffee";
+  const spec = flags.adapter ?? "memory";
+  const map = loadCaseDir(dir);
+  const cases = [...map.values()].sort((a, b) => String(a.id).localeCompare(String(b.id)));
+  if (cases.length === 0) {
+    console.error(`没有在 ${dir} 里找到案例`);
+    return 2;
+  }
+  const timeoutMs = flags.timeout ? Number(flags.timeout) : 5000;
+  const signals = [];
+  if (flags["skip-certify"] !== true) {
+    const report = await certify({
+      cases,
+      adapterFactory: async () => loadAdapter(spec, {}, process.cwd()),
+      adapterName: spec,
+      timeoutMs,
+      mutations: MUTATIONS,
+    });
+    signals.push(...signalsFromCertify(report));
+  }
+  if (flags["skip-probe"] !== true) {
+    const pr = await probeAdapter({ adapter: await loadAdapter(spec, {}, process.cwd()), adapterName: spec, timeoutMs });
+    signals.push(...signalsFromProbe(pr));
+  }
+  const result = recallSignals(signals, { loose: flags.loose === true });
+  const state = loadState(process.cwd());
+  const rows = bump(state, result.matchedIds);
+  if (flags["dry-run"] !== true) saveState(process.cwd(), state);
+  if (flags.json) {
+    console.log(JSON.stringify({ signals, result, rows }, null, 2));
+  } else {
+    console.log(formatRecall(result, { rows, root: process.cwd() }));
+  }
+  return recallExit(rows, { noGate: flags["no-gate"] === true });
 }
 
 async function cmdProbe(flags) {
@@ -1288,6 +1350,8 @@ const HELP = `agent-web —— 给 Agent 写机器可判的集成测试
   agent-web prepare <动作日志> --adapter=SPEC  一次生成步骤、案例草稿和流程预览
   agent-web draft <轨迹文件> --adapter=SPEC   回放轨迹，反推案例草稿（要人确认）
   agent-web flow <案例.json> [--result=FILE]  生成交互式流程图 HTML
+  agent-web knowledge                         事故档案：这个仓库踩过的八个坑
+  agent-web recall [案例目录]                 比对档案：这次有没有重犯旧错（第二次拦下）
   agent-web init <目录>                       生成案例模板（--adapter 写进 environment）
 
 适配器 SPEC 可以是：
@@ -1347,7 +1411,11 @@ async function main() {
         return await cmdAudit(args, flags);
       case 'accept':
         return cmdAccept(args, flags);
-      case 'probe':
+      case 'knowledge':
+      return cmdKnowledge(flags);
+    case 'recall':
+      return cmdRecall(args, flags);
+    case 'probe':
         return await cmdProbe(flags);
       case 'coverage':
         return await cmdCoverage(args, flags);

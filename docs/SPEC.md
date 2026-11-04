@@ -881,7 +881,71 @@ agent-web probe --adapter=SPEC [--detail] [--json] [--timeout=MS] [--allow-volat
 `--allow-volatile` 跳过「观测稳定」这一项，只给视图本身合法地含时钟的适配器用 ——
 跳过就要在文档里写清原因，否则下一个人不知道这个洞是开着的。
 
-## 15. 版本演进
+## 15. 事故档案（knowledge / recall）
+
+前面各章管的是「这次判得对不对」。这一章管的是「上次错过的地方，这次有没有再错一遍」。
+
+### 15.1 入库宪法
+
+一条错误要进 `knowledge/`，必须同时具备两样东西：
+
+| 要件 | 含义 | 缺失的后果 |
+| --- | --- | --- |
+| `repro` | 一条能跑的命令，证明它真的发生过 | 变成传闻，下一个人无法确认 |
+| `guard` | 一个已经落地的检查项（`probe` / `certify` / `ci` / `test` / `lint`） | 变成日志，下次发生时没有人喊 |
+
+`guard.kind` 为 `none` 的条目**不被接受**，`validateEntry` 直接报「不许入库」。这一条和判据准入是同一句话的两面：
+那边要求「杀不掉任何变异体的断言不许入库」，这边要求「给不出判据的错误不许入库」。
+
+### 15.2 条目字段
+
+```js
+export const eNN = {
+  id: 'k-some-thing',          // 必须 kebab-case 且以 k- 开头，与文件名一致
+  title: '一句话说清坏在哪',
+  symptom: '看到的现象',
+  cause: '根因，写到能据此改代码的程度',
+  fix: '当时怎么修的',
+  fingerprint: {
+    structure: '层/环节:失败类别',   // 例如 execute/binding:unexpected_pass
+    witness: 'orders.*.pickupNo',    // 见证路径，支持 * 与 (a|b|*At)
+    detector: 'certify:m-xxx',       // 能被扫出来的检测项 id
+  },
+  first_seen: { commit: 'abc1234', date: '2026-11-04', evidence: '哪份文档/哪个数字能对上' },
+  guard: { kind: 'test', ref: '哪个文件里的哪条检查' },
+  repro: '一条真的能跑的命令',
+  recurred: 0,
+};
+```
+
+### 15.3 指纹的三层
+
+| 层 | 用来区分什么 | 例 |
+| --- | --- | --- |
+| `structure` | 坏在哪一环、哪一类 | `execute/binding:unexpected_pass` |
+| `witness` | 坏在哪个字段 | `orders.*.pickupNo` |
+| `detector` | 哪个检查项认得出它 | `certify:m-pickup-no-offset` |
+
+默认要求 `detector` 完全一致才命中。「总价算错」和「取餐号算错」结构相同、见证不同，是两条记录，不合并。
+`--loose` 才退到 `witness` 通配匹配，用于检测项改名之后的老档案。
+
+### 15.4 「加深记忆」是可验证的动作
+
+命中次数记在 `.agent-web/recall.json`（不进版本库）：
+
+| 第几次命中 | 行为 | 退出码 |
+| --- | --- | --- |
+| 1 | 提示，附当时怎么修的和判据落在哪 | 0 |
+| ≥2 | 提示 + 拦下 | 1（`--no-gate` 放过） |
+
+次数是记的，不是算的；拦截是显式的，不是隐式的。这样「它记得这件事」和「它这次拦了你」都能被单独验证。
+
+### 15.5 哪些档案不靠 recall 守
+
+`recall` 只扫 `certify:` / `probe:` / `traps:` 三类前缀。`test:` / `ci:` / `lint:` 条目由 CI 或单测兜底，
+`recall` 会单列出来并写明各自的落点，避免「没被扫到」被读成「没人管」。
+
+## 16. 版本演进
 
 `0.1` 之后允许的改动：
 

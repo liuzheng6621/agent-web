@@ -1,0 +1,20 @@
+# README 用图的生成脚本
+
+一次性生成脚本，不参与构建和测试。产物已经在 `docs/media/` 里，只在需要改文案或配色时重跑。
+
+| 脚本 | 产物 |
+| --- | --- |
+| `1-hero-verdicts.py` | `hero.png`、`verdicts.png` |
+| `2-loop.py` | `loop.png`（一份案例、两个实现的对照图） |
+| `3-terminal.py` | `terminal.png`、`recall.png`、`.tmp-frames/` 的动画帧 |
+
+```bash
+python tools/media/1-hero-verdicts.py
+python tools/media/2-loop.py
+python tools/media/3-terminal.py
+ffmpeg -y -framerate 4 -i .tmp-frames/f%04d.png \
+  -vf "split[a][b];[a]palettegen=max_colors=160:stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=3" \
+  -loop 0 docs/media/demo.gif
+```
+
+依赖只有 Pillow 和 ffmpeg。字体用系统自带的微软雅黑与 Consolas，中文与代码分别渲染后按字宽拼接——单一等宽字体没有中文字形，混排会出现豆腐块。
