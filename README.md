@@ -360,7 +360,7 @@ git -c http.proxy=http://127.0.0.1:8899 push github main
 git config --local http.https://github.com.proxy http://127.0.0.1:8899
 ```
 
-它只监听本机，只负责把 CONNECT 透传到 DNS 解出的地址，用完关掉即可。**这不是给用户用的东西**，是维护者在这台机器上发版时的临时通道。
+地址会逐个试（DNS 结果 + 一小份备用地址），GitHub 的 IP 时通时不通，必要时 `node scripts/gh-proxy.mjs --ip=140.82.114.4` 直接指定。它只监听本机，用完关掉即可。**这不是给用户用的东西**，是维护者在这台机器上发版时的临时通道。
 
 ---
 

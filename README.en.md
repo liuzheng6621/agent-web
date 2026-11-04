@@ -360,7 +360,7 @@ git -c http.proxy=http://127.0.0.1:8899 push github main
 git config --local http.https://github.com.proxy http://127.0.0.1:8899
 ```
 
-It binds to loopback only and does nothing but relay CONNECT to the address DNS returned; shut it down when you are done. **This is not a feature for users** — it is a maintainer's temporary channel on this particular machine.
+Addresses are tried in order (DNS results plus a small fallback list); GitHub's IPs come and go, so `node scripts/gh-proxy.mjs --ip=140.82.114.4` pins one when needed. It binds to loopback only; shut it down when you are done. **This is not a feature for users** — it is a maintainer's temporary channel on this particular machine.
 
 ---
 
