@@ -646,6 +646,9 @@ test('flow：HTML 自包含且对动态内容做 HTML / script 转义', async ()
   assert.match(html, /id="flow-data"/);
   assert.match(html, /<style>/);
   assert.match(html, /<script>\s*const DATA=/);
+  assert.match(html, /id="theme-toggle"/);
+  assert.match(html, /aria-controls="step-details-/);
+  assert.match(html, /@media\(max-width:700px\)/);
   assert.doesNotMatch(html, /<script type="application\/json" id="flow-data">[^<]*<\/script><img/);
   assert.match(html, /\\u003c\/script\\u003e/);
   assert.doesNotMatch(html, /not-for-export/);
