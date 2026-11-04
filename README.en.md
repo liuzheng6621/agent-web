@@ -290,6 +290,39 @@ See the [working connector example](examples/adapter-template/README.md) and [ca
 
 ---
 
+## How much of the system do these cases actually touch
+
+A verdict answers "how did these cases go", not "have these cases covered the system". `coverage` reconciles what the manifest declares with what the cases actually use:
+
+```bash
+node bin/agent-web.mjs coverage cases/coffee --adapter=memory --detail
+```
+
+```text
+一、能力对账
+  声明能力        9
+  被案例用到      6
+  从未被用到      3   ← not a bug, just cases that have not reached it yet
+  案例要但没声明  1   ← a real gap: those steps can only ever be unknown
+  覆盖率          66.7%   = used / declared
+```
+
+Keep the two apart: **unused** means the cases are not demanding enough, **missing** means a verdict can never get evidence. The bundled `unknown-capability` case is a deliberate gap (it is what demonstrates `coverage_gap`), so running against `cases/coffee` always reports one missing capability and exits 1 — that is not dirty data.
+
+`--min=0.8` turns it into a gate: no gaps and the rate must clear the bar. Observation scopes get their own line — if a case reads a collection the manifest never declares, those assertions can only be `unknown`.
+
+## An adapter is executable code
+
+`--adapter=./xxx.mjs` does not read a config file; it imports that file as a plain Node module. It runs on your machine, as you: it can read environment variables (tokens included), touch the filesystem, and make network calls.
+
+So:
+
+- Only load adapters you trust, especially ones shipped inside a case set somebody gave you
+- Read the file once before the first run. It is a few hundred lines; `fetch` and `fs` are easy to spot
+- agent-web prints a warning before loading an external adapter; set `AGENT_WEB_QUIET_ADAPTER_WARNING=1` once you have acknowledged it
+
+The built-in `memory` and `taixianglian` adapters load internally and never trigger that warning.
+
 ## A short glossary
 
 The code keeps fixed English names. Here is what they mean in everyday terms:
@@ -366,7 +399,7 @@ Addresses are tried in order (DNS results plus a small fallback list); GitHub's 
 
 ## Version and next steps
 
-Current version: `0.7`. It runs cases, checks an assistant's actions, turns a request log into replayable steps and a draft case, and has started policing the verdict itself: one copy of the cases, no verdict from an unreviewed draft, and a false-green audit that turns a suspiciously all-green verdict red.
+Current version: `0.8`. It runs cases, checks an assistant's actions, turns a request log into replayable steps and a draft case, polices the verdict itself (one copy of the cases, no verdict from an unreviewed draft, a false-green audit that turns a suspiciously all-green verdict red), and measures how much of the system the case set actually touches.
 
 Next: make it easier for different systems to share the same cases, run tests against multiple systems at once, and turn abilities that are only inferred into abilities that have been verified in practice.
 

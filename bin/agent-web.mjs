@@ -31,6 +31,7 @@ import { summarize, agreement, formatText, countFailedAssertions } from '../src/
 import { loadAdapter, listBuiltins } from '../src/adapter/load.mjs';
 import { diffViews } from '../src/view.mjs';
 import { auditRuns, formatAudit } from '../src/audit.mjs';
+import { collectUsage, summarizeCoverage, formatCoverage, coverageVerdict } from '../src/coverage.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..');
@@ -300,6 +301,62 @@ async function cmdCapabilities(args, flags) {
   console.log(JSON.stringify(m, null, 2));
   return 0;
 }
+
+// 能力覆盖率：把 manifest 声明的能力和案例真正用到的能力对上账。
+// 它不跑案例、不下判决，只回答「这套案例碰过这个系统的多少面」。
+async function cmdCoverage(args, flags) {
+  if (args.length === 0) {
+    console.error('用法：agent-web coverage <目录或文件> [--adapter=memory] [--min=0.8] [--detail] [--json]');
+    return 2;
+  }
+  const adapterName = flags.adapter ?? 'memory';
+  const adapter = await makeAdapter(adapterName);
+  const manifest = await adapter.manifest();
+
+  const files = collectCaseFiles(args[0]);
+  const cases = [];
+  const skipped = [];
+  for (const f of files) {
+    const raw = JSON.parse(fs.readFileSync(f, 'utf8'));
+    const errors = validateCase(raw);
+    if (errors.length > 0) {
+      skipped.push({ file: path.basename(f), error: errors[0] });
+      continue;
+    }
+    cases.push(raw);
+  }
+
+  const report = summarizeCoverage(collectUsage(cases, manifest));
+  const min = flags.min !== undefined && flags.min !== true ? Number(flags.min) : null;
+  const verdict = coverageVerdict(report, { min });
+
+  if (flags.json) {
+    const payload = { ...report };
+    if (flags.detail) {
+      payload.unused = report.unused_list;
+      payload.missing_capabilities = report.missing_list;
+      payload.missing_scopes = report.scope_missing_list;
+    }
+    payload.verdict = verdict;
+    console.log(JSON.stringify(payload, null, 2));
+  } else {
+    console.log(formatCoverage(report, { detail: Boolean(flags.detail) }));
+  }
+
+  if (skipped.length > 0) {
+    console.error('');
+    console.error(`注意：${skipped.length} 个文件没通过校验，未计入覆盖率`);
+    for (const s of skipped) console.error(`  ${s.file}: ${s.error}`);
+  }
+
+  if (!verdict.ok) {
+    console.error('');
+    console.error(`不通过：${verdict.why}`);
+    return 1;
+  }
+  return 0;
+}
+
 
 function cmdInit(args, flags) {
   if (args.length === 0) {
@@ -972,6 +1029,7 @@ const HELP = `agent-web —— 给 Agent 写机器可判的集成测试
   agent-web report <results.jsonl>            由判决结果出指标
   agent-web accept <文件> --by=NAME     确认草稿，确认后才能判决
   agent-web capabilities [--adapter=SPEC]     打印能力清单与证据等级
+  agent-web coverage <案例> --adapter=SPEC    能力覆盖率对账（--min=0.8 设门槛）
   agent-web compare <案例> --adapters=A,B     同一份案例喂多个实现，比判决
   agent-web drift <旧.jsonl> <新.jsonl>      比较两次跑批的初态形状（漂移检测）
   agent-web record <动作日志> --adapter=SPEC   把 Agent 的实际动作还原成候选轨迹
@@ -1029,6 +1087,8 @@ async function main() {
         return await cmdAudit(args, flags);
       case 'accept':
         return cmdAccept(args, flags);
+      case 'coverage':
+        return await cmdCoverage(args, flags);
       case 'init':
         return cmdInit(args, flags);
       default:

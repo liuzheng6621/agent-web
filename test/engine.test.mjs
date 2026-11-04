@@ -13,6 +13,7 @@ import { selectEntities, validateSelector } from '../src/select.mjs';
 import { evalAssertions, validateAssertion, phaseOf } from '../src/assert/index.mjs';
 import { validateCase, resolveArguments, acceptCase, draftBlocker } from '../src/case.mjs';
 import { auditRuns } from '../src/audit.mjs';
+import { collectUsage, summarizeCoverage, coverageVerdict } from '../src/coverage.mjs';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CLI_PATH = path.join(REPO_ROOT, 'bin', 'agent-web.mjs');
@@ -843,4 +844,92 @@ test('audit 区分漏判、仅候选敢判与两侧不一致的案例集', () =>
   assert.equal(r.counts.only_candidate, 1);
   assert.equal(r.rates.blind, 1);
   assert.equal(r.sound, true);
+});
+
+test('coverage：把用过的、闲置的、案例要但没声明的分开算', () => {
+  const manifest = {
+    adapter: 'x',
+    capabilities: [
+      { id: 'order.create', kind: 'write', evidence_level: 'validated' },
+      { id: 'order.list', kind: 'read', evidence_level: 'observed' },
+      { id: 'menu.edit', kind: 'write', evidence_level: 'inferred' },
+    ],
+  };
+  const cases = [
+    { id: 'c1', reference_trajectory: [{ capability: 'order.create' }, { capability: 'order.create' }] },
+    { id: 'c2', reference_trajectory: [{ capability: 'order.list' }, { capability: 'order.refund' }] },
+  ];
+  const report = summarizeCoverage(collectUsage(cases, manifest));
+
+  assert.equal(report.declared, 3);
+  assert.equal(report.used, 2);
+  assert.equal(report.unused, 1);
+  assert.equal(report.missing, 1);
+  assert.equal(report.missing_list[0].id, 'order.refund');
+  assert.equal(report.missing_list[0].steps, 1);
+  assert.deepEqual(report.missing_list[0].cases, ['c2']);
+  assert.deepEqual(report.unused_list.map((u) => u.id), ['menu.edit']);
+  // 行里的 steps 是"被要了几步"，不是"几条案例"，两者不能混
+  const created = collectUsage(cases, manifest).rows.find((r) => r.id === 'order.create');
+  assert.equal(created.steps, 2);
+  assert.deepEqual(created.cases, ['c1']);
+});
+
+test('coverage：覆盖率是 用到的/声明的，且分母为 0 时是 null 不是 0', () => {
+  const cases = [{ id: 'c1', reference_trajectory: [{ capability: 'a' }] }];
+  const one = summarizeCoverage(collectUsage(cases, {
+    adapter: 'x',
+    capabilities: [{ id: 'a', kind: 'read', evidence_level: 'validated' }, { id: 'b', kind: 'read', evidence_level: 'validated' }],
+  }));
+  assert.equal(one.rate.value, 0.5);
+
+  const none = summarizeCoverage(collectUsage(cases, { adapter: 'x', capabilities: [] }));
+  assert.equal(none.rate.value, null, '一个能力都没声明时，覆盖率是没意义的，不能写 0%');
+});
+
+test('coverage：案例要观测但 manifest 没声明的集合单独记', () => {
+  const manifest = { adapter: 'x', capabilities: [], scopes: ['orders'] };
+  const cases = [
+    { id: 'c1', observability: { declared_scopes: ['orders', 'status_log'] }, reference_trajectory: [] },
+  ];
+  const report = summarizeCoverage(collectUsage(cases, manifest));
+  assert.equal(report.scope.declared, 1);
+  assert.equal(report.scope.asked, 2);
+  assert.equal(report.scope.missing, 1);
+  assert.equal(report.scope_missing_list[0].scope, 'status_log');
+});
+
+test('coverage：有缺口就不通过；缺口为 0 但没到门槛也不通过', () => {
+  const gap = summarizeCoverage(collectUsage(
+    [{ id: 'c1', reference_trajectory: [{ capability: 'ghost' }] }],
+    { adapter: 'x', capabilities: [{ id: 'a', kind: 'read', evidence_level: 'validated' }] },
+  ));
+  assert.equal(coverageVerdict(gap).ok, false);
+
+  const clean = summarizeCoverage(collectUsage(
+    [{ id: 'c1', reference_trajectory: [{ capability: 'a' }] }],
+    {
+      adapter: 'x',
+      capabilities: [
+        { id: 'a', kind: 'read', evidence_level: 'validated' },
+        { id: 'b', kind: 'read', evidence_level: 'validated' },
+      ],
+    },
+  ));
+  assert.equal(coverageVerdict(clean).ok, true);
+  assert.equal(coverageVerdict(clean, { min: 0.8 }).ok, false);
+  assert.equal(coverageVerdict(clean, { min: 0.5 }).ok, true);
+});
+
+test('加载外部适配器之前会提醒这是可执行代码，且能被环境变量关掉', () => {
+  const base = ['coverage', 'examples/adapter-template/cases', '--adapter=./examples/adapter-template/warehouse-adapter.mjs'];
+  const loud = spawnSync(process.execPath, [CLI_PATH, ...base], { cwd: REPO_ROOT, encoding: 'utf8' });
+  assert.match(loud.stderr, /正在加载外部适配器/, '外部适配器必须先提醒再 import');
+
+  const quiet = spawnSync(process.execPath, [CLI_PATH, ...base], {
+    cwd: REPO_ROOT,
+    encoding: 'utf8',
+    env: { ...process.env, AGENT_WEB_QUIET_ADAPTER_WARNING: '1' },
+  });
+  assert.doesNotMatch(quiet.stderr, /正在加载外部适配器/);
 });

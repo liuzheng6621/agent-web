@@ -67,6 +67,25 @@ function pickFactory(mod, spec) {
  * @param {object} options 传给工厂的参数
  * @param {string} cwd 解析相对路径的基准目录
  */
+// 红线：适配器不是配置，是可执行的普通 Node 模块。import 的那一刻它就以当前
+// 用户身份跑起来了——能读环境变量、读写文件、发网络请求。在跑别人的案例集之前，
+// 先看一眼适配器文件里写了什么。这里只提醒，不拦：拦住了也拦不住真正想跑的人。
+function warnExternal(spec, resolved) {
+  if (process.env.AGENT_WEB_QUIET_ADAPTER_WARNING === '1') return;
+  process.stderr.write(
+    `注意：正在加载外部适配器 ${spec}
+` +
+      `      文件 ${resolved}
+` +
+      `      它会被当作普通 Node 模块 import，以当前用户权限执行任意代码
+` +
+      `      （可读环境变量、读写文件、访问网络）。只加载你信得过的东西。
+` +
+      `      确认了解可设 AGENT_WEB_QUIET_ADAPTER_WARNING=1 关掉这条提示。
+`,
+  );
+}
+
 export async function loadAdapter(spec, options = {}, cwd = process.cwd()) {
   const name = String(spec ?? '').trim();
   if (name === '') throw new Error('适配器名字为空');
@@ -76,6 +95,7 @@ export async function loadAdapter(spec, options = {}, cwd = process.cwd()) {
     factory = BUILTINS[name];
   } else if (isPathSpec(name)) {
     const abs = path.resolve(cwd, name);
+    warnExternal(name, abs);
     let mod;
     try {
       mod = await import(pathToFileURL(abs).href);
@@ -87,6 +107,7 @@ export async function loadAdapter(spec, options = {}, cwd = process.cwd()) {
     }
     factory = pickFactory(mod, name);
   } else {
+    warnExternal(name, name);
     let mod;
     try {
       mod = await import(name);
