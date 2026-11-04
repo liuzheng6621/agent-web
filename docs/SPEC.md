@@ -588,7 +588,7 @@ blind_rate = Σ blind / Σ (guarded + blind)
 | `state` | 只篡改 `observe()` 返回的规范视图 | 终态类断言够不够狠 |
 | `execute` | 篡改动作的结局（放行本该拒绝的写） | 负例步够不够狠 |
 
-内置六个（`src/mutate.mjs`）：`m-money-off-by-cent`、`m-status-frozen`、
+内置六个（目录见 12.8）：`m-money-off-by-cent`、`m-status-frozen`、
 `m-history-empty`、`m-extra-foreign-order`、`m-foreign-write-allowed`、`m-no-reject`。
 
 变异体是**可审的清单**，不是不可见的天命：它只覆盖想到的坏法。
@@ -634,6 +634,55 @@ a(P⁺) = true   且   a(m) = false
 | `--strict` 且存在「能求值但抓不住任何东西」的断言 | 1 |
 
 默认不对空转断言判红：空转是正常的中间状态，一刀切会让人把命令整个关掉。
+
+### 12.8 变异体目录的格式
+
+变异体不放代码里，放目录里：`docs/mutants/`。一个文件一个变异体，文件名即 id。
+
+```js
+// docs/mutants/m-some-thing.mjs
+import { wrapState } from './_helpers.mjs';
+
+export const meta = {
+  id: 'm-some-thing',      // 必须与文件名一致
+  title: '一句话名字',
+  layer: 'state',          // state | execute
+  symptom: '用户投诉长什么样',
+  mechanism: '具体改了什么',
+  catch_hint: '什么样的断言能抓住它；什么样的抓不住',
+};
+
+export function wrap(adapter) {
+  return wrapState(adapter, (state) => { /* 只改这里 */ });
+}
+```
+
+| 字段 | 必需 | 约束 |
+| --- | --- | --- |
+| `id` | 是 | `^m-[a-z0-9]+(-[a-z0-9]+)*$`，且必须等于文件名（去扩展名） |
+| `title` | 是 | 非空 |
+| `layer` | 是 | `state` 或 `execute` |
+| `symptom` | 是 | 非空。写不出用户会怎么投诉，说明这个变异体不对应真故障 |
+| `mechanism` | 是 | 非空。改了什么，一句话 |
+| `catch_hint` | 是 | 非空。抓得住的与抓不住的都要写 |
+| `wrap(adapter)` | 是 | 返回同契约的适配器 |
+
+`docs/mutants/index.mjs` 的 `validateMutants()` 在加载时校验上表，任何一条不满足就抛错
+（CI 因此会失败）。**这不只是防手滑：它拦的是"复制上一个变异体、只改了里面的逻辑、忘了改 id"**
+——两个 id 不同的同一变异体，等于把一张票投了两遍，会把最小充分集算得更小、更好看。
+
+三个包装器（`docs/mutants/_helpers.mjs`），不要去动适配器内部状态：
+
+| 包装器 | 改什么 |
+| --- | --- |
+| `wrapState(adapter, fn)` | `observe()` 的返回值 |
+| `wrapExecute(adapter, fn)` | 执行前的请求（换身份、换参数） |
+| `wrapExecuteAfter(adapter, fn)` | 执行后的结局（该拒的改成成功） |
+
+它们是适配器的**装饰器**，不是变体机制：`certify` 不关心变异体怎么实现，只关心
+`observe`/`execute` 的行为与正确实现不同（12.3）。
+
+新增变异体的验收标准不属于格式，属于评审：见 `docs/mutants/README.md` 的四条收稿标准。
 
 ### 12.7 为什么单独一条命令
 

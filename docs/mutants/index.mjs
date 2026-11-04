@@ -1,0 +1,54 @@
+/**
+ * 变异体目录。这里不是 src —— 它是一份**需要被人审的清单**，
+ * 而不是一段只要跑通就算数的代码。
+ *
+ * 投稿方式：复制任一文件改内容，把 id 写进下面的 ENTRIES，跑 npm test。
+ */
+import * as moneyOffByCent from './m-money-off-by-cent.mjs';
+import * as statusFrozen from './m-status-frozen.mjs';
+import * as historyEmpty from './m-history-empty.mjs';
+import * as extraForeignOrder from './m-extra-foreign-order.mjs';
+import * as foreignWriteAllowed from './m-foreign-write-allowed.mjs';
+import * as noReject from './m-no-reject.mjs';
+
+const ENTRIES = [
+  ['m-money-off-by-cent', moneyOffByCent],
+  ['m-status-frozen', statusFrozen],
+  ['m-history-empty', historyEmpty],
+  ['m-extra-foreign-order', extraForeignOrder],
+  ['m-foreign-write-allowed', foreignWriteAllowed],
+  ['m-no-reject', noReject],
+];
+
+const LAYERS = new Set(['state', 'execute']);
+const REQUIRED = ['title', 'symptom', 'mechanism', 'catch_hint'];
+
+export function validateMutants(list) {
+  const errors = [];
+  const seen = new Set();
+  for (const [key, mod] of list) {
+    const meta = mod?.meta;
+    if (!meta) { errors.push(`${key}: 没有导出 meta`); continue; }
+    if (meta.id !== key) errors.push(`${key}: meta.id 是 ${meta.id}，与登记名不符（复制粘贴没改？）`);
+    if (seen.has(meta.id)) errors.push(`${meta.id}: id 重复`);
+    seen.add(meta.id);
+    if (!/^m-[a-z0-9]+(-[a-z0-9]+)*$/.test(String(meta.id))) errors.push(`${key}: id 应形如 m-some-thing`);
+    if (!LAYERS.has(meta.layer)) errors.push(`${key}: layer 必须是 state 或 execute，实际 ${meta.layer}`);
+    for (const f of REQUIRED) {
+      if (typeof meta[f] !== 'string' || meta[f].trim() === '') errors.push(`${key}: 缺 ${f}`);
+    }
+    if (typeof mod.wrap !== 'function') errors.push(`${key}: 没有导出 wrap(adapter)`);
+  }
+  return errors;
+}
+
+const errors = validateMutants(ENTRIES);
+if (errors.length > 0) {
+  throw new Error('变异体目录不合法：\n' + errors.map((e) => '  - ' + e).join('\n'));
+}
+
+export const mutants = ENTRIES.map(([, mod]) => ({ ...mod.meta, wrap: mod.wrap }));
+export const mutantIds = mutants.map((m) => m.id);
+export function mutantById(id) {
+  return mutants.find((m) => m.id === id) ?? null;
+}

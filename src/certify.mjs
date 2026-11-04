@@ -89,7 +89,7 @@ export async function certifyCase(caseObj, adapterFactory, { adapterName = 'unkn
     rows.push({
       mutation: m.id,
       title: m.title,
-      level: m.level,
+      layer: m.layer,
       verdict: p.verdict.status,
       reason_code: p.verdict.reason_code,
       cells,
@@ -166,7 +166,7 @@ export async function certify({ cases, adapterFactory, adapterName = 'unknown', 
       });
       if (row.caseCaught) verdictKills += 1;
     }
-    return { id: m.id, title: m.title, level: m.level, symptom: m.symptom, caught: killedBy.length > 0 || verdictKills > 0, killedBy, blindBy, survivedIn, verdictKills };
+    return { id: m.id, title: m.title, layer: m.layer, symptom: m.symptom, caught: killedBy.length > 0 || verdictKills > 0, killedBy, blindBy, survivedIn, verdictKills };
   });
 
   const caught = mutationsSummary.filter((m) => m.caught).length;
@@ -215,7 +215,7 @@ export function formatCertify(report, { detail = false } = {}) {
     const mark = m.caught ? '抓到' : '漏网';
     const by = m.killedBy.map((k) => `${k.caseId}#${k.assertion.split('#')[1]}`).slice(0, 3).join(' ');
     const tail = m.caught ? by || `判决级 ×${m.verdictKills}` : '没有任何断言或负例步意识到它';
-    L.push(`  [${mark}] ${m.id.padEnd(w)}  ${m.level.padEnd(7)}  ${tail}`);
+    L.push(`  [${mark}] ${m.id.padEnd(w)}  ${String(m.layer).padEnd(7)}  ${tail}`);
   }
   L.push('');
 

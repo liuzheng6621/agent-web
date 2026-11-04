@@ -79,9 +79,15 @@
       {
         "kind": "count_delta",
         "selector": {
-          "collection": "status_log"
+          "collection": "status_log",
+          "where": [
+            {
+              "field": "type",
+              "eq": "order.picked"
+            }
+          ]
         },
-        "delta": 4
+        "delta": 1
       }
     ]
   },

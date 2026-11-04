@@ -9,6 +9,7 @@
   agent-web audit <可信.jsonl> <被审.jsonl>  用真实判决当尺子，量假绿/假红
   agent-web traps <结果.jsonl> --cases=目录  陷阱普查：这批判决有多少条在盲区里
   agent-web certify <案例目录> --adapter=SPEC  判据准入：哪些断言真的抓得住东西
+  agent-web mutants                          变异体目录：实现能坏成什么样
  *   agent-web capabilities             打印适配器的能力清单与证据等级
  *   agent-web prepare <动作日志>       一次生成轨迹、案例草稿与流程预览
  *   agent-web draft <轨迹文件>          回放一条轨迹，反推案例草稿
@@ -202,6 +203,26 @@ function loadCaseDir(dir) {
     if (c && c.id) out.set(c.id, c);
   }
   return out;
+}
+
+function cmdMutants(args, flags) {
+  const list = describeMutations();
+  if (flags.json) {
+    console.log(JSON.stringify(list, null, 2));
+    return 0;
+  }
+  console.log(`变异体目录 · ${list.length} 个 · docs/mutants/`);
+  console.log('');
+  for (const m of list) {
+    console.log(`${m.id}  [${m.layer}]`);
+    console.log(`  ${m.title}`);
+    console.log(`  症状：${m.symptom}`);
+    console.log(`  怎么坏：${m.mechanism}`);
+    console.log(`  怎么抓：${m.catch_hint}`);
+    console.log('');
+  }
+  console.log('投稿：复制 docs/mutants/ 里任一文件，改 id 与 wrap，登记到 index.mjs 的 ENTRIES，跑 npm test。');
+  return 0;
 }
 
 async function cmdCertify(args, flags) {
@@ -1191,6 +1212,8 @@ async function main() {
         return await cmdTraps(args, flags);
       case 'certify':
         return await cmdCertify(args, flags);
+      case 'mutants':
+        return cmdMutants(args, flags);
       case 'audit':
         return await cmdAudit(args, flags);
       case 'accept':

@@ -351,6 +351,36 @@ Boundaries worth knowing:
 - It does not prove the cases are right. Bodies only cover the bugs you thought of; the list of
   bodies is itself something to review, which is why it lives in the repository and not inside CI.
 
+### The list of bodies is open for contribution
+
+The six bodies live in `docs/mutants/`, one file each, carrying `symptom` (what the user complains
+about), `mechanism` (what was changed) and `catch_hint` (which assertion can see it, and which
+cannot). List them all: `agent-web mutants`.
+
+The four acceptance rules are in [docs/mutants/README.md](docs/mutants/README.md): it maps to a real
+failure, you can name what catches it, it is not a duplicate of the existing six, and the places it
+cannot be caught are admitted.
+
+**This list is the one thing other people can contribute.** Cases must fit a specific system and the
+spec has to stay stable, but "here is another way a system can be wrong" is something everyone can
+speak about.
+
+### Swap the implementation; the admission verdict should not move a single field
+
+Same cases, `--adapter` switched from the built-in implementation to a real backend (a Spring Boot
+coffee shop on port 8180). The two reports agree **field by field**: the same seven verdicts, the
+same six bodies caught, 12 evaluable assertions with 7 useful, and the same four assertions in the
+minimal set.
+
+That is stronger than "100% verdict agreement": it says *which assertions do the work* does not
+depend on the implementation either.
+
+One real lesson from doing it: the log assertion was first written as "four log entries" — true on
+the built-in implementation (which also records order creation), false on the real backend (which
+records only transitions, three entries). Rewritten as "exactly one `order.picked` event", it holds
+on both. **Assert event types, not totals** — totals are the implementation's freedom, event types
+are the business fact.
+
 ## One copy of the cases
 
 `cases/coffee/` is not duplicated per implementation. The same directory hits different systems by switching `--adapter`:

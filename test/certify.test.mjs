@@ -19,7 +19,7 @@ test('变异体清单稳定：六个，id 不重复', () => {
   assert.equal(new Set(ids).size, 6);
   for (const m of MUTATIONS) {
     assert.equal(typeof m.wrap, 'function', `${m.id} 缺 wrap`);
-    assert.ok(['state', 'execute'].includes(m.level), `${m.id} level 不对`);
+    assert.ok(['state', 'execute'].includes(m.layer), `${m.id} layer 不对`);
   }
 });
 
@@ -96,4 +96,31 @@ test('flatAssertions 把 goal 与 invariant 分成两组标号', () => {
   assert.ok(list.some((x) => x.label === 'goal[0]'));
   assert.ok(list.some((x) => x.label === 'inv[0]'));
   assert.equal(list.length, happy().task.goal_assertions.length + (happy().task.invariants ?? []).length);
+});
+
+test('变异体目录：登记名与 meta.id 必须一致，字段齐全', async () => {
+  const { validateMutants, mutants } = await import('../docs/mutants/index.mjs');
+  assert.equal(validateMutants([['m-x', { meta: { id: 'm-x', title: 't', layer: 'state', symptom: 's', mechanism: 'm', catch_hint: 'c' }, wrap() {} }]]).length, 0);
+  assert.ok(mutants.length >= 6);
+  for (const m of mutants) {
+    assert.ok(m.title && m.symptom && m.mechanism && m.catch_hint, `${m.id} 少了说明字段`);
+    assert.ok(['state', 'execute'].includes(m.layer), `${m.id} layer 不对`);
+  }
+});
+
+test('变异体目录会拒收坏投稿', async () => {
+  const { validateMutants } = await import('../docs/mutants/index.mjs');
+  const ok = { id: 'm-ok', title: 't', layer: 'state', symptom: 's', mechanism: 'm', catch_hint: 'c' };
+  const bad = (patch) => validateMutants([['m-ok', { meta: { ...ok, ...patch }, wrap() {} }]]);
+
+  assert.ok(bad({ id: 'm-other' }).some((e) => e.includes('与登记名不符')), '复制粘贴没改 id 必须被拒');
+  assert.ok(bad({ id: 'M_BAD' }).some((e) => e.includes('m-some-thing')), 'id 形状不对必须被拒');
+  assert.ok(bad({ layer: 'observe' }).some((e) => e.includes('layer')), 'layer 只能是 state/execute');
+  assert.ok(bad({ catch_hint: '' }).some((e) => e.includes('catch_hint')), '写不出怎么抓的必须被拒');
+  assert.ok(validateMutants([['m-ok', { meta: ok }]]).some((e) => e.includes('wrap')), '没有 wrap 必须被拒');
+  const dup = validateMutants([
+    ['m-ok', { meta: ok, wrap() {} }],
+    ['m-ok', { meta: ok, wrap() {} }],
+  ]);
+  assert.ok(dup.some((e) => e.includes('重复')), '重复 id 必须被拒');
 });
