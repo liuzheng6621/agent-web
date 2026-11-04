@@ -2,7 +2,7 @@
 
 README 只放入门和目录。这一份是完整说明：每条命令的细节、判决顺序表怎么来的、遇到过的坑怎么修的、以及为什么有些看起来该做的东西没有做。
 
-内容与 v0.17 的 README 一致，后续新增能力会先补 README 的短说明，再补到这里。
+内容与 v0.19 的 README 一致，后续新增能力会先补 README 的短说明，再补到这里。
 
 ---
 
@@ -80,9 +80,137 @@ node bin/agent-web.mjs verify cases/coffee/happy-path.json --adapter=memory
 
 ---
 
+## 从一个网址开始
+
+![输入一个网址之后发生了什么：探测、生成只读适配器与案例草稿、确认、判决](media/discover.png)
+
+前面几节都假定你手上已经有一份日志。但更多时候你手上只有一台跑着的站点，别人给你的，或者你自己很久没碰的那个。
+这时候最便宜的一步不是写适配器，是先让工具把「这台站点有什么」列出来。
+
+```bash
+git clone https://gitee.com/liu-everything_impossble/agent-web.git
+cd agent-web
+./quickstart.sh http://127.0.0.1:8080
+```
+
+Windows 用 `pwsh -File quickstart.ps1 http://127.0.0.1:8080`。没有依赖，只要有 Node 20 以上。
+
+### 它会跑出什么
+
+```
+探测 http://127.0.0.1:8199
+
+  根路径  200  text/html  62 字节  演示订单服务
+  接口描述  http://127.0.0.1:8199/openapi.json  演示订单服务 1.0.0
+
+  探测到 6 个接口：只读 3，写 3
+    R  menu.list                GET /api/menu
+    R  orders.list              GET /api/orders
+    R  orders.get               GET /api/orders/{id}
+    W  orders.create            POST /api/orders
+    W  orders.delete            DELETE /api/orders/{id}
+    W  menu.image               POST /api/menu/{id}/image
+
+  实跑 3 个只读接口：
+    OK    200 1ms    1 行     menu.list
+    OK    200 2ms    2 行     orders.list
+    SKIP  需要路径参数    orders.get  GET /api/orders/{id}
+    2/2 可用，1 个需要参数没打
+```
+
+三行字加起来就回答了三件事：这台机器通不通、接口在哪、哪些接口现在真的能用。
+
+### 生成的两份东西
+
+```text
+agent-web-site/
+├── adapter.mjs           只读适配器，立刻能跑
+└── cases/
+    ├── menu-readonly.json
+    └── orders-readonly.json
+```
+
+适配器是全的：五个方法都在，`manifest()` 通过校验，默认 `reset_strategy` 是 `identity`。
+案例每个资源一条，断言只有一条 —— `{ "kind": "unchanged", "scopes": ["orders"] }`：读操作不该改变任何东西。
+
+先把这两份当成**别人写给你的初稿**：格式对、能跑，但里面每一个判断都是机器推的。
+
+### 三条它明确不做的
+
+**一、不猜写操作该保证什么。** 看到 `POST /orders` 能知道「会创建一个订单」，推不出「同一个人对同一个订单重复下单该不该被拒」。
+前一句写在接口描述里，后一句是产品决策。所以生成的适配器对所有写能力返回 `unsupported`，
+而不是假装成功 —— 假装成功会让判决变成绿灯，那比缺能力坏得多。
+
+**二、不猜路径。** 站点没有 OpenAPI 时它**不会**去试 `/api/orders`、`/api/users` 这类常见路径。
+猜出来的 404 会变成案例里的假失败，而假失败比缺案例更坏：它让人开始不信任这套工具。那种情况它只做一件事 —— 告诉你改走 `prepare`。
+
+**三、带参数的接口不去打。** `/api/orders/{id}` 拿不到真实 id，硬拼一个去打必然 404。它把这类标成 `SKIP 需要路径参数`，
+单独计数，不算进「可用 / 不可用」的分母。
+
+### 三个数字怎么读
+
+| 行 | 意思 | 什么时候要担心 |
+| --- | --- | --- |
+| `R` / `W` | 只读 / 会改状态的接口 | —— |
+| `OK` | 真的打通了、返回 JSON | 大面积 `OK` 但行数是 0，说明接口通而数据空，案例会测得很虚 |
+| `SKIP` | 需要路径参数，没打 | 从不担心。这是有意的 |
+
+### 然后是这四步
+
+```bash
+# 1. 看一眼生成的适配器和案例（生成的东西都标了 inferred，别当事实）
+ls agent-web-site/cases
+
+# 2. 自检适配器：查它有没有在基本行为上自相矛盾
+node bin/agent-web.mjs probe --adapter=agent-web-site/adapter.mjs
+
+# 3. 确认案例。不确认不出判决，确认人会被写进文件
+node bin/agent-web.mjs accept agent-web-site/cases/orders-readonly.json --by=你的名字
+
+# 4. 跑判决
+node bin/agent-web.mjs verify agent-web-site/cases --adapter=agent-web-site/adapter.mjs
+```
+
+第 2 步值得单独说：探针跑六项检查（契约、复位幂等、观测稳定、无状态泄漏、空参不炸、写了要变），
+生成的适配器在这六项上应当全绿。它证明的是「这份观测在能机械检查的范围内自洽」，
+不证明它没在别处撒谎 —— 那件事只能靠读代码和跨实现对照。
+
+第 3 步也别跳。不确认时的判决是 `unknown / unconfirmed_draft`，
+留在分母里，可判定率会难看 —— 这是故意的。
+
+### 站点没有 OpenAPI 怎么办
+
+大多数内部系统都没有。这时报告是这样的：
+
+```
+探测 http://127.0.0.1:8180
+
+  根路径  406  未知类型  0 字节
+  接口描述  没找到（试过 8 个常见位置）
+  根路径不是 200，但站点是通的 —— 很多后端只提供接口、根路径本来就什么都不返回。
+```
+
+然后它把剩下的路指明白了：先抓一次真实操作，从流量里还原。也就是回到本文开头那条路：
+
+```bash
+node bin/agent-web.mjs prepare <动作日志.jsonl> --adapter=<你写的一半适配器> --out-dir=./my-site
+```
+
+注意 `record` 和 `prepare` 吃的是**一行一个 JSON 的动作日志**，不是 HAR 原文件。
+浏览器抓到的 HAR 要先用 jq 之类摊平，或者用能直接导出 JSONL 的工具。
+
+### 这条路想清楚了什么、没想清楚什么
+
+想清楚的是：**「接一个新系统」的成本，从「写一个适配器」降到「改一个适配器」**。
+探测做完之后，你要填的是写操作那半截，以及真正有业务含义的断言。读操作那半截不用写。
+
+没想清楚的是：字段语义。工具不知道 `status: "READY"` 在你的业务里意味着什么，
+所以它一条业务断言都不生成。这块只能人给。
+
+---
 ## 使用指南：从日志到正式判分
 
-![agent-web 使用流程：收集日志、生成材料、人工审查、正式判分与系统对照](docs/prepare-flow.zh.svg)
+![agent-web 使用流程：收集日志、生成材料、人工审查、正式判分与系统对照](prepare-flow.zh.svg)
 
 助手已经跑过一次，并且你拿到了它发出的请求日志？最短路径是：日志 → `prepare` → 人工检查 → `verify`。`prepare` 一次生成可重放步骤、待确认案例草稿和流程预览：
 
@@ -697,15 +825,16 @@ agent-web probe --adapter=memory --detail
 
 ```text
 bin/agent-web.mjs       命令行入口
-src/                   判分、案例、记录、草稿和流程图代码
+src/                   判分、案例、记录、草稿、探测、流程图代码
+quickstart.sh/.ps1     一键：给一个网址，探测并生成适配器与案例草稿
 cases/                 内置测试题
 examples/              可运行的连接样例与日志
   agent-traces/memory-happy-path.jsonl   可直接试用 prepare 的简化日志
 docs/SPEC.md            案例文件的详细格式
-test/engine.test.mjs    自动测试（49 条）
+test/                 自动测试（141 条）
 ```
 
-常用命令：`prepare`（一条命令生成步骤、案例草稿和流程预览）、`selftest`（跑内置检查）、`verify`（检查案例）、`compare`（比较不同系统）、`record`（整理请求记录）、`draft`（单独生成案例草稿）、`flow`（生成流程图）、`drift`（比较两次初始数据是否变化）。运行 `node bin/agent-web.mjs help` 查看完整命令。
+常用命令：`discover`（给一个网址，探测并生成）、`prepare`（一条命令生成步骤、案例草稿和流程预览）、`selftest`（跑内置检查）、`verify`（检查案例）、`compare`（比较不同系统）、`probe`（查适配器自洽性）、`record`（整理请求记录）、`draft`（单独生成案例草稿）、`flow`（生成流程图）、`drift`（比较两次初始数据是否变化）。运行 `node bin/agent-web.mjs help` 查看完整命令。
 
 ---
 
@@ -728,11 +857,13 @@ git config --local http.https://github.com.proxy http://127.0.0.1:8899
 
 ## 版本与后续
 
-当前版本 `0.16`（`package.json` 里的数字就是它，文档与它对齐）。能力清单：
+当前版本 `0.19`（`package.json` 里的数字就是它，`CHANGELOG.md` 第一条必须与它一致，测试和 CI 都在查）。能力清单：
 
 | 命令 | 一句话 |
 | --- | --- |
+| `discover <网址>` | 探测一台站点，生成只读适配器与案例草稿 |
 | `verify` / `selftest` | 跑案例，出三值判决 |
+| `report` | 由判决结果出指标（可判定率、Wilson 区间、原因分布） |
 | `compare` | 同一批案例跑多个实现，比判决是否一致 |
 | `audit` | 一个实现当尺子验收另一个，报假绿 |
 | `traps` | 判决是不是在盲区里产生的（只看终态、事件词表缺失、身份塌缩……） |
@@ -740,16 +871,20 @@ git config --local http.https://github.com.proxy http://127.0.0.1:8899
 | `certify` | 断言杀不杀得掉变异体；杀不掉的欠账逐条给补法 |
 | `mutants` | 变异体清单（本身开源，可投稿） |
 | `drill` | 把变异体变成题，机器批改提交的断言 |
+| `probe` | 探针：查适配器有没有在基本行为上撒谎 |
 | `record` / `prepare` / `draft` | 从请求日志还原可重放步骤，生成待确认草稿 |
 | `accept` | 草稿转正，必须署名 |
+| `drift` | 两次跑批的初态形状变了没有 |
+| `knowledge` / `recall` | 事故档案；这次有没有重犯旧错 |
 | `flow` / `init` / `capabilities` | 画流程、起目录、报能力 |
 
 ## 现在做不到什么
 
 这一段比上面那张表重要。按「离真实使用最近」排序：
 
-1. **每个目标系统都要写一份适配器**，没有「填个网址就能接」。适配器是代码，
-   加载它等于以你的身份执行它（见 SPEC 6.4），所以别加载来路不明的。
+1. **写操作仍然要人写。** `discover` 能把探测到的只读接口直接变成可跑的适配器
+   （见「从一个网址开始」一节），但写操作一律 `unsupported`——它不知道你的业务该保证什么。
+   适配器本身是代码，加载它等于以你的身份执行它（见 SPEC 6.4），所以别加载来路不明的。
 2. **字段命名差异靠人写映射，工具不猜**。规范视图就是那个映射层；写在适配器里
    是故意的——映射集中在一处，案例才能跨实现可移植。自动推导映射现在没有可信做法。
 3. **不评价过程好坏，只判过程合法**。有 `status_transition`（路径）、`traps`（能报

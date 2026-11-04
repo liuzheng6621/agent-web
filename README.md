@@ -191,6 +191,7 @@ node bin/agent-web.mjs recall        # 扫一遍，看这次有没有重犯
 
 | 文件 | 内容 |
 | --- | --- |
+| [docs/GUIDE.md](docs/GUIDE.md) | 完整说明：每条命令的细节、判决顺序怎么来的、踩过的坑怎么修的 |
 | [docs/SPEC.md](docs/SPEC.md) | 格式规范：案例、断言、适配器契约、判决顺序表 |
 | [docs/FINDING-001.md](docs/FINDING-001.md) | 一次假通过的全过程 |
 | [docs/museum/](docs/museum/) | 六件失败展品，每件都能复现 |

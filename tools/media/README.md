@@ -7,11 +7,13 @@
 | `1-hero-verdicts.py` | `hero.png`、`verdicts.png` |
 | `2-loop.py` | `loop.png`（一份案例、两个实现的对照图） |
 | `3-terminal.py` | `terminal.png`、`recall.png`、`.tmp-frames/` 的动画帧 |
+| `4-discover.py` | `discover.png`（输入一个网址之后发生了什么） |
 
 ```bash
 python tools/media/1-hero-verdicts.py
 python tools/media/2-loop.py
 python tools/media/3-terminal.py
+python tools/media/4-discover.py
 ffmpeg -y -framerate 4 -i .tmp-frames/f%04d.png \
   -vf "split[a][b];[a]palettegen=max_colors=160:stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=3" \
   -loop 0 docs/media/demo.gif
