@@ -112,6 +112,9 @@ export async function certifyCase(caseObj, adapterFactory, { adapterName = 'unkn
       witness: witnesses[0] ?? null,
       witnessCount: witnesses.length,
       suggestions: suggestions.slice(0, 3),
+      // 差异看得见、但全落在 id / 时间 / pickupNo 这类不可移植字段上：
+      // 说明它杀得掉，只是没有能跨实现表达的断言。不记这一笔，读者会以为工具坏了。
+      suggestionBlocked: suggestions.length === 0 && witnesses.length > 0,
     });
   }
   return { caseId: caseObj.id, base, armed, rows };
@@ -139,7 +142,28 @@ const VIEW_COLLECTIONS = ['orders', 'menu', 'status_log'];
  * 把一处可观测差异翻成一条断言。返回 null 表示没有现成模板能表达它。
  * 只翻"正确实现上一定为真、坏实现上一定为假"的那种——翻不出来就不猜。
  */
+/**
+ * 这些字段的值由「谁先跑」「库自增」「时钟」决定，跨实现断不了。
+ *
+ * 把它们建议成断言，写进去的人会得到一个必然失败（换实现就变）或必然空转
+ * （同一个进程里恰好对上）的检查项 —— 比没有建议更糟，因为它看起来像条建议。
+ */
+const NON_PORTABLE = new Set([
+  'id', 'ids', 'createTime', 'createdAt', 'updatedAt', 'updateTime',
+  'at', 'time', 'timestamp', 'now', 'seq', 'oid', 'token',
+  'pickupNo', 'username', 'by', 'operatorName', 'operatorRole',
+]);
+
+export function isPortablePath(path) {
+  const last = String(path).split('.').pop();
+  if (NON_PORTABLE.has(last)) return false;
+  // createdAt / startAt / xxxTime 这类后缀一律算时钟或外部生成的
+  if (/(At|Time|_at|_time)$/.test(last)) return false;
+  return true;
+}
+
 export function suggestFromWitness(witness, baseCtx) {
+  if (!isPortablePath(witness.path)) return null;
   const parts = String(witness.path).split('.');
   const collection = parts[0];
   if (!VIEW_COLLECTIONS.includes(collection)) return null;
@@ -242,10 +266,12 @@ export async function certify({ cases, adapterFactory, adapterName = 'unknown', 
     // equivalent，得由投稿人给出可区分性证明（meta.equivalence_evidence）。
     const witnesses = [];
     const suggestions = [];
+    let blockedIn = 0;
     for (const cr of per) {
       const row = cr.rows.find((r) => r.mutation === m.id);
       if (!row) continue;
       if (row.witness) witnesses.push({ caseId: cr.caseId, ...row.witness });
+      if (row.suggestionBlocked) blockedIn += 1;
       for (const sg of row.suggestions) suggestions.push({ caseId: cr.caseId, path: sg.path, assertion: sg.assertion, proof: sg.proof });
     }
     const status = caught ? 'caught' : suggestions.length > 0 ? 'killable' : witnesses.length > 0 ? 'killable' : 'undetermined';
@@ -261,6 +287,7 @@ export async function certify({ cases, adapterFactory, adapterName = 'unknown', 
       survivedIn,
       verdictKills,
       witnessCount: witnesses.length,
+      suggestionBlocked: blockedIn > 0 && suggestions.length === 0,
       witness: witnesses[0] ?? null,
       suggestion: suggestions[0] ?? null,
       suggestionCount: suggestions.length,
@@ -323,6 +350,13 @@ export function formatSuggestions(report) {
       out.push(`//   杀死 ${r.mutant}  ← 差异在 ${r.path}`);
       out.push('   ' + stableStringify(r.assertion) + ',');
     }
+    out.push('');
+  }
+  const blocked = (report.mutations ?? []).filter((m) => !m.caught && m.suggestionBlocked);
+  if (blocked.length > 0) {
+    out.push('// 以下变异体杀得掉，但差异全落在不可移植字段上（id / 时间 / 取餐号这类），');
+    out.push('// 没有能跨实现表达的断言 —— 换一个实现它就必然失败，写进去等于给自己造一条会红的假账：');
+    for (const m of blocked) out.push('//   ' + m.id + (m.witness ? '  ← ' + m.witness.path : ''));
     out.push('');
   }
   return out.join(String.fromCharCode(10)).replace(/,\s*$/, '');

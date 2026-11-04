@@ -10,10 +10,14 @@
 
 import { validateManifest } from './contract.mjs';
 
+// 菜名与价格必须与参考实现（真实咖啡店 /waiter/menu）逐字一致。
+// 这不是为了好看：案例里写的是菜名，mock 的菜单一旦自己编，同一份案例在真实
+// 后端上就会因为「菜单里没有这道菜」变成 infrastructure_error —— 案例的可移植性
+// 就是从这里漏掉的（two-items 案例曾用「美式」，真实后端叫「美式咖啡」）。
 const MENU = [
   { id: 'latte', name: '拿铁', price: 28 },
-  { id: 'americano', name: '美式', price: 22 },
-  { id: 'pourover', name: '手冲', price: 38 },
+  { id: 'americano', name: '美式咖啡', price: 22 },
+  { id: 'signature', name: '太相恋特调', price: 38 },
 ];
 
 const USERS = {

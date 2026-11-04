@@ -13,7 +13,7 @@ const order = (over = {}) => ({
   pickupNo: 1101,
   items: [
     { dishName: '拿铁', count: 2, unitPrice: 28, subTotal: 56 },
-    { dishName: '美式', count: 3, unitPrice: 22, subTotal: 66 },
+    { dishName: '美式咖啡', count: 3, unitPrice: 22, subTotal: 66 },
   ],
   ...over,
 });

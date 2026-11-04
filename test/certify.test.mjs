@@ -10,6 +10,7 @@ import {
   suggestFromWitness,
   verifySuggestion,
   formatSuggestions,
+  isPortablePath,
 } from '../src/certify.mjs';
 import { MUTATIONS, mutate, mutationIds } from '../src/mutate.mjs';
 import { createMemoryAdapter } from '../src/adapter/memory.mjs';
@@ -169,23 +170,49 @@ test('差异翻断言：字段用 field_equals，长度用 count_delta，认不�
   assert.equal(suggestFromWitness({ path: 'orders.0', correct: {} }, ctx), null, '整个实体不同不该硬翻成一条字段断言');
 });
 
-test('建议断言必须当场验过才允许出现', async () => {
+test('建议断言必须当场验过才允许出现；给不出的必须说明卡在哪', async () => {
   const report = await certify({ cases: all(), adapterFactory: () => createMemoryAdapter() });
   const uncaught = report.mutations.filter((m) => !m.caught);
   assert.ok(uncaught.length > 0);
   for (const m of uncaught) {
     assert.equal(m.status, 'killable', `${m.id} 没有可观测差异，应当是 undetermined 而不是静默算进欠账`);
-    assert.ok(m.suggestion, `${m.id} 是欠账却拿不出建议断言`);
-    assert.equal(m.suggestion.proof.onBase, 'true', `${m.id} 的建议断言在正确实现上不成立`);
-    assert.equal(m.suggestion.proof.onMutant, 'false', `${m.id} 的建议断言杀不掉它`);
+    if (m.suggestion) {
+      assert.equal(m.suggestion.proof.onBase, 'true', `${m.id} 的建议断言在正确实现上不成立`);
+      assert.equal(m.suggestion.proof.onMutant, 'false', `${m.id} 的建议断言杀不掉它`);
+    } else {
+      // 给不出建议是允许的，但必须说清是「差异全落在不可移植字段上」，
+      // 不能什么都不说 —— 沉默会被读成「工具没找到洞」。
+      assert.equal(m.suggestionBlocked, true, `${m.id} 既没有建议也没有说是被不可移植字段挡住的`);
+      assert.ok(m.witness, `${m.id} 连见证都没有，那就不该是 killable`);
+    }
   }
 });
 
-test('--suggest 的产出能直接粘进案例：每条都带案例名与杀死的变异体', async () => {
+test('不可移植字段不许被建议成断言', () => {
+  // id / 时间 / 取餐号这类值由「谁先跑」「库自增」「时钟」决定，换实现必变。
+  // 建议它们等于让人写一条必然失败（或必然空转）的检查项。
+  for (const p of ['orders.0.id', 'orders.0.createTime', 'orders.0.pickupNo', 'status_log.0.at', 'orders.0.updatedAt']) {
+    assert.equal(isPortablePath(p), false, `${p} 不该被当成可移植字段`);
+  }
+  for (const p of ['orders.0.status', 'orders.0.totalAmount', 'orders.0.items.0.count']) {
+    assert.equal(isPortablePath(p), true, `${p} 是可移植字段，不该被挡`);
+  }
+  const base = { initial: { orders: [] }, final: { orders: [{ id: 1, status: 'PICKED' }] } };
+  assert.equal(suggestFromWitness({ path: 'orders.0.id', correct: 1 }, base), null);
+  assert.ok(suggestFromWitness({ path: 'orders.0.status', correct: 'PICKED' }, base));
+});
+
+test('--suggest 的产出能直接粘进案例，并交代哪些给不出', async () => {
   const report = await certify({ cases: all(), adapterFactory: () => createMemoryAdapter() });
   const text = formatSuggestions(report);
-  for (const m of report.mutations.filter((x) => !x.caught && x.suggestion)) {
+  const withSuggestion = report.mutations.filter((x) => !x.caught && x.suggestion);
+  for (const m of withSuggestion) {
     assert.ok(text.includes(m.id), `建议里缺 ${m.id}`);
   }
-  assert.ok(text.includes('field_equals') || text.includes('count_delta'));
+  for (const m of report.mutations.filter((x) => !x.caught && x.suggestionBlocked && !x.suggestion)) {
+    assert.ok(text.includes(m.id), `给不出的 ${m.id} 也要点名，不能沉默`);
+  }
+  if (withSuggestion.length > 0) {
+    assert.ok(text.includes('field_equals') || text.includes('count_delta'));
+  }
 });

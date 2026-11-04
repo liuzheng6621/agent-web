@@ -488,6 +488,38 @@ difference cannot be read off the code — only run.
 That is why this works as a training target: the label comes from the mechanism, not from a rater.
 Any model solving the same mutants gets a comparable score, because the grader only honours results.
 
+## Portability has a cost: a hole we dug ourselves
+
+A new case ("two lattes plus three americanos") passed on the mock and returned
+`unknown / infrastructure_error` against the real backend: **there is no 美式 on the menu**.
+
+The mock's menu was invented (`美式`, `手冲`); the real shop sells `美式咖啡` and
+`太相恋特调`. Cases address dishes by name, so the same case meant different dishes on
+each side. That is not a bad case — it is a missing alignment contract between the
+reference implementation and the real one. The fix was to make the mock's menu match
+verbatim, and write the reason into `memory.mjs` so nobody "tidies up" a dish name later.
+
+After aligning: certification 11/12 on both implementations with the **same** survivor,
+and 100% (8/8) cross-adapter verdict agreement. Before: 11/12 versus 8/12 — the missing
+three were not caught, they were blocked by a dish name.
+
+### A subtler hole closed at the same time
+
+Suggested assertions once included `field_equals id = 1`. It verified on the spot (in that
+process the id *was* 1), so the mechanism did not stop it — but it is guaranteed to fail
+on any other implementation. Fields decided by insertion order, clock, or local numbering
+(`id`, `*At`, `pickupNo`, `username`) now yield no suggestion at all, and `--suggest` says
+so explicitly rather than staying silent, because silence reads as "found nothing".
+
+### Why there is no concurrency switch
+
+Tried it: 12 mutants by 8 cases against the real backend took 77s serially and 8s at six
+ways — but the conclusions drifted (a mutant moved from "caught by assertion 4" to
+"verdict-level", another moved from owed to missed). Serial repeated runs are identical.
+Concurrency puts machine-local timing into the system under test, and the whole value of
+cross-implementation comparison is that both sides ran the same thing. A 9x faster
+evaluator with a different answer is worth less than the slow one.
+
 ## One copy of the cases
 
 `cases/coffee/` is not duplicated per implementation. The same directory hits different systems by switching `--adapter`:
