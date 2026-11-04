@@ -18,6 +18,7 @@ import { fileURLToPath } from 'node:url';
 
 import { judge } from '../src/runner.mjs';
 import { fingerprint } from '../src/values.mjs';
+import { recordTrajectory } from '../src/record.mjs';
 import { summarize, agreement, formatText, countFailedAssertions } from '../src/report.mjs';
 import { loadAdapter, listBuiltins } from '../src/adapter/load.mjs';
 import { diffViews } from '../src/view.mjs';
@@ -408,6 +409,52 @@ async function cmdDrift(args) {
   return drifted > 0 ? 1 : 0;
 }
 
+async function cmdRecord(args, flags) {
+  if (args.length === 0) {
+    console.error('用法：agent-web record <动作日志> --adapter=SPEC --out=<文件> [--case=<案例id>]');
+    return 2;
+  }
+  const adapterName = flags.adapter ?? 'memory';
+  const adapter = await makeAdapter(adapterName);
+  const manifest = await adapter.manifest();
+  const logPath = path.resolve(args[0]);
+  if (!fs.existsSync(logPath)) {
+    console.error('找不到日志 ' + logPath);
+    return 2;
+  }
+
+  const { entryCount, doc } = recordTrajectory({
+    text: fs.readFileSync(logPath, 'utf8'),
+    manifest,
+    adapter,
+    producedBy: typeof flags.case === 'string' ? path.basename(logPath) : path.basename(logPath),
+    includeReads: flags['include-reads'] === true || flags['include-reads'] === 'true',
+  });
+
+  if (typeof flags.case === 'string') doc.note = '由 record 从 ' + path.basename(logPath) + ' 还原，对应案例 ' + flags.case;
+
+  const out = typeof flags.out === 'string' ? flags.out : null;
+  if (out) {
+    fs.mkdirSync(path.dirname(path.resolve(out)), { recursive: true });
+    fs.writeFileSync(path.resolve(out), JSON.stringify(doc, null, 2) + String.fromCharCode(10), 'utf8');
+  }
+
+  console.log('读入 ' + entryCount + ' 条动作，还原出 ' + doc.trajectory.length + ' 步');
+  for (const s of doc.trajectory) {
+    const arg = s.bindings ? JSON.stringify(s.bindings) : JSON.stringify(s.arguments ?? {});
+    console.log('  ' + s.id + ' ' + s.capability + ' as=' + s.as + ' ' + s.expected_outcome + ' ' + arg);
+  }
+  if (doc.skipped && doc.skipped.length > 0) {
+    const by = {};
+    for (const x of doc.skipped) by[x.reason] = (by[x.reason] ?? 0) + 1;
+    console.log('');
+    console.log('跳过 ' + doc.skipped.length + ' 条：' + Object.entries(by).map(([k, n]) => k + '×' + n).join(' '));
+  }
+  if (out) console.log('');
+  if (out) console.log('已写入 ' + out);
+  return doc.trajectory.length > 0 ? 0 : 1;
+}
+
 function announceCandidateMode(flags) {
   if (typeof flags.trajectory !== 'string' || flags.json) return;
   // 候选轨迹模式下，expected.json 描述的是参考轨迹，落差是结论而不是错误。
@@ -424,6 +471,7 @@ const HELP = `agent-web —— 给 Agent 写机器可判的集成测试
   agent-web capabilities [--adapter=SPEC]     打印能力清单与证据等级
   agent-web compare <案例> --adapters=A,B     同一份案例喂多个实现，比判决
   agent-web drift <旧.jsonl> <新.jsonl>      比较两次跑批的初态形状（漂移检测）
+  agent-web record <动作日志> --adapter=SPEC  把 Agent 的实际动作还原成候选轨迹
   agent-web init <目录>                       生成案例模板（--adapter 写进 environment）
 
 适配器 SPEC 可以是：
@@ -459,6 +507,8 @@ async function main() {
         return await cmdReport(args, flags);
       case 'compare':
         return await cmdCompare(args, flags);
+      case 'record':
+        return await cmdRecord(args, flags);
       case 'drift':
         return await cmdDrift(args);
       case 'capabilities':

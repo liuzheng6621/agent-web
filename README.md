@@ -209,6 +209,48 @@ agent-web verify cases/memory-demo --adapter=memory --trajectory=examples/candid
 
 ---
 
+## 从真实流量到轨迹：record
+
+候选轨迹此前只能手写，这就把「能判 Agent」和「好用」隔开了。`record` 补上这一段：吃 Agent 自己发的请求日志，产出 `verify --trajectory` 能直接吃的文件。
+
+```bash
+node bin/agent-web.mjs record examples/agent-traces/happy-path.jsonl \
+  --adapter=taixianglian --case=taixianglian/happy-path \
+  --out=examples/agent-traces/recorded/happy-path.json
+```
+
+输入是一行一个请求的 JSONL（或一个数组），每条最少要有 `as`、`method`、`path`，能带上 `body`、`status`、`response`：
+
+```json
+{"as":"customer","method":"POST","path":"/waiter/order","body":{"dishList":[{"dishName":"拿铁","count":1}]},"status":200,"response":{"code":200,"data":{"id":2}}}
+```
+
+也接受已经归一化的动作（`capability` + `arguments` + `outcome`），运行时直接导出这种最省事。
+
+还原出来的东西：
+
+```
+读入 8 条动作，还原出 4 步
+  s1 order.create as=customer applied {"items":[{"dishName":"拿铁","qty":1}]}
+  s2 kitchen.accept as=staff applied {"orderId":"$s1.orderId"}
+  s3 kitchen.ready as=staff applied {"orderId":"$s1.orderId"}
+  s4 order.pick as=customer applied {"orderId":"$s1.orderId"}
+
+跳过 4 条：unmapped_request×3 read_skipped×1
+```
+
+三件事值得说清楚：
+
+**绑定是自动推的。** 某一步的参数值等于前面某步返回的实体 id，就写成 `$s1.orderId`。不这么做，录下来的 `orderId: 2` 只在那一次环境里成立——重置一次数据库就全错。上面这份日志里真实 id 是 2，而 built-in 内存适配器的 id 从 1001 起，正是靠绑定才能把它原样重放。
+
+**只录写操作。** 读操作是 Agent 用来摸 id 的，不是被判的动作，混进来还会撞 `allowed_capabilities`，把好轨迹判成 `invalid_action`。要录就加 `--include-reads`。
+
+**认不出来就跳过，不猜。** 每条跳过都带原因（`unmapped_request` / `missing_as` / `no_outcome` / `unparsable_arguments`），写进产物的 `skipped` 字段。安静地塞一条假动作，比少一步危险得多。
+
+实证：`examples/agent-traces/happy-path.jsonl` 是真跑出来的——一个不用 agent-web 任何代码的脚本打真实后端，8 个请求，落盘前把令牌与密码抹成 `<redacted>`。还原出的 4 步轨迹，在内存适配器（id 1001 起）和真实后端（id 2）上**都判 pass**。
+
+---
+
 ## 检测被测系统变了没有
 
 ```bash

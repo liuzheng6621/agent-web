@@ -1,0 +1,69 @@
+{
+  "note": "由 record 从 happy-path.jsonl 还原",
+  "produced_by": "happy-path.jsonl",
+  "trajectory": [
+    {
+      "id": "s1",
+      "capability": "order.create",
+      "as": "customer",
+      "expected_outcome": "applied",
+      "arguments": {
+        "items": [
+          {
+            "dishName": "拿铁",
+            "qty": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "s2",
+      "capability": "kitchen.accept",
+      "as": "staff",
+      "expected_outcome": "applied",
+      "bindings": {
+        "orderId": "$s1.orderId"
+      }
+    },
+    {
+      "id": "s3",
+      "capability": "kitchen.ready",
+      "as": "staff",
+      "expected_outcome": "applied",
+      "bindings": {
+        "orderId": "$s1.orderId"
+      }
+    },
+    {
+      "id": "s4",
+      "capability": "order.pick",
+      "as": "customer",
+      "expected_outcome": "applied",
+      "bindings": {
+        "orderId": "$s1.orderId"
+      }
+    }
+  ],
+  "skipped": [
+    {
+      "index": 0,
+      "reason": "unmapped_request",
+      "detail": "POST /register 不在 manifest 的 http 模板里"
+    },
+    {
+      "index": 1,
+      "reason": "unmapped_request",
+      "detail": "POST /login 不在 manifest 的 http 模板里"
+    },
+    {
+      "index": 2,
+      "reason": "unmapped_request",
+      "detail": "POST /login 不在 manifest 的 http 模板里"
+    },
+    {
+      "index": 3,
+      "reason": "read_skipped",
+      "detail": "menu.list 是读操作，默认不录"
+    }
+  ]
+}

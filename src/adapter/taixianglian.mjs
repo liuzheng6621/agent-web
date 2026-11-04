@@ -319,7 +319,23 @@ export function createTaixianglianAdapter(options = {}) {
     runs.delete(runId);
   }
 
-  return { manifest, reset, observe, execute, close, baseUrl };
+  /**
+   * record 用的反向映射：把一个真实请求还原成案例能用的参数。
+   * 返回 null 表示"这条请求我认不出参数"，record 会把它记进 skipped 而不是瞎猜。
+   */
+  function toStep(entry, matched) {
+    const cap = matched.capability;
+    if (cap === 'order.create') {
+      const list = entry?.body?.dishList;
+      if (!Array.isArray(list) || list.length === 0) return null;
+      return { items: list.map((it) => ({ dishName: it.dishName, qty: Number(it.count ?? it.qty ?? 1) })) };
+    }
+    const id = matched?.params?.id;
+    if (id !== undefined) return { orderId: Number(id) };
+    return {};
+  }
+
+  return { manifest, reset, observe, execute, close, baseUrl, toStep };
 }
 
 export function validateTaixianglianAdapter() {

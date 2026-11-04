@@ -5,9 +5,10 @@ export { TRUE, FALSE, UNKNOWN, isValue, fromBool, and, or, not } from './three-v
 export { NORMALIZATION_VERSION, deepEqual, stableStringify, fingerprint, getPath, setPath } from './values.mjs';
 export { PRED_OPS, validateSelector, selectEntities, describeSelector } from './select.mjs';
 export { KINDS, PHASES, PHASE_MATRIX, phaseOf, validateAssertion, evalAssertions, firstFailure } from './assert/index.mjs';
-export { SCHEMA_VERSION, STEP_OUTCOMES, BindingError, validateCase, resolveArguments, deriveLabels } from './case.mjs';
+export { SCHEMA_VERSION, STEP_OUTCOMES, BindingError, validateCase, validateSteps, resolveArguments, deriveLabels } from './case.mjs';
 export { VERDICTS, judge } from './runner.mjs';
 export { wilson, summarize, agreement, formatText } from './report.mjs';
+export { parseLog, matchHttp, outcomeOf, inferSteps, toTrajectoryDoc, recordTrajectory } from './record.mjs';
 export {
   OUTCOMES,
   CAPABILITY_KINDS,

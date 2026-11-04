@@ -417,3 +417,62 @@ test('judge：结构不合法的候选轨迹不进执行', async () => {
   assert.equal(v.reason_code, 'invalid_case');
   assert.ok(Array.isArray(v.errors) && v.errors.length > 0);
 });
+
+// ---- record：真实流量 → 候选轨迹 ----
+
+const REC_MANIFEST = {
+  capabilities: [
+    { id: 'order.create', kind: 'write', http: 'POST /waiter/order' },
+    { id: 'menu.list', kind: 'read', http: 'GET /waiter/menu' },
+    { id: 'kitchen.accept', kind: 'write', http: 'POST /kitchen/order/{id}/accept' },
+  ],
+};
+const REC_ADAPTER = {
+  toStep(entry, matched) {
+    if (matched.capability === 'order.create') {
+      return { items: (entry.body.dishList ?? []).map((x) => ({ dishName: x.dishName, qty: x.count })) };
+    }
+    return { orderId: Number(matched.params.id) };
+  },
+};
+
+test('record：反查能力靠 http 模板，参数靠适配器 toStep', async () => {
+  const { matchHttp } = await import('../src/record.mjs');
+  const hit = matchHttp(REC_MANIFEST, 'POST', '/kitchen/order/7/accept');
+  assert.equal(hit.capability, 'kitchen.accept');
+  assert.deepEqual(hit.params, { id: '7' });
+  assert.equal(matchHttp(REC_MANIFEST, 'POST', '/kitchen/order/7/ready'), null);
+});
+
+test('record：业务码决定结局，连不上不记成 rejected', async () => {
+  const { outcomeOf } = await import('../src/record.mjs');
+  assert.equal(outcomeOf({ status: 200, response: { code: 200 } }), 'applied');
+  assert.equal(outcomeOf({ status: 200, response: { code: 40901 } }), 'rejected');
+  assert.equal(outcomeOf({ status: 200, response: { code: 40101 } }), null);
+  assert.equal(outcomeOf({ status: 0, response: null }), null);
+});
+
+test('record：绑定指向第一个产出该 id 的步，读操作默认不录', async () => {
+  const { inferSteps } = await import('../src/record.mjs');
+  const entries = [
+    { as: 'customer', method: 'GET', path: '/waiter/menu', status: 200, response: { code: 200, data: [] } },
+    { as: 'customer', method: 'POST', path: '/waiter/order', body: { dishList: [{ dishName: '拿铁', count: 2 }] }, status: 200, response: { code: 200, data: { id: 42 } } },
+    { as: 'staff', method: 'POST', path: '/kitchen/order/42/accept', status: 200, response: { code: 200, data: { id: 42 } } },
+    { as: 'staff', method: 'POST', path: '/kitchen/order/42/accept', status: 200, response: { code: 200, data: { id: 42 } } },
+  ];
+  const { steps, skipped } = inferSteps({ entries, manifest: REC_MANIFEST, adapter: REC_ADAPTER });
+  assert.equal(steps.length, 3);
+  assert.equal(skipped[0].reason, 'read_skipped');
+  assert.deepEqual(steps[0].arguments, { items: [{ dishName: '拿铁', qty: 2 }] });
+  // 第 2、3 步的 orderId 都指回产出它的那一步，不串成链
+  assert.equal(steps[1].bindings.orderId, '$s1.orderId');
+  assert.equal(steps[2].bindings.orderId, '$s1.orderId');
+});
+
+test('record：没有执行者角色的请求跳过，不瞎猜', async () => {
+  const { inferSteps } = await import('../src/record.mjs');
+  const entries = [{ method: 'POST', path: '/waiter/order', body: { dishList: [{ dishName: '拿铁', count: 1 }] }, status: 200, response: { code: 200, data: { id: 1 } } }];
+  const { steps, skipped } = inferSteps({ entries, manifest: REC_MANIFEST, adapter: REC_ADAPTER });
+  assert.equal(steps.length, 0);
+  assert.equal(skipped[0].reason, 'missing_as');
+});

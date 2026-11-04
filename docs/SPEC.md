@@ -207,6 +207,23 @@ agent-web drift before.jsonl after.jsonl
 
 ---
 
+## 5.6 record：把流量还原成轨迹
+
+```bash
+agent-web record <日志> --adapter=SPEC --out=<文件> [--case=<案例 id>] [--include-reads]
+```
+
+- 反查能力：拿 `method + path` 匹配 manifest 里各能力的 `http` 模板；路径模板匹配，`{param}` 捕获成参数。
+- 反查参数：优先用适配器的 `toStep`；没有就用捕获到的路径参数。
+- 结局判定：业务码 `200` → `applied`；`40000–49999` → `rejected`；**`40100–40199` 与其余一切 → 不录**（认证失败和连不上是环境问题，记成 `rejected` 会把环境故障算成 Agent 的错）。
+- 绑定推断：参数值等于之前某步返回的实体 id，改写成 `$sN.orderId`。**只认第一个产出者**——后续步骤回显同一个 id 不改写，否则绑定会串成传递链。
+- 读操作默认不录；`--include-reads` 打开。
+- 无法还原的条目进 `skipped`，带 `reason`，不静默丢弃。
+
+产物就是一个普通的轨迹文件，交给 `verify --trajectory` 直接用。
+
+---
+
 ## 6. 适配器契约
 
 适配器是普通对象，必须实现：
@@ -254,6 +271,8 @@ agent-web drift before.jsonl after.jsonl
 ```
 
 - `reset_strategy`：`snapshot` / `reseed` / `identity`，声明初态怎么来的。
+- `http`：可选，这个能力对应的 HTTP 形状，写法 ``METHOD /path/{param}``。`record` 靠它把真实请求反查回能力。没有它就录不到——日志里出现未声明的请求一律进 `skipped`。
+- `toStep(entry, matched)`：适配器可选方法，把一条请求还原成案例参数（返回 `null` 表示认不出）。**为什么放在适配器里**：`dishList → items` 这种映射属于实现知识，核心不该知道。
 - `events_types`：可选，声明本适配器**确实记录**的事件类型。断言里出现不在词表内的 `type` 时，`event_absent` 判 `unknown / unsupported_event`，绝不返回 TRUE。**词表把 `events_complete` 的承诺限定在真实存在的类型上**：应用压根不记「下单」这类事件时，若不声明词表，「没查到我下单的记录」会被误读成「没有下过单」。未声明词表则退回只看 `events_complete` 的老语义。
 - `events_complete`：`true` 表示事件流水是完整记录。为 `false` 时 `event_absent` 类断言必须判 `unknown`——没记全就不能说"没发生过"。
 - `evidence_level`：`observed`（亲眼看到）/ `inferred`（从接口推出来）/ `validated`（端到端验证过）。**这是给人看的诚实标记，判决不用它。**
