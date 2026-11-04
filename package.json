@@ -1,6 +1,6 @@
 {
   "name": "agent-web",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "给 Agent 写机器可判的集成测试：一份案例，多个实现，判决必须一致。",
   "type": "module",
   "bin": {
@@ -15,19 +15,21 @@
     "./adapter/taixianglian": "./src/adapter/taixianglian.mjs",
     "./record": "./src/record.mjs",
     "./draft": "./src/draft.mjs",
-    "./flow": "./src/flow.mjs"
+    "./flow": "./src/flow.mjs",
+    "./audit": "./src/audit.mjs"
   },
   "scripts": {
     "test": "node --test test/engine.test.mjs",
     "selftest": "node bin/agent-web.mjs selftest",
-    "compare": "node bin/agent-web.mjs compare cases/memory-demo --adapters=memory,taixianglian"
+    "compare": "node bin/agent-web.mjs compare cases/coffee --adapters=memory,taixianglian"
   },
   "keywords": [
     "agent",
     "testing",
     "evaluation",
     "assertions",
-    "integration-test"
+    "integration-test",
+    "audit"
   ],
   "license": "MIT",
   "engines": {

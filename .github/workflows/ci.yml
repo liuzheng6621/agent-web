@@ -44,6 +44,28 @@ jobs:
             console.log("一致率 100%，N =", a.checked);
           '
 
+      # ---------------------------------------------------------------
+      # 下面两步测的不是被测系统，是这个工具自己会不会放水。
+      # ---------------------------------------------------------------
+
+      - name: 未确认草稿不许产生判决
+        run: |
+          mkdir -p /tmp/draft-check
+          node -e 'const fs=require("node:fs");const c=JSON.parse(fs.readFileSync("cases/coffee/happy-path.json","utf8"));c.draft={status:"unconfirmed",source:"ci"};fs.writeFileSync("/tmp/draft-check/happy-path.json",JSON.stringify(c,null,2));'
+          node bin/agent-web.mjs verify /tmp/draft-check --adapter=memory --json |
+            node -e 'let t="";process.stdin.on("data",d=>t+=d).on("end",()=>{const v=JSON.parse(t)[0];if(v.status!=="unknown"||v.reason_code!=="unconfirmed_draft"){console.error("未确认草稿竟然产生了判决：",v.status,v.reason_code);process.exit(1);}console.log("草稿被判 unknown/unconfirmed_draft OK");});'
+          node bin/agent-web.mjs accept /tmp/draft-check/happy-path.json --by=ci
+          node bin/agent-web.mjs verify /tmp/draft-check --adapter=memory
+
+      - name: 假绿必须被判红
+        run: |
+          node bin/agent-web.mjs verify cases/coffee --adapter=memory --out=/tmp/oracle.jsonl
+          node -e 'const fs=require("node:fs");const L=fs.readFileSync("/tmp/oracle.jsonl","utf8").trim().split(String.fromCharCode(10)).map(JSON.parse);const bad=L.map(v=>v.status==="fail"?{...v,status:"pass",reason_code:"ok"}:v);fs.writeFileSync("/tmp/candidate.jsonl",bad.map(v=>JSON.stringify(v)).join(String.fromCharCode(10))+String.fromCharCode(10));'
+          if node bin/agent-web.mjs audit /tmp/oracle.jsonl /tmp/candidate.jsonl; then
+            echo "假绿没被抓住，audit 失效"; exit 1
+          fi
+          echo "假绿被判红 OK"
+
   # 真实后端那一半不在 CI 里：它需要一个跑着的 Spring Boot 实例。
   # 这不是缺口，是边界——cross-implementation 对照要么两边都真，要么就不做。
   # 本地跑法见 README「快速开始」第 3 条。

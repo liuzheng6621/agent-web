@@ -1,9 +1,0 @@
-{
-  "taixianglian/happy-path": "pass",
-  "taixianglian/cancel-before-pickup": "pass",
-  "taixianglian/readonly-menu": "pass",
-  "taixianglian/skip-ready-stage": "fail",
-  "taixianglian/foreign-pickup": "fail",
-  "taixianglian/goal-not-reached": "fail",
-  "taixianglian/unknown-capability": "unknown"
-}

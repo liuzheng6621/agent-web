@@ -1,21 +1,18 @@
 {
   "schema_version": "agent-web/0.1",
-  "id": "taixianglian/goal-not-reached",
+  "id": "coffee/unknown-capability",
   "environment": {
-    "adapter": "taixianglian",
+    "adapter": "memory",
     "seed": {}
   },
   "task": {
-    "natural_goal": "顾客点一杯拿铁并让它进入可以取餐的状态。",
+    "natural_goal": "让店员给这一单退款。",
     "goal_assertions": [
       {
-        "kind": "field_equals",
+        "kind": "entity_exists",
         "selector": {
-          "collection": "orders",
-          "index": 0
-        },
-        "path": "status",
-        "value": "READY"
+          "collection": "orders"
+        }
       }
     ]
   },
@@ -36,7 +33,7 @@
     },
     {
       "id": "s2",
-      "capability": "kitchen.accept",
+      "capability": "order.refund",
       "as": "staff",
       "expected_outcome": "applied",
       "bindings": {

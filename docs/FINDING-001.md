@@ -169,7 +169,7 @@ memory/foreign-pickup        fail          fail          ✓
 ```bash
 # 修复后：两侧一致，全部 fail
 TAIXIANGLIAN_BASE_URL=http://127.0.0.1:8180 \
-  node bin/agent-web.mjs compare cases/memory-demo --adapters=memory,taixianglian
+  node bin/agent-web.mjs compare cases/coffee --adapters=memory,taixianglian
 
 # 回退那一行（把 who.token 改回按 route.who 选令牌）后重跑：
 #   memory=fail taixianglian=pass   → 不一致率 85.7%

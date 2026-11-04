@@ -5,6 +5,8 @@
  *   agent-web selftest                 零依赖自测：内置适配器 + 内置案例
  *   agent-web verify <目录或文件>       对指定适配器跑案例，出判决
  *   agent-web report <results.jsonl>   由判决结果出指标
+  agent-web accept <文件> --by=NAME     确认草稿，确认后才能判决
+  agent-web audit <可信.jsonl> <被审.jsonl>  用真实判决当尺子，量假绿/假红
  *   agent-web capabilities             打印适配器的能力清单与证据等级
  *   agent-web prepare <动作日志>       一次生成轨迹、案例草稿与流程预览
  *   agent-web draft <轨迹文件>          回放一条轨迹，反推案例草稿
@@ -23,11 +25,12 @@ import { judge } from '../src/runner.mjs';
 import { fingerprint } from '../src/values.mjs';
 import { recordTrajectory } from '../src/record.mjs';
 import { replayTrajectory, buildDraftCase } from '../src/draft.mjs';
-import { validateCase, validateSteps } from '../src/case.mjs';
+import { validateCase, validateSteps, acceptCase, draftBlocker } from '../src/case.mjs';
 import { renderFlowHtml } from '../src/flow.mjs';
 import { summarize, agreement, formatText, countFailedAssertions } from '../src/report.mjs';
 import { loadAdapter, listBuiltins } from '../src/adapter/load.mjs';
 import { diffViews } from '../src/view.mjs';
+import { auditRuns, formatAudit } from '../src/audit.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..');
@@ -111,7 +114,7 @@ async function runOne(caseFile, adapter, opts = {}) {
 }
 
 async function cmdSelftest(flags) {
-  const dir = path.join(ROOT, 'cases', 'memory-demo');
+  const dir = path.join(ROOT, 'cases', 'coffee');
   const expected = readExpected(dir);
   const adapter = await makeAdapter('memory');
   announceCandidateMode(flags);
@@ -146,6 +149,74 @@ async function cmdSelftest(flags) {
 
   const mismatched = verdicts.filter((v) => expected[v.case_id] !== undefined && expected[v.case_id] !== v.status);
   return mismatched.length === 0 ? 0 : 1;
+}
+
+function readJsonl(file) {
+  const abs = path.resolve(file);
+  if (!fs.existsSync(abs)) throw new Error(`路径不存在：${abs}`);
+  return fs
+    .readFileSync(abs, 'utf8')
+    .split(String.fromCharCode(10))
+    .map((l) => l.trim())
+    .filter((l) => l !== '')
+    .map((l, i) => {
+      try {
+        return JSON.parse(l);
+      } catch (e) {
+        throw new Error(`${path.basename(abs)} 第 ${i + 1} 行不是合法 JSON：${e.message}`);
+      }
+    });
+}
+
+async function cmdAudit(args, flags) {
+  if (args.length < 2) {
+    console.error('用法：agent-web audit <可信结果.jsonl> <被审结果.jsonl> [--json] [--detail]');
+    console.error('  可信的那份通常是真实后端跑出来的判决；被审的那份是新实现或改动后的实现。');
+    return 2;
+  }
+  const report = auditRuns(readJsonl(args[0]), readJsonl(args[1]));
+  if (flags.json) {
+    console.log(JSON.stringify(report, null, 2));
+  } else {
+    console.log(formatAudit(report, { detail: Boolean(flags.detail) }));
+  }
+  return report.sound ? 0 : 1;
+}
+
+async function cmdAccept(args, flags) {
+  if (args.length === 0) {
+    console.error('用法：agent-web accept <案例文件> --by=<确认人> [--at=ISO时间]');
+    return 2;
+  }
+  const file = path.resolve(args[0]);
+  let c;
+  try {
+    c = JSON.parse(fs.readFileSync(file, 'utf8'));
+  } catch (e) {
+    console.error(`读取失败：${e && e.message}`);
+    return 2;
+  }
+  let accepted;
+  try {
+    accepted = acceptCase(c, { by: flags.by, at: flags.at });
+  } catch (e) {
+    console.error(`无法确认：${e && e.message}`);
+    return 2;
+  }
+  const errors = validateCase(accepted);
+  if (errors.length > 0) {
+    console.error('案例未通过格式校验，不予确认：');
+    for (const err of errors) console.error(`  - ${err}`);
+    return 1;
+  }
+  const was = draftBlocker(c);
+  fs.writeFileSync(file, JSON.stringify(accepted, null, 2) + String.fromCharCode(10), 'utf8');
+  const rel = path.relative(process.cwd(), file) || file;
+  console.log(`已确认 ${rel}`);
+  console.log(`  draft.status: ${was ? was.status : '无 draft 字段（本就可判决）'} → confirmed`);
+  console.log(`  reviewed_by:  ${accepted.draft.reviewed_by}`);
+  console.log(`  reviewed_at:  ${accepted.draft.reviewed_at}`);
+  return 0;
 }
 
 async function cmdVerify(args, flags) {
@@ -899,6 +970,7 @@ const HELP = `agent-web —— 给 Agent 写机器可判的集成测试
   agent-web selftest [--json]                 零依赖自测：内置适配器 + 内置案例
   agent-web verify <目录或文件> --adapter=SPEC 跑案例出判决
   agent-web report <results.jsonl>            由判决结果出指标
+  agent-web accept <文件> --by=NAME     确认草稿，确认后才能判决
   agent-web capabilities [--adapter=SPEC]     打印能力清单与证据等级
   agent-web compare <案例> --adapters=A,B     同一份案例喂多个实现，比判决
   agent-web drift <旧.jsonl> <新.jsonl>      比较两次跑批的初态形状（漂移检测）
@@ -953,6 +1025,10 @@ async function main() {
         return await cmdDrift(args);
       case 'capabilities':
         return await cmdCapabilities(args, flags);
+      case 'audit':
+        return await cmdAudit(args, flags);
+      case 'accept':
+        return cmdAccept(args, flags);
       case 'init':
         return cmdInit(args, flags);
       default:

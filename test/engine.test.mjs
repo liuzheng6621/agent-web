@@ -11,7 +11,8 @@ import { TRUE, FALSE, UNKNOWN, and, or, not } from '../src/three-valued.mjs';
 import { getPath, fingerprint, deepEqual, stableStringify } from '../src/values.mjs';
 import { selectEntities, validateSelector } from '../src/select.mjs';
 import { evalAssertions, validateAssertion, phaseOf } from '../src/assert/index.mjs';
-import { validateCase, resolveArguments } from '../src/case.mjs';
+import { validateCase, resolveArguments, acceptCase, draftBlocker } from '../src/case.mjs';
+import { auditRuns } from '../src/audit.mjs';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CLI_PATH = path.join(REPO_ROOT, 'bin', 'agent-web.mjs');
@@ -392,7 +393,7 @@ test('event_absent：适配器不记录的事件类型，退回 unknown 而不�
 test('judge：候选轨迹优先于参考轨迹，并记录来源', async () => {
   const { judge } = await import('../src/runner.mjs');
   const { createMemoryAdapter } = await import('../src/adapter/memory.mjs');
-  const c = JSON.parse(fs.readFileSync(new URL('../cases/memory-demo/happy-path.json', import.meta.url), 'utf8'));
+  const c = JSON.parse(fs.readFileSync(new URL('../cases/coffee/happy-path.json', import.meta.url), 'utf8'));
 
   const adapter = createMemoryAdapter();
   const full = await judge({ case: c, adapter, adapterName: 'memory' });
@@ -410,7 +411,7 @@ test('judge：候选轨迹优先于参考轨迹，并记录来源', async () => 
 test('judge：结构不合法的候选轨迹不进执行', async () => {
   const { judge } = await import('../src/runner.mjs');
   const { createMemoryAdapter } = await import('../src/adapter/memory.mjs');
-  const c = JSON.parse(fs.readFileSync(new URL('../cases/memory-demo/happy-path.json', import.meta.url), 'utf8'));
+  const c = JSON.parse(fs.readFileSync(new URL('../cases/coffee/happy-path.json', import.meta.url), 'utf8'));
   const v = await judge({
     case: c,
     adapter: createMemoryAdapter(),
@@ -553,7 +554,7 @@ test('draft：新增多条时不替人挑判据对象', async () => {
   assert.equal(s.goal_assertions[0].delta, 2);
 });
 
-test('draft：回放 → 草稿 → 自检 pass，且负例能力留在白名单里', async () => {
+test('draft：回放 → 草稿（须确认）→ 自检 pass，且负例能力留在白名单里', async () => {
   const { createMemoryAdapter } = await import('../src/adapter/memory.mjs');
   const { replayTrajectory, buildDraftCase } = await import('../src/draft.mjs');
   const { judge } = await import('../src/runner.mjs');
@@ -589,7 +590,13 @@ test('draft：回放 → 草稿 → 自检 pass，且负例能力留在白名单
   // 断言里不许出现具体 id：内存适配器从 1001 起编号，换到真实后端就是 2
   assert.ok(!JSON.stringify(c.task.goal_assertions).includes('1001'), '断言里钉死了环境相关的 id');
 
-  const v = await judge({ case: c, adapter, adapterName: 'memory' });
+  // 草稿必须先过人这一关：没人确认过的机器生成案例，不给判决
+  const blocked = await judge({ case: c, adapter, adapterName: 'memory' });
+  assert.equal(blocked.status, 'unknown');
+  assert.equal(blocked.reason_code, 'unconfirmed_draft');
+
+  const accepted = acceptCase(c, { by: 'YG' });
+  const v = await judge({ case: accepted, adapter, adapterName: 'memory' });
   assert.equal(v.status, 'pass', v.detail);
 });
 
@@ -754,4 +761,86 @@ test('prepare：没有可还原步骤或发现敏感字段时不写产物', () =
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }
+});
+
+// ---------------------------------------------------------------------------
+// 草稿闸门：机器生成的案例，没人确认过就不给判
+// ---------------------------------------------------------------------------
+
+function draftCase() {
+  const c = JSON.parse(fs.readFileSync(new URL('../cases/coffee/happy-path.json', import.meta.url), 'utf8'));
+  c.id = 'coffee/draft-gate';
+  c.draft = { status: 'unconfirmed', generated_by: 'agent-web draft' };
+  return c;
+}
+
+test('未确认的草稿案子不产生判决，记 unknown 并留在分母里', async () => {
+  const adapter = createMemoryAdapter();
+  const v = await judge({ case: draftCase(), adapter, adapterName: 'memory' });
+  assert.equal(v.status, 'unknown');
+  assert.equal(v.reason_code, 'unconfirmed_draft');
+  assert.match(v.detail, /accept/);
+});
+
+test('确认之后同一条案例照常判决', async () => {
+  const adapter = createMemoryAdapter();
+  const accepted = acceptCase(draftCase(), { by: 'YG' });
+  assert.equal(accepted.draft.status, 'confirmed');
+  assert.equal(accepted.draft.reviewed_by, 'YG');
+  const v = await judge({ case: accepted, adapter, adapterName: 'memory' });
+  assert.equal(v.status, 'pass');
+  assert.equal(v.reason_code, 'ok');
+});
+
+test('不接受匿名确认：确认人必须能指认', () => {
+  assert.throws(() => acceptCase(draftCase(), {}), /--by/);
+  assert.throws(() => acceptCase(draftCase(), { by: '   ' }), /--by/);
+});
+
+test('手写案例没有 draft 字段，本来就能判', () => {
+  const c = draftCase();
+  delete c.draft;
+  assert.equal(draftBlocker(c), null);
+});
+
+// ---------------------------------------------------------------------------
+// audit：拿真实判决当尺子，量假绿
+// ---------------------------------------------------------------------------
+
+function v(caseId, status, reason = 'ok') {
+  return { case_id: caseId, status, reason_code: reason };
+}
+
+test('audit 把"真有问题却判通过"单独算成假绿，并判定证据不成立', () => {
+  const oracle = [v('a', 'pass'), v('b', 'fail'), v('c', 'fail')];
+  const suspect = [v('a', 'pass'), v('b', 'fail'), v('c', 'pass')];
+  const r = auditRuns(oracle, suspect);
+  assert.equal(r.counts.truePass, 1);
+  assert.equal(r.counts.trueFail, 1);
+  assert.equal(r.counts.falsePass, 1);
+  assert.equal(r.sound, false);
+  assert.equal(r.rates.agreement, 2 / 3);
+  assert.equal(r.rates.false_pass, 1 / 2);
+});
+
+test('audit 全部一致时 sound 为真，且分母为 0 的比率是 null 而不是 0', () => {
+  const rows = [v('a', 'pass'), v('b', 'fail')];
+  const r = auditRuns(rows, rows);
+  assert.equal(r.sound, true);
+  assert.equal(r.rates.agreement, 1);
+  assert.equal(r.rates.false_alarm, 0);
+  assert.equal(r.rates.false_pass, 0);
+  assert.equal(r.rates.blind, 0);
+});
+
+test('audit 区分漏判、仅候选敢判与两侧不一致的案例集', () => {
+  const oracle = [v('a', 'pass'), v('b', 'unknown'), v('only1', 'pass')];
+  const suspect = [v('a', 'unknown'), v('b', 'pass'), v('only2', 'fail')];
+  const r = auditRuns(oracle, suspect);
+  assert.equal(r.counts.blind, 1);
+  assert.equal(r.counts.candidate_only, 1);
+  assert.equal(r.counts.only_oracle, 1);
+  assert.equal(r.counts.only_candidate, 1);
+  assert.equal(r.rates.blind, 1);
+  assert.equal(r.sound, true);
 });

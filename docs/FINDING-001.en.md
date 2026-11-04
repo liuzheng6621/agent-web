@@ -170,7 +170,7 @@ The backend needs to be running on `127.0.0.1:8180` (`java -jar target/taixiangl
 ```bash
 # After the fix: both sides agree, every case fails as expected
 TAIXIANGLIAN_BASE_URL=http://127.0.0.1:8180 \
-  node bin/agent-web.mjs compare cases/memory-demo --adapters=memory,taixianglian
+  node bin/agent-web.mjs compare cases/coffee --adapters=memory,taixianglian
 
 # Revert that one line (pick the token by route.who again) and rerun:
 #   memory=fail taixianglian=pass   → 85.7% disagreement

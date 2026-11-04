@@ -1,6 +1,15 @@
 # 参考被测系统：咖啡店后端
 
-`cases/taixianglian/` 里的七条案例打的是这个后端。它不在本仓库里，作用是提供一个**真实**的对照组——有数据库、有 JWT、有角色、有状态机，不是玩具。
+`cases/coffee/` 里的七条案例打的是这个后端。它不在本仓库里，作用是提供一个**真实**的对照组——有数据库、有 JWT、有角色、有状态机，不是玩具。
+
+注意这七条案例 **只存一份**，不按实现复制。它们描述的是"一个咖啡店点单系统该有的行为"，跟具体是内存实现还是这个 Spring Boot 后端无关：
+
+```bash
+node bin/agent-web.mjs verify cases/coffee --adapter=memory        # 内置实现，零依赖
+node bin/agent-web.mjs verify cases/coffee --adapter=taixianglian  # 真实后端（需先起服务）
+```
+
+两份判决必须一致。一旦不一致，要么案例写得不诚实，要么某个实现有 bug——这两种都值得知道。
 
 ## 系统是什么
 

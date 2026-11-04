@@ -1,12 +1,12 @@
 {
   "schema_version": "agent-web/0.1",
-  "id": "taixianglian/cancel-before-pickup",
+  "id": "coffee/skip-ready-stage",
   "environment": {
-    "adapter": "taixianglian",
+    "adapter": "memory",
     "seed": {}
   },
   "task": {
-    "natural_goal": "顾客下单后改主意，在店员接单前取消这一单。",
+    "natural_goal": "顾客下单，店员接单后直接让顾客取餐（跳过做好这一步）。",
     "goal_assertions": [
       {
         "kind": "field_equals",
@@ -15,21 +15,7 @@
           "index": 0
         },
         "path": "status",
-        "value": "CANCELED"
-      },
-      {
-        "kind": "status_transition",
-        "selector": {
-          "collection": "orders",
-          "index": 0
-        },
-        "path": "status",
-        "transitions": [
-          [
-            "PENDING",
-            "CANCELED"
-          ]
-        ]
+        "value": "PICKED"
       }
     ]
   },
@@ -43,14 +29,23 @@
         "items": [
           {
             "dishName": "拿铁",
-            "qty": 2
+            "qty": 1
           }
         ]
       }
     },
     {
       "id": "s2",
-      "capability": "order.cancel",
+      "capability": "kitchen.accept",
+      "as": "staff",
+      "expected_outcome": "applied",
+      "bindings": {
+        "orderId": "$s1.orderId"
+      }
+    },
+    {
+      "id": "s3",
+      "capability": "order.pick",
       "as": "customer",
       "expected_outcome": "applied",
       "bindings": {

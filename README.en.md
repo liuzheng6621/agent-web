@@ -58,7 +58,7 @@ cd agent-web
 node bin/agent-web.mjs selftest
 
 # Check one specific case
-node bin/agent-web.mjs verify cases/memory-demo/happy-path.json --adapter=memory
+node bin/agent-web.mjs verify cases/coffee/happy-path.json --adapter=memory
 ```
 
 `selftest` runs seven examples: normal completion, unauthorized pickup, a missing step, and cases with insufficient information. Passing these examples means the basic checking flow works; it does not mean every real system has been tested.
@@ -113,7 +113,7 @@ This checks that the case is valid and runnable. A successful run does not prove
 The steps stored with a case are a sample route, not necessarily the route the assistant took. To check the assistant's own actions:
 
 ```bash
-node bin/agent-web.mjs verify cases/memory-demo \
+node bin/agent-web.mjs verify cases/coffee \
   --adapter=memory \
   --trajectory=examples/candidate-trajectories \
   --out=candidate-results.jsonl
@@ -178,7 +178,7 @@ agent-web includes an in-memory demo system and can connect to a sample coffee-s
 ```bash
 # Start the sample coffee-shop service on localhost port 8080 first
 TAIXIANGLIAN_BASE_URL=http://127.0.0.1:8080 \
-  node bin/agent-web.mjs compare cases/memory-demo \
+  node bin/agent-web.mjs compare cases/coffee \
   --adapters=memory,taixianglian
 ```
 
@@ -186,9 +186,9 @@ Example output:
 
 ```text
 case                          in-memory     coffee shop   same result
-memory/happy-path             pass          pass          ✓
-memory/foreign-pickup         fail          fail          ✓
-memory/unknown-capability     unknown       unknown       ✓
+coffee/happy-path             pass          pass          ✓
+coffee/foreign-pickup         fail          fail          ✓
+coffee/unknown-capability     unknown       unknown       ✓
 
 same result on 7 of 7 cases (100.0%)
 ```
@@ -199,14 +199,68 @@ This comparison once caught a real problem: the case said “customer B picks up
 
 ---
 
+## Use the real backend as a ruler: false-green audit
+
+"Two verdicts agree" is an observation, not proof. A real ruler has to be another implementation: a case the real backend judges `fail` must also be judged `fail` by the new one.
+
+```bash
+# 1. archive both runs
+TAIXIANGLIAN_BASE_URL=http://127.0.0.1:8080   node bin/agent-web.mjs verify cases/coffee --adapter=taixianglian --out=real.jsonl
+node bin/agent-web.mjs verify cases/coffee --adapter=memory --out=memory.jsonl
+
+# 2. audit one verdict set against the other served as oracle
+node bin/agent-web.mjs audit real.jsonl memory.jsonl --detail
+```
+
+The output is a confusion matrix:
+
+| Cell | Meaning | Risk |
+| --- | --- | --- |
+| agree·pass | both say it is fine | — |
+| agree·fail | both say it is broken | — |
+| **false green** | it is broken, the candidate says fine | worst: it stays green forever |
+| false red | it is fine, the candidate says broken | noisy, not dangerous |
+| blind | the oracle decides, the candidate cannot | insufficient evidence |
+
+One false green makes `audit` exit 1. This is not a style preference: a false red sends someone to look, a blind spot is honestly recorded as `unknown`, and only a false green makes an unusable verdict look perfect.
+
+## A draft must pass a human first
+
+`draft` derives a case from a real trajectory and marks it `draft.status: "unconfirmed"`. **Such a case produces no verdict** — it is recorded as `unknown / unconfirmed_draft`. A machine-written exam cannot grade anything until somebody has read it.
+
+Confirm it once and it becomes an exam:
+
+```bash
+node bin/agent-web.mjs accept cases/coffee/my-draft.json --by=YG
+# 已确认 cases/coffee/my-draft.json
+#   draft.status: unconfirmed → confirmed
+#   reviewed_by:  YG
+#   reviewed_at:  2026-11-04T07:41:16.195Z
+```
+
+Anonymous confirmation is rejected (`--by` is required): "somebody looked at it" that cannot be named is the same as nobody looking. Hand-written cases carry no `draft` field and are unaffected.
+
+## One copy of the cases
+
+`cases/coffee/` is not duplicated per implementation. The same directory hits different systems by switching `--adapter`:
+
+```bash
+node bin/agent-web.mjs verify cases/coffee --adapter=memory
+node bin/agent-web.mjs verify cases/coffee --adapter=taixianglian
+```
+
+A case describes "what a coffee ordering system should do", independent of who implements it. Copying it per implementation gives you two truths that slowly diverge — FINDING-001 started exactly there: two copies treated as one comparison.
+
+---
+
 ## Check whether the system changed
 
 The system may have different starting data after an update. Save the results from before and after, then compare them:
 
 ```bash
-node bin/agent-web.mjs verify cases/memory-demo --adapter=memory --out=before.jsonl
+node bin/agent-web.mjs verify cases/coffee --adapter=memory --out=before.jsonl
 # After the update, run it again and save the results as after.jsonl
-node bin/agent-web.mjs verify cases/memory-demo --adapter=memory --out=after.jsonl
+node bin/agent-web.mjs verify cases/coffee --adapter=memory --out=after.jsonl
 node bin/agent-web.mjs drift before.jsonl after.jsonl
 ```
 

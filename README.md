@@ -58,7 +58,7 @@ cd agent-web
 node bin/agent-web.mjs selftest
 
 # 检查一条具体案例
-node bin/agent-web.mjs verify cases/memory-demo/happy-path.json --adapter=memory
+node bin/agent-web.mjs verify cases/coffee/happy-path.json --adapter=memory
 ```
 
 `selftest` 会跑 7 条样例：正常完成、越权、漏步骤和无法判断等情况。样例通过表示程序的基本判分流程正常，不代表所有真实系统都已测过。
@@ -113,7 +113,7 @@ node bin/agent-web.mjs verify agent-web-output/coffee-happy-path/case.draft.json
 案例自带的步骤是参考答案，不一定是助手实际走过的路。要检查助手自己的操作记录，先运行：
 
 ```bash
-node bin/agent-web.mjs verify cases/memory-demo \
+node bin/agent-web.mjs verify cases/coffee \
   --adapter=memory \
   --trajectory=examples/candidate-trajectories \
   --out=candidate-results.jsonl
@@ -176,7 +176,7 @@ agent-web 自带一个内存里的演示系统，也能连接咖啡店示例后�
 ```bash
 # 咖啡店示例服务须先在本机 8080 端口运行
 TAIXIANGLIAN_BASE_URL=http://127.0.0.1:8080 \
-  node bin/agent-web.mjs compare cases/memory-demo \
+  node bin/agent-web.mjs compare cases/coffee \
   --adapters=memory,taixianglian
 ```
 
@@ -184,9 +184,9 @@ TAIXIANGLIAN_BASE_URL=http://127.0.0.1:8080 \
 
 ```text
 案例                           内存样例      咖啡店服务    结果相同
-memory/happy-path             pass          pass          ✓
-memory/foreign-pickup         fail          fail          ✓
-memory/unknown-capability     unknown       unknown       ✓
+coffee/happy-path             pass          pass          ✓
+coffee/foreign-pickup         fail          fail          ✓
+coffee/unknown-capability     unknown       unknown       ✓
 
 同一案例判分一致率 100.0% (7/7)
 ```
@@ -197,14 +197,70 @@ memory/unknown-capability     unknown       unknown       ✓
 
 ---
 
+## 拿真实后端当尺子：假绿审计
+
+「两份判决一致」只是观察，不是证明。真正的尺子要来自另一个实现：真实后端判 `fail` 的案例，新实现也判 `fail`，这份判决才算可信。
+
+```bash
+# 1. 两次跑批各自存档
+TAIXIANGLIAN_BASE_URL=http://127.0.0.1:8080   node bin/agent-web.mjs verify cases/coffee --adapter=taixianglian --out=real.jsonl
+node bin/agent-web.mjs verify cases/coffee --adapter=memory --out=memory.jsonl
+
+# 2. 以真实后端为 oracle，审另一份判决
+node bin/agent-web.mjs audit real.jsonl memory.jsonl --detail
+```
+
+输出是一张混淆矩阵：
+
+| 格子 | 含义 | 危险程度 |
+| --- | --- | --- |
+| 一致·通过 | 两边都说没问题 | — |
+| 一致·未通过 | 两边都说有问题 | — |
+| **假绿** | 真的有问题，候选却说没问题 | 最危险：会稳定变绿 |
+| 假红 | 真的没问题，候选说有问题 | 吵，但不危险 |
+| 漏判 | 真实后端判得出，候选判不出 | 证据不足 |
+
+只要出现一条假绿，`audit` 就退出码 1。这不是口味问题：假红会让人去查，漏判会被老实记成 `unknown`，只有假绿能让一份不能用的判决看起来完美。
+
+对着真实咖啡店后端跑，当前是 6 条能判、假绿 0 条；把其中一条 `fail` 手工改成 `pass` 再跑，它立刻变红并点出是哪条。
+
+## 草稿必须先过人手
+
+`draft` 从一条真实轨迹反推案例，产物带着 `draft.status: "unconfirmed"`。**这种案例不产生判决**，一律记 `unknown / unconfirmed_draft`——机器生成的考卷，没人核对过就不能拿来评分。
+
+确认一次，它才是一张考卷：
+
+```bash
+node bin/agent-web.mjs accept cases/coffee/my-draft.json --by=YG
+# 已确认 cases/coffee/my-draft.json
+#   draft.status: unconfirmed → confirmed
+#   reviewed_by:  YG
+#   reviewed_at:  2026-11-04T07:41:16.195Z
+```
+
+不接受匿名确认（`--by` 必填）：「有人看过」如果无法指认，就等于没人看过。手写案例没有 `draft` 字段，不受影响。
+
+## 案例只存一份
+
+`cases/coffee/` 不按实现复制。同一目录换 `--adapter` 就能打不同实现：
+
+```bash
+node bin/agent-web.mjs verify cases/coffee --adapter=memory
+node bin/agent-web.mjs verify cases/coffee --adapter=taixianglian
+```
+
+案例描述的是「一个咖啡店点单系统该有的行为」，跟谁实现无关。把它按实现复制成两份，等于给自己造两个会慢慢分叉的真相——FINDING-001 那次假通过，起因就是「两份实现被当成一份来对照」。
+
+---
+
 ## 发现系统版本变化
 
 同一条案例，系统升级前后可能遇到不同的初始数据。先分别保存两次测试结果，再比较：
 
 ```bash
-node bin/agent-web.mjs verify cases/memory-demo --adapter=memory --out=before.jsonl
+node bin/agent-web.mjs verify cases/coffee --adapter=memory --out=before.jsonl
 # 应用更新后再跑一次，保存为 after.jsonl
-node bin/agent-web.mjs verify cases/memory-demo --adapter=memory --out=after.jsonl
+node bin/agent-web.mjs verify cases/coffee --adapter=memory --out=after.jsonl
 node bin/agent-web.mjs drift before.jsonl after.jsonl
 ```
 

@@ -275,6 +275,24 @@ agent-web draft <轨迹文件> --adapter=SPEC [--out=<案例.json>] [--id=<案�
 
 ---
 
+## 5.8 accept：草稿转正
+
+`draft` 产出的案例带 `draft.status: "unconfirmed"`，判决阶段会被拦在第 2 条（见 7）。转正需要一次可指认的确认：
+
+```bash
+node bin/agent-web.mjs accept <案例文件> --by=<确认人> [--at=<ISO 时间>]
+```
+
+确认后写入：
+
+| 字段 | 值 |
+| --- | --- |
+| `draft.status` | `confirmed` |
+| `draft.reviewed_by` | 由 `--by` 给定，为空则拒绝写入 |
+| `draft.reviewed_at` | 由 `--at` 给定，缺省为当前时间（ISO 8601） |
+
+不提供"匿名确认"：没有署名的确认与没有确认等价。
+
 ## 6. 适配器契约
 
 适配器是普通对象，必须实现：
@@ -397,27 +415,30 @@ manifest 校验失败 → `unknown / invalid_environment`。
 | # | 条件 | 判决 | reason_code |
 | --- | --- | --- | --- |
 | 1 | 案例格式校验失败 | unknown | `invalid_case` |
-| 2 | `manifest()` 抛错 | unknown | `invalid_environment` |
-| 3 | manifest 不符合契约 | unknown | `invalid_environment` |
-| 4 | 复位后观测不到初态 | unknown | `missing_observation` |
-| 5 | 前置条件为假 | unknown | `invalid_initial_state` |
-| 6 | 前置条件无法求值 | unknown | `missing_observation` |
-| 7 | 步的能力不在 manifest | unknown | `coverage_gap` |
-| 8 | 步的能力不在 `allowed_capabilities` | fail | `invalid_action` |
-| 9 | 参数绑定失败 | fail | `invalid_action` |
-| 10 | 适配器返回 `unsupported` | unknown | `coverage_gap` |
-| 11 | 适配器返回 `infra_error` | unknown | `infrastructure_error` |
-| 12 | 应成功却被拒绝 | fail | `unexpected_rejection` |
-| 13 | 应被拒绝却成功了 | fail | `expected_rejection` |
-| 14 | 目标断言为假 | fail | `assertion_false` |
-| 15 | 不变量为假 | fail | `invariant_violated` |
-| 16 | 任一断言为 unknown | unknown | `missing_observation` |
-| 17 | 全部成立 | pass | `ok` |
+| 2 | 案例是未确认草稿（`draft.status` 存在且不是 `confirmed`） | unknown | `unconfirmed_draft` |
+| 3 | `manifest()` 抛错 | unknown | `invalid_environment` |
+| 4 | manifest 不符合契约 | unknown | `invalid_environment` |
+| 5 | 复位后观测不到初态 | unknown | `missing_observation` |
+| 6 | 前置条件为假 | unknown | `invalid_initial_state` |
+| 7 | 前置条件无法求值 | unknown | `missing_observation` |
+| 8 | 步的能力不在 manifest | unknown | `coverage_gap` |
+| 9 | 步的能力不在 `allowed_capabilities` | fail | `invalid_action` |
+| 10 | 参数绑定失败 | fail | `invalid_action` |
+| 11 | 适配器返回 `unsupported` | unknown | `coverage_gap` |
+| 12 | 适配器返回 `infra_error` | unknown | `infrastructure_error` |
+| 13 | 应成功却被拒绝 | fail | `unexpected_rejection` |
+| 14 | 应被拒绝却成功了 | fail | `expected_rejection` |
+| 15 | 目标断言为假 | fail | `assertion_false` |
+| 16 | 不变量为假 | fail | `invariant_violated` |
+| 17 | 任一断言为 unknown | unknown | `missing_observation` |
+| 18 | 全部成立 | pass | `ok` |
 | — | 未捕获异常 | unknown | `infrastructure_error` |
 
-注意 5 与 14 的不对称：**前置条件为假判 unknown 而不是 fail**。初态不干净是环境问题，不是被测系统的错。把环境问题记成 fail，会把噪声算进被测对象头上。
+注意 5 与 16 的不对称：**前置条件为假判 unknown 而不是 fail**。初态不干净是环境问题，不是被测系统的错。把环境问题记成 fail，会把噪声算进被测对象头上。
 
-注意 12 优先于 14：一步该成功却被挡下，就没必要再评速度与终态了，首因更清楚。
+注意 2：**未确认草稿不判 pass 也不判 fail，判 unknown**。它还不是一张考卷，没有资格得分。让机器生成的案例直接进判决，等于让写案例的模型给自己出题。
+
+注意 14 优先于 16：一步该成功却被挡下，就没必要再评速度与终态了，首因更清楚。
 
 ---
 
@@ -427,13 +448,44 @@ manifest 校验失败 → `unknown / invalid_environment`。
 | --- | --- |
 | 0 | 全部判决与预期一致 |
 | 1 | 存在不一致（含 unknown 与预期不符） |
-| 2 | 用法错误、路径不存在、适配器名未知 |
+| 3 | 用法错误、路径不存在、适配器名未知 |
 
 `unknown` 计为不一致：拿不准就当红灯，别当绿灯。
 
 ---
 
-## 9. 版本演进
+## 9. 假绿审计（audit）
+
+`audit` 不属于案例格式，它是对**判决本身**的度量：拿一份可信判决当 oracle，量另一份判决错在哪。
+
+```bash
+node bin/agent-web.mjs audit <可信结果.jsonl> <被审结果.jsonl> [--detail] [--json]
+```
+
+两份输入都是 `verify --out=` 产出的 JSONL。判定规则：
+
+| 条件 | 归类 |
+| --- | --- |
+| oracle 与候选都 `pass` | 一致·通过 |
+| 都 `fail` | 一致·未通过 |
+| oracle `fail`、候选 `pass` | **假绿** |
+| oracle `pass`、候选 `fail` | 假红 |
+| oracle 可判、候选 `unknown` | 漏判 |
+| oracle `unknown`、候选可判 | 仅候选敢判（不计入比率） |
+| 双方都 `unknown` | 双方都无法判断 |
+
+比率：
+
+- `判决一致率 = (一致通过 + 一致未通过) / 都能判`
+- `假绿率 = 假绿 / (假绿 + 一致未通过)`
+- `假红率 = 假红 / (假红 + 一致通过)`
+- `漏判率 = 漏判 / oracle 判得出的案例数`
+
+分母为 0 时比率为 `null`，显示为「—」，**不得显示为 0%**——0/0 与 0/100 是两件事。
+
+退出码：假绿为 0 时返回 0，否则返回 1。**只有假绿影响退出码**，因为只有它会让"不能用的判决"看起来完美。
+
+## 10. 版本演进
 
 `0.1` 之后允许的改动：
 

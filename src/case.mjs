@@ -233,3 +233,45 @@ export function phaseSummary(assertions) {
     phase: a.phase ?? PHASE_MATRIX[a.kind]?.default ?? null,
   }));
 }
+
+/** 草稿状态：机器生成、等人确认。确认之后才允许进判决。 */
+export const DRAFT_STATES = Object.freeze(['unconfirmed', 'confirmed']);
+
+/**
+ * 这条案例能不能进判决。
+ * 没有 draft 字段 = 手写案例，直接可用；
+ * draft.status 不是 confirmed = 机器生成还没人看过，不给判。
+ */
+export function draftBlocker(c) {
+  const status = c && c.draft ? c.draft.status : undefined;
+  if (!status) return null;
+  if (status === 'confirmed') return null;
+  return {
+    status,
+    detail:
+      '案例仍是未确认草稿（draft.status=' + status +
+      '），不接受判决；先跑 agent-web accept <文件> --by=<确认人>',
+  };
+}
+
+/**
+ * 确认一条草稿：写下谁在什么时候看过它。
+ * 不接受匿名确认 —— 「有人看过」如果无法指认，就等于没人看过。
+ */
+export function acceptCase(c, opts) {
+  const options = opts || {};
+  if (!c || typeof c !== 'object') throw new Error('案例必须是对象');
+  const by = typeof options.by === 'string' ? options.by.trim() : '';
+  if (by === '') throw new Error('必须给出确认人 --by=<名字>');
+  const at = typeof options.at === 'string' && options.at.trim() !== ''
+    ? options.at.trim()
+    : new Date().toISOString();
+  const prev = c.draft && typeof c.draft === 'object' ? c.draft : {};
+  const draft = Object.assign({}, prev, {
+    status: 'confirmed',
+    reviewed_by: by,
+    reviewed_at: at,
+  });
+  const next = Object.assign({}, c, { draft: draft });
+  return next;
+}

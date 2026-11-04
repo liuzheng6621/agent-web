@@ -1,6 +1,6 @@
 {
   "schema_version": "agent-web/0.1",
-  "id": "memory/readonly-menu",
+  "id": "coffee/readonly-menu",
   "environment": {
     "adapter": "memory",
     "seed": {}

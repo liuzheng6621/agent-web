@@ -1,0 +1,9 @@
+{
+  "coffee/happy-path": "pass",
+  "coffee/cancel-before-pickup": "pass",
+  "coffee/readonly-menu": "pass",
+  "coffee/skip-ready-stage": "fail",
+  "coffee/foreign-pickup": "fail",
+  "coffee/goal-not-reached": "fail",
+  "coffee/unknown-capability": "unknown"
+}

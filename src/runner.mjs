@@ -13,7 +13,7 @@
  * 把 unknown 从统计里踢掉，是这类系统最常见的自欺方式。
  */
 
-import { validateCase, validateSteps, resolveArguments, deriveLabels, BindingError } from './case.mjs';
+import { validateCase, validateSteps, resolveArguments, deriveLabels, BindingError, draftBlocker } from './case.mjs';
 import { validateManifest } from './adapter/contract.mjs';
 import { checkStateAgainstView } from './view.mjs';
 import { evalAssertions, firstFailure, TRUE, FALSE, UNKNOWN } from './assert/index.mjs';
@@ -75,6 +75,16 @@ async function judgeInner({ case: c, adapter, adapterName = 'unknown', trajector
     return makeVerdict(base, 'unknown', 'invalid_case', {
       detail: '案例未通过格式校验，不进入执行',
       errors: caseErrors,
+      timing_ms: Date.now() - startedAt,
+    });
+  }
+
+  // 草稿闸门：draft.status 仍是 unconfirmed 的案例，是机器生成、还没人看过的东西。
+  // 让它进判决，等于让一张没人核对过的考卷冒充考卷 —— 所以判 unknown，不给分。
+  const draftBlock = draftBlocker(c);
+  if (draftBlock) {
+    return makeVerdict(base, 'unknown', 'unconfirmed_draft', {
+      detail: draftBlock.detail,
       timing_ms: Date.now() - startedAt,
     });
   }
