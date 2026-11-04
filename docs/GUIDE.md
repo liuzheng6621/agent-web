@@ -831,7 +831,7 @@ cases/                 内置测试题
 examples/              可运行的连接样例与日志
   agent-traces/memory-happy-path.jsonl   可直接试用 prepare 的简化日志
 docs/SPEC.md            案例文件的详细格式
-test/                 自动测试（141 条）
+test/                 自动测试（173 条）
 ```
 
 常用命令：`discover`（给一个网址，探测并生成）、`prepare`（一条命令生成步骤、案例草稿和流程预览）、`selftest`（跑内置检查）、`verify`（检查案例）、`compare`（比较不同系统）、`probe`（查适配器自洽性）、`record`（整理请求记录）、`draft`（单独生成案例草稿）、`flow`（生成流程图）、`drift`（比较两次初始数据是否变化）。运行 `node bin/agent-web.mjs help` 查看完整命令。

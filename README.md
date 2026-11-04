@@ -337,6 +337,38 @@ node bin/agent-web.mjs recall        # 扫一遍，看这次有没有重犯
 
 **建议断言必须当场验证。** `--suggest` 给出的每一条，都会在正确实现和变异体上各跑一遍，两边结果符合预期才允许出现在报告里。没验过的建议等于没给。
 
+## 非咖啡领域：流浪动物救助任务
+
+`examples/animal-tracking/` 给「守望者」后端准备了一条独立案例：居民提交救助任务 → 管理员审核 → 志愿者接取并完成。案例同时检查未审核任务不可接取、非执行者不可完成、重复完成不可重复领积分，以及 `PENDING → AVAILABLE → IN_PROGRESS → COMPLETED` 状态迁移。
+
+先跑离线确定性夹具和业务变异体：
+
+```bash
+node bin/agent-web.mjs verify examples/animal-tracking --adapter=examples/animal-tracking/memory-adapter.mjs
+node examples/animal-tracking/certify.mjs
+```
+
+要打到 animal 仓库的真实 Spring 后端，先在 `E:\\java\\Git\\加了\\animal\\backend` 启动一次性 H2 环境；不要对生产库或含真实数据的 MySQL 库运行。PowerShell 示例：
+
+```powershell
+mvn spring-boot:run "-Dspring-boot.run.arguments=--server.port=18080 --spring.datasource.url=jdbc:h2:mem:animal_agent_web_test;MODE=MySQL;DB_CLOSE_DELAY=-1 --spring.datasource.username=sa --spring.datasource.password= --spring.datasource.driver-class-name=org.h2.Driver --spring.jpa.hibernate.ddl-auto=create-drop --spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect --spring.mqtt.enabled=false"
+```
+
+另开 PowerShell，在 agent-web 仓库设置本地地址与该 H2 实例预置的管理员账号，再执行：
+
+```powershell
+$env:ANIMAL_TEST_ISOLATED = '1'
+$env:ANIMAL_TEST_BASE_URL = 'http://127.0.0.1:18080'
+$env:ANIMAL_TEST_ADMIN_USER = 'admin'
+$env:ANIMAL_TEST_ADMIN_PASSWORD = 'admin123'
+node .\\bin\\agent-web.mjs verify examples/animal-tracking --adapter=examples/animal-tracking/adapter.mjs
+node .\\bin\\agent-web.mjs compare examples/animal-tracking --adapters=examples/animal-tracking/memory-adapter.mjs,examples/animal-tracking/adapter.mjs
+```
+
+真实适配器没有默认目标，强制要求隔离确认与 loopback HTTP 地址；每次 `reset` 会创建新的居民/志愿者账号并写入任务，H2 实例应是一次性的。
+
+实跑结论（一次性 H2、2026-11-04）：案例 `pass`、探针 6/6、跨适配器一致率 100%。过程中修掉一个真实冲突：后端对登录接口限流，`reset()` 每次重登 admin 会撞 429 把判决打成 unknown——admin token 现在按进程缓存。
+
 ## 现在做不到什么
 
 按离真实使用最近排序。
@@ -349,7 +381,7 @@ node bin/agent-web.mjs recall        # 扫一遍，看这次有没有重犯
 6. **等价变异体问题没有解决。** 只是把它变成了显式状态：杀不掉但造得出差异 → 欠账；连差异都造不出 → 说不清，要求给出证明。
 7. **分页仍然表达不了。** 十二种谓词覆盖了唯一性、类型、值域、顺序，但「第 2 页且按时间倒序」这种带分页元信息的约束还是写不出来 —— 规范视图不带页码。
 8. **适配器可以撒谎。** 裁剪过的观测、假装的执行，`probe` 只能查六项机械性质，查不出故意造假。它保证的是「给定这份观测，判决是这么来的」。
-9. **只在一个域上验证过。** 咖啡店：菜单、订单、状态机、两种角色。换个域大概率会暴露新的缺口。
+9. **跨域验证仍然太少。** 咖啡店（菜单、订单、状态机）与动物救助任务（审核流、执行者校验、一次性积分）两套都过了真实后端；但「两个」离「形状足够多样」还差得远——账本类（借贷必须平衡）还没碰过。
 
 ## 文档
 

@@ -1,0 +1,174 @@
+{
+  "schema_version": "agent-web/0.1",
+  "id": "animal-tracking/rescue-task-lifecycle",
+  "environment": {
+    "adapter": "animal-tracking",
+    "seed": {}
+  },
+  "task": {
+    "natural_goal": "居民提交一条流浪动物救助任务，管理员审核，志愿者接取并完成；只有执行者能完成任务，完成后只发放一次积分。",
+    "allowed_capabilities": [
+      "task.create",
+      "task.approve",
+      "task.accept",
+      "task.complete"
+    ],
+    "goal_assertions": [
+      {
+        "kind": "entity_exists",
+        "selector": {
+          "collection": "tasks"
+        },
+        "max": 1
+      },
+      {
+        "kind": "count_delta",
+        "selector": {
+          "collection": "tasks"
+        },
+        "delta": 1
+      },
+      {
+        "kind": "field_equals",
+        "selector": {
+          "collection": "tasks",
+          "index": 0
+        },
+        "path": "status",
+        "value": "COMPLETED"
+      },
+      {
+        "kind": "status_transition",
+        "selector": {
+          "collection": "tasks",
+          "index": 0
+        },
+        "path": "status",
+        "transitions": [
+          ["PENDING", "AVAILABLE"],
+          ["AVAILABLE", "IN_PROGRESS"],
+          ["IN_PROGRESS", "COMPLETED"]
+        ]
+      },
+      {
+        "kind": "field_equals",
+        "selector": {
+          "collection": "tasks",
+          "index": 0
+        },
+        "path": "isApproved",
+        "value": true
+      },
+      {
+        "kind": "field_equals",
+        "selector": {
+          "collection": "tasks",
+          "index": 0
+        },
+        "path": "assignedToRole",
+        "value": "volunteer"
+      },
+      {
+        "kind": "field_equals",
+        "selector": {
+          "collection": "tasks",
+          "index": 0
+        },
+        "path": "currentVolunteers",
+        "value": 1
+      },
+      {
+        "kind": "field_equals",
+        "selector": {
+          "collection": "tasks",
+          "index": 0
+        },
+        "path": "rewardPoints",
+        "value": 25
+      },
+      {
+        "kind": "field_equals",
+        "selector": {
+          "collection": "points",
+          "index": 0
+        },
+        "path": "points",
+        "value": 25
+      }
+    ]
+  },
+  "reference_trajectory": [
+    {
+      "id": "s1",
+      "capability": "task.create",
+      "as": "reporter",
+      "expected_outcome": "applied",
+      "arguments": {
+        "title": "带伤流浪猫送医",
+        "description": "发现一只需要救助的流浪猫，安排送医检查。",
+        "type": "RESCUE",
+        "location": "测试救助点",
+        "priority": "HIGH",
+        "rewardPoints": 25,
+        "maxVolunteers": 1
+      }
+    },
+    {
+      "id": "s2",
+      "capability": "task.accept",
+      "as": "volunteer",
+      "expected_outcome": "rejected",
+      "bindings": {
+        "taskId": "$s1.taskId"
+      }
+    },
+    {
+      "id": "s3",
+      "capability": "task.approve",
+      "as": "admin",
+      "expected_outcome": "applied",
+      "bindings": {
+        "taskId": "$s1.taskId"
+      }
+    },
+    {
+      "id": "s4",
+      "capability": "task.accept",
+      "as": "volunteer",
+      "expected_outcome": "applied",
+      "bindings": {
+        "taskId": "$s1.taskId"
+      }
+    },
+    {
+      "id": "s5",
+      "capability": "task.complete",
+      "as": "otherVolunteer",
+      "expected_outcome": "rejected",
+      "bindings": {
+        "taskId": "$s1.taskId"
+      }
+    },
+    {
+      "id": "s6",
+      "capability": "task.complete",
+      "as": "volunteer",
+      "expected_outcome": "applied",
+      "bindings": {
+        "taskId": "$s1.taskId"
+      }
+    },
+    {
+      "id": "s7",
+      "capability": "task.complete",
+      "as": "volunteer",
+      "expected_outcome": "rejected",
+      "bindings": {
+        "taskId": "$s1.taskId"
+      }
+    }
+  ],
+  "observability": {
+    "declared_scopes": ["tasks", "points"]
+  }
+}
