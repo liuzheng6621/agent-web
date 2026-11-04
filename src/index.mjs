@@ -9,6 +9,7 @@ export { SCHEMA_VERSION, STEP_OUTCOMES, BindingError, validateCase, validateStep
 export { VERDICTS, judge } from './runner.mjs';
 export { wilson, summarize, agreement, formatText } from './report.mjs';
 export { parseLog, matchHttp, outcomeOf, inferSteps, toTrajectoryDoc, recordTrajectory } from './record.mjs';
+export { identityOf, synthesize, replayTrajectory, buildDraftCase } from './draft.mjs';
 export {
   OUTCOMES,
   CAPABILITY_KINDS,

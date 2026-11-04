@@ -251,6 +251,56 @@ node bin/agent-web.mjs record examples/agent-traces/happy-path.jsonl \
 
 ---
 
+## 从轨迹到案例：draft
+
+`record` 解决了轨迹从哪来，剩下的问题是**案例从哪来**。此前只能人肉：盯着终态一条条手写 `field_equals`，写完还得担心 `id` 是不是钉死在那一次运行上。
+
+`draft` 把这一步变成一次回放：
+
+```bash
+node bin/agent-web.mjs draft examples/agent-traces/recorded/happy-path.json \
+  --adapter=memory --out=examples/agent-traces/drafts/happy-path.case.json
+```
+
+```
+回放 4 步，终态如下（初态指纹 fnv1a32:f584a774）
+  menu        3 -> 3      未变
+  orders      0 -> 1      +1
+  status_log  0 -> 4      +4
+
+目标断言 3 条
+  [0] {"kind":"count_delta","selector":{"collection":"orders"},"delta":1}
+      └ orders 由 0 条变成 1 条（净变化 +1）
+  [1] {"kind":"field_equals","selector":{"collection":"orders","index":0},"path":"status","value":"PICKED"}
+      └ orders 的 status 停在 "PICKED"（这是本次运行的终点，不代表它应该停在这里）
+  [2] {"kind":"status_transition","selector":{"collection":"orders","index":0},"path":"status","transitions":[["PENDING","MAKING"],["MAKING","READY"],["READY","PICKED"]]}
+      └ orders#0 实际走了 PENDING -> MAKING -> READY -> PICKED
+
+不变量 1 条
+  [0] {"kind":"unchanged","scopes":["menu"]}
+
+待确认 5 条
+  - status_log 是事件流水（manifest.events_scope），本次新增 4 条，草稿不为它生成 count_delta……
+  - 草稿的断言全部从「实际发生」反推，回放必然 pass —— 它描述现状，不表达应该。
+  - 至少补一条负例：越权、非法状态迁移、重复提交应当被拒。
+  - allowed_capabilities 目前照抄轨迹里用到的写操作……
+  - 确认后删掉 draft 字段，这条案例才算接手。
+
+草稿自检：pass（ok）—— 这只说明格式合法、可重放，不说明判据正确。
+```
+
+四件事值得说清楚。
+
+**产物一定是绿的。** 断言就是从这次运行的终态抄下来的，回放当然 pass。这句话必须印在输出里，否则下一个人会把它当判据用。draft 交付的不是测试，是一份**待确认清单**：这个值对不对、这条该不该有、缺了哪条负例。
+
+**环境相关的字段一条都不写。** `id`、`createTime`、`pickupNo`、`username` 换一次 reset 就变，写进断言等于把案例钉死在这一场运行上。绑定表达式（`$s1.orderId`）能处理这类值，断言不能——断言里没有 `$s1` 这种语法。
+
+**证不出来的不写。** 事件流水的条数取决于实现记多细；多条新实体时挑哪一条当判据属于业务判断。这两类一律进 `todo` 并附上原因。少写一条比写错一条安全：错的断言会一直绿。
+
+**负例步的能力也要进白名单。** runner 在调用适配器之前先查 `allowed_capabilities`，少写一条，`expected_outcome: rejected` 的步会在「系统拒绝它」之前就被判成 `invalid_action`——负例被自己的白名单挡在了门外。这个坑是写 draft 的时候自己踩出来的，测试里留了一条守着。
+
+---
+
 ## 检测被测系统变了没有
 
 ```bash
@@ -404,6 +454,7 @@ agent-web drift before.jsonl after.jsonl
 4. **`inferred` 证据等级没有提级路径。** manifest 里标了 `inferred` 的能力（比如需要 multipart 的图片上传）只能一直诚实地标着，没有从推断升到验证的流程。
 5. **单适配器单 run 串行跑。** 没有并发，也没有跨机器分发。
 6. **复杂度标签只是标签。** `complex` 由步数、写操作数、角色切换数算出来，不是难度标定，不要当难度用。
+7. **`draft` 只会抄现状。** 它写不出「不该发生的事」——负例、禁止事件、时间上限，一条都不会自己冒出来。这些仍然只能人想，工具最多提醒你去想。
 
 ---
 
@@ -411,7 +462,7 @@ agent-web drift before.jsonl after.jsonl
 
 ```
 agent-web/
-├── bin/agent-web.mjs          命令行：selftest / verify / report / compare / capabilities / init
+├── bin/agent-web.mjs          命令行：selftest / verify / report / compare / record / draft / drift / capabilities / init
 ├── src/
 │   ├── three-valued.mjs       Kleene 三值逻辑（true / false / unknown 及其 and/or/not）
 │   ├── values.mjs             归一化、深比较、稳定序列化、结构指纹
@@ -422,6 +473,8 @@ agent-web/
 │   ├── runner.mjs             六步判决流水线
 │   ├── report.mjs             Wilson 区间、汇总指标、一致性、文本输出
 │   ├── view.mjs               视图契约：声明校验、状态核对、跨实现差异
+│   ├── record.mjs             流量 → 候选轨迹（http 模板反查、绑定推断）
+│   ├── draft.mjs              轨迹 → 案例草稿（回放、断言合成、待确认清单）
 │   └── adapter/
 │       ├── contract.mjs       适配器契约（manifest 校验、四种执行结果、证据等级）
 │       ├── load.mjs           适配器加载（内置名 / 文件路径 / 包名）
@@ -432,12 +485,13 @@ agent-web/
 │   └── taixianglian/          与上面除 adapter 外字节相同的七条
 ├── examples/
 │   ├── README.md              参考被测系统（咖啡店）说明
-│   └── adapter-template/      能直接跑的适配器骨架 + 四条示例案例
+│   ├── adapter-template/      能直接跑的适配器骨架 + 四条示例案例
+│   └── agent-traces/          真实流量日志 → record 产物 → draft 草稿
 ├── docs/
 │   ├── SPEC.md                案例格式规范
 │   ├── FINDING-001.md         身份塌缩导致的假通过
 │   └── FINDING-001.en.md      同上，英文版
-└── test/engine.test.mjs       32 个单元测试（node --test，零依赖）
+└── test/engine.test.mjs       44 个单元测试（node --test，零依赖）
 ```
 
 ---
@@ -453,9 +507,11 @@ agent-web/
 
 ## 路线
 
-- `0.1`（当前）：内存适配器 + 真实 HTTP 适配器 + 七种断言 + 跨适配器判决对照 + 视图契约，跑通。
-- `0.2`：跨视图映射（不同集合名的案例能换算过去）；多后端并发；`inferred` 提级路径。
-- 之后：轨迹录制成案例（人跑一遍，自动生成断言草稿，人工确认）；跨系统案例复用。
+- `0.1`：内存适配器 + 真实 HTTP 适配器 + 七种断言 + 跨适配器判决对照 + 视图契约，跑通。
+- `0.2`：判别人的轨迹；事件词表；初态漂移检测。
+- `0.3`：`record`——真实流量还原成候选轨迹。
+- `0.4`（当前）：`draft`——轨迹回放成案例草稿，把「写案例」压成「确认几条待办」。
+- 之后：跨视图映射（不同集合名的案例能换算过去）；多后端并发；`inferred` 提级路径。
 
 ---
 

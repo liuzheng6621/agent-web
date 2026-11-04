@@ -30,6 +30,8 @@
 | `reference_trajectory` | array | 是 | 参考轨迹，见第 5 节 |
 | `observability` | object | 否 | 声明期望被观测的域 |
 
+**本规范未定义的顶层字段必须被忽略。** 实现不得因为出现陌生字段就判 `invalid_case`——案例上会挂工具的注记（目前只有 `draft`，见 5.7），把它们当成格式错误会让「草稿」和「正式案例」没法放在同一个目录里。
+
 校验失败时判决为 `unknown / invalid_case`，整条案例**不进入执行**。
 
 ---
@@ -221,6 +223,55 @@ agent-web record <日志> --adapter=SPEC --out=<文件> [--case=<案例 id>] [--
 - 无法还原的条目进 `skipped`，带 `reason`，不静默丢弃。
 
 产物就是一个普通的轨迹文件，交给 `verify --trajectory` 直接用。
+
+---
+
+## 5.7 draft：从轨迹反推案例草稿
+
+```bash
+agent-web draft <轨迹文件> --adapter=SPEC [--out=<案例.json>] [--id=<案例 id>] [--goal="..."]
+```
+
+回放一次：`reset` → 逐步 `execute` → `observe` 终态，语义与 runner 一致。**任何一步中断都不生成草稿**——跑不通就没有「实际终态」可依据，继续往下写出来的全是想象。
+
+合成规则是确定性的，没有模型参与：
+
+| 观测 | 产出 | 相位 |
+| --- | --- | --- |
+| 某集合条数变了 | `count_delta`（delta 取实际净变化） | initial_vs_final |
+| 恰好一条新实体 | 对「相对首次观测发生变化」的字段写 `field_equals`，最多 4 条，`status` 优先 | final |
+| 该实体的 status 序列长度 ≥ 2 | `status_transition`（transitions 取相邻边） | trace |
+| 全程未变且非空的集合 | `unchanged`，写进 `invariants` 而不是 `goal_assertions` | initial_vs_final |
+
+不生成的四类，一律进 `draft.todo` 并写明原因：
+
+- **环境相关字段**：`id` / `*Id` / `*_id` / `createTime` / `pickupNo` / `username` 等。换一次 reset 就变，写进断言等于把案例钉死在这一场运行上。绑定表达式能处理它们，断言不能。
+- **事件流水的条数**（`manifest.events_scope`）：条数依赖实现记多细。
+- **多条新实体**：挑哪一条当判据属于业务判断。
+- **终态消失的实体**：草稿只看得到「少了」，看不到「该不该少」。
+
+`status_transition` 的序列取法与求值器逐字相同（按 `step.stateAfter` 取、去连续重复），所以草稿一定能重放。这一点是刻意的：草稿的用途是「可确认」，不是「可发现」。
+
+**草稿必须带着未确认标记。** 产物里有一个 `draft` 顶层块：
+
+```json
+"draft": {
+  "status": "unconfirmed",
+  "generated_by": "agent-web draft",
+  "from": "examples/agent-traces/recorded/happy-path.json",
+  "initial_fingerprint": "fnv1a32:f584a774",
+  "final_fingerprint": "fnv1a32:f9721fb8",
+  "collections": [{ "collection": "orders", "before": 0, "after": 1, "delta": 1 }],
+  "notes": [{ "at": "goal[1]", "why": "orders 的 status 停在 \"PICKED\"（这是本次运行的终点，不代表它应该停在这里）" }],
+  "todo": ["……"]
+}
+```
+
+`draft` 是非规范的注记块，实现必须忽略（见第 1 节）。人工确认后应删掉它，这条案例才算接手。
+
+**产物一定是 `pass`。** 断言从这次运行的终态抄下来，回放当然过。这不是「草稿对了」，是「草稿同义反复」。工具必须把这句话打进输出，否则下一个人会把它当判据用。
+
+`allowed_capabilities` 取轨迹里出现过的**全部**能力，包括 `expected_outcome: "rejected"` 的步。runner 在调用适配器之前先查白名单（第 7 节第 8 条），少写一条，负例会在「系统拒绝它」之前就被判成 `invalid_action`——负例被自己的白名单挡在门外。
 
 ---
 

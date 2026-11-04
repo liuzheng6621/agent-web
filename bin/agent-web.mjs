@@ -6,6 +6,7 @@
  *   agent-web verify <目录或文件>       对指定适配器跑案例，出判决
  *   agent-web report <results.jsonl>   由判决结果出指标
  *   agent-web capabilities             打印适配器的能力清单与证据等级
+ *   agent-web draft <轨迹文件>          回放一条轨迹，反推案例草稿
  *   agent-web init <目录>              生成一份案例模板
  *
  * 退出码：0 全部符合预期；1 存在不符；2 用法或环境错误。
@@ -19,6 +20,8 @@ import { fileURLToPath } from 'node:url';
 import { judge } from '../src/runner.mjs';
 import { fingerprint } from '../src/values.mjs';
 import { recordTrajectory } from '../src/record.mjs';
+import { replayTrajectory, buildDraftCase } from '../src/draft.mjs';
+import { validateCase, validateSteps } from '../src/case.mjs';
 import { summarize, agreement, formatText, countFailedAssertions } from '../src/report.mjs';
 import { loadAdapter, listBuiltins } from '../src/adapter/load.mjs';
 import { diffViews } from '../src/view.mjs';
@@ -455,8 +458,139 @@ async function cmdRecord(args, flags) {
   return doc.trajectory.length > 0 ? 0 : 1;
 }
 
-function announceCandidateMode(flags) {
-  if (typeof flags.trajectory !== 'string' || flags.json) return;
+// draft：把一条轨迹回放一遍，从实际终态反推案例草稿。
+// 它的产物一定是 pass —— 断言就是从这次运行的终态抄下来的。
+// 所以这一步不是"生成测试"，是"把人要想的部分从零开始压到几条待确认"。
+async function cmdDraft(args, flags) {
+  if (args.length === 0) {
+    console.error('用法：agent-web draft <轨迹文件> --adapter=SPEC [--out=案例.json] [--id=前缀/名字] [--goal="..."]');
+    return 2;
+  }
+  const trajPath = path.resolve(args[0]);
+  if (!fs.existsSync(trajPath)) {
+    console.error('找不到轨迹文件 ' + trajPath);
+    return 2;
+  }
+  const raw = JSON.parse(fs.readFileSync(trajPath, 'utf8'));
+  const steps = Array.isArray(raw) ? raw : Array.isArray(raw?.trajectory) ? raw.trajectory : null;
+  if (!steps || steps.length === 0) {
+    console.error('轨迹文件里没有非空的 trajectory 数组：' + trajPath);
+    return 2;
+  }
+  const stepErrors = validateSteps(steps, 'trajectory');
+  if (stepErrors.length > 0) {
+    console.error('轨迹未通过结构校验，不进入回放：');
+    for (const e of stepErrors) console.error('  - ' + e);
+    return 1;
+  }
+
+  const adapterName = flags.adapter ?? 'memory';
+  const adapter = await makeAdapter(adapterName);
+  const manifest = await adapter.manifest();
+  const scopes = manifest.scopes;
+  let seed = {};
+  if (typeof flags.seed === 'string') {
+    try {
+      seed = JSON.parse(flags.seed);
+    } catch (e) {
+      console.error('--seed 不是合法 JSON：' + e.message);
+      return 2;
+    }
+  }
+
+  const replay = await replayTrajectory({ adapter, steps, scopes, seed });
+  if (!replay.ok) {
+    // 轨迹回放不通，就没有"实际终态"可抄。这时候继续往下写，写出来的全是想象。
+    console.error('回放中断：' + replay.aborted.code + (replay.aborted.at !== undefined ? ' @ step[' + replay.aborted.at + ']' : ''));
+    console.error('  ' + replay.aborted.detail);
+    console.error('这条轨迹在这个适配器上跑不通，没有终态可依据，不生成草稿。');
+    return 1;
+  }
+
+  const base = path.basename(trajPath).replace(/\.json$/i, '');
+  const caseId = typeof flags.id === 'string' ? flags.id : 'draft/' + base;
+  const { case: c, synth } = buildDraftCase({
+    id: caseId,
+    adapterName: manifest.adapter ?? adapterName,
+    seed,
+    source: (path.relative(process.cwd(), trajPath) || base).split(path.sep).join('/'),
+    steps,
+    initial: replay.initial,
+    final: replay.final,
+    trace: replay.trace,
+    manifest,
+    scopes,
+    goal: typeof flags.goal === 'string' ? flags.goal : '',
+  });
+
+  const caseErrors = validateCase(c);
+  // 一条断言都没合成出来时，格式校验会先报「goal_assertions 必须是非空数组」。
+  // 那是结果，不是原因 —— 原因在上面那张终态表里，交给下面的空断言分支说。
+  const realErrors = synth.goal_assertions.length === 0
+    ? caseErrors.filter((e) => !e.includes('goal_assertions'))
+    : caseErrors;
+  if (realErrors.length > 0) {
+    console.error('生成的草稿未通过案例格式校验（这是 draft 自己的 bug，不是你的）：');
+    for (const e of realErrors) console.error('  - ' + e);
+    return 1;
+  }
+
+  const pad = (t, w) => String(t) + ' '.repeat(Math.max(0, w - [...String(t)].length));
+  console.log('回放 ' + steps.length + ' 步，终态如下（初态指纹 ' + fingerprint(replay.initial) + '）');
+  const w = Math.max(...synth.summary.map((s) => [...s.collection].length), 8) + 2;
+  for (const s of synth.summary) {
+    const mark = s.delta === 0 ? '未变' : (s.delta > 0 ? '+' : '') + s.delta;
+    console.log('  ' + pad(s.collection, w) + pad(s.before + ' -> ' + s.after, 12) + mark);
+  }
+
+  const noteFor = (at) => synth.notes.find((n) => n.at === at);
+  console.log('');
+  console.log('目标断言 ' + synth.goal_assertions.length + ' 条');
+  if (synth.goal_assertions.length === 0) {
+    console.log('  （一条也没生成）');
+  }
+  synth.goal_assertions.forEach((a, i) => {
+    console.log('  [' + i + '] ' + JSON.stringify(a));
+    const n = noteFor('goal[' + i + ']');
+    if (n) console.log('      └ ' + n.why);
+  });
+
+  if (synth.invariants.length > 0) {
+    console.log('');
+    console.log('不变量 ' + synth.invariants.length + ' 条');
+    synth.invariants.forEach((a, i) => {
+      console.log('  [' + i + '] ' + JSON.stringify(a));
+      const n = noteFor('invariant[' + i + ']');
+      if (n) console.log('      └ ' + n.why);
+    });
+  }
+
+  console.log('');
+  console.log('待确认 ' + synth.todo.length + ' 条');
+  for (const t of synth.todo) console.log('  - ' + t);
+
+  if (synth.goal_assertions.length === 0) {
+    console.log('');
+    console.error('回放没有产出任何目标断言：这条轨迹没有留下可判的终态痕迹，不写文件。');
+    return 1;
+  }
+
+  const out = typeof flags.out === 'string' ? path.resolve(flags.out) : null;
+  if (out) {
+    fs.mkdirSync(path.dirname(out), { recursive: true });
+    fs.writeFileSync(out, JSON.stringify(c, null, 2) + '\n', 'utf8');
+  }
+
+  // 自检：拿草稿自己跑一遍。跑不过说明草稿内部不自洽（多半是选择器写歪了），
+  // 跑得过也只是一句「能跑」，不是「判据对」—— 这两句话必须分开说。
+  const self = await judge({ case: c, adapter, adapterName: manifest.adapter ?? adapterName });
+  console.log('');
+  console.log('草稿自检：' + self.status + '（' + self.reason_code + '）—— 这只说明格式合法、可重放，不说明判据正确。');
+  if (out) console.log('已写入 ' + path.relative(process.cwd(), out));
+  return self.status === 'pass' ? 0 : 1;
+}
+
+function announceCandidateMode(flags) {  if (typeof flags.trajectory !== 'string' || flags.json) return;
   // 候选轨迹模式下，expected.json 描述的是参考轨迹，落差是结论而不是错误。
   console.log('候选轨迹模式：判的是 --trajectory 目录里的动作序列，不是案例自带的参考轨迹。');
   console.log('下面的 ✓/✗ 相对 expected.json 的参考基线，落差本身就是要看的东西。');
@@ -472,6 +606,7 @@ const HELP = `agent-web —— 给 Agent 写机器可判的集成测试
   agent-web compare <案例> --adapters=A,B     同一份案例喂多个实现，比判决
   agent-web drift <旧.jsonl> <新.jsonl>      比较两次跑批的初态形状（漂移检测）
   agent-web record <动作日志> --adapter=SPEC  把 Agent 的实际动作还原成候选轨迹
+  agent-web draft <轨迹文件> --adapter=SPEC   回放轨迹，反推案例草稿（要人确认）
   agent-web init <目录>                       生成案例模板（--adapter 写进 environment）
 
 适配器 SPEC 可以是：
@@ -509,6 +644,8 @@ async function main() {
         return await cmdCompare(args, flags);
       case 'record':
         return await cmdRecord(args, flags);
+      case 'draft':
+        return await cmdDraft(args, flags);
       case 'drift':
         return await cmdDrift(args);
       case 'capabilities':

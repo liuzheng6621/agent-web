@@ -1,6 +1,6 @@
 {
   "name": "agent-web",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "给 Agent 写机器可判的集成测试：一份案例，多个实现，判决必须一致。",
   "type": "module",
   "bin": {
@@ -13,7 +13,8 @@
     "./report": "./src/report.mjs",
     "./adapter/memory": "./src/adapter/memory.mjs",
     "./adapter/taixianglian": "./src/adapter/taixianglian.mjs",
-    "./record": "./src/record.mjs"
+    "./record": "./src/record.mjs",
+    "./draft": "./src/draft.mjs"
   },
   "scripts": {
     "test": "node --test test/engine.test.mjs",

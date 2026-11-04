@@ -476,3 +476,129 @@ test('record：没有执行者角色的请求跳过，不瞎猜', async () => {
   assert.equal(steps.length, 0);
   assert.equal(skipped[0].reason, 'missing_as');
 });
+
+// ---- draft：轨迹回放 → 断言草稿 ----
+
+const DRAFT_MANIFEST = {
+  events_scope: 'status_log',
+  capabilities: [
+    { id: 'order.create', kind: 'write' },
+    { id: 'order.pick', kind: 'write' },
+    { id: 'menu.list', kind: 'read' },
+  ],
+  view: {
+    collections: {
+      menu: { kind: 'list' },
+      orders: { kind: 'list' },
+      status_log: { kind: 'list' },
+    },
+  },
+};
+
+function draftStates(orders, log = []) {
+  return {
+    menu: [{ id: 'latte', dishName: '拿铁', price: 28 }],
+    orders,
+    status_log: log,
+  };
+}
+
+test('draft：实体身份优先用 id，没有 id 才退回指纹', async () => {
+  const { identityOf } = await import('../src/draft.mjs');
+  assert.equal(identityOf({ id: 7, status: 'PENDING' }), 'id:7');
+  assert.match(identityOf({ status: 'PENDING' }), /^fp:fnv1a32:/);
+});
+
+test('draft：合成 count_delta / field_equals / status_transition，不碰事件流水与环境字段', async () => {
+  const { synthesize } = await import('../src/draft.mjs');
+  const order = (status) => ({ id: 7, status, totalAmount: 28, createTime: 123, items: [{ dishName: '拿铁', count: 1 }] });
+  const initial = draftStates([]);
+  const final = draftStates([order('PICKED')], [{ type: 'order.created', orderId: 7, from: null, to: 'PENDING' }]);
+  const trace = [{ stateAfter: draftStates([order('PENDING')]) }, { stateAfter: final }];
+
+  const s = synthesize({ initial, final, trace, manifest: DRAFT_MANIFEST, steps: [] });
+  const kinds = s.goal_assertions.map((a) => a.kind);
+  assert.deepEqual(kinds, ['count_delta', 'field_equals', 'status_transition']);
+  assert.equal(s.goal_assertions[0].delta, 1);
+  assert.equal(s.goal_assertions[1].path, 'status');
+  assert.equal(s.goal_assertions[1].value, 'PICKED');
+  assert.deepEqual(s.goal_assertions[2].transitions, [['PENDING', 'PICKED']]);
+
+  // 换一次 reset 就变的字段不许进断言
+  const paths = s.goal_assertions.filter((a) => a.kind === 'field_equals').map((a) => a.path);
+  assert.ok(!paths.includes('id'));
+  assert.ok(!paths.includes('createTime'));
+
+  // 事件流水不进 count_delta，但要给出原因
+  assert.ok(!s.goal_assertions.some((a) => a.selector?.collection === 'status_log'));
+  assert.ok(s.todo.some((t) => t.includes('status_log') && t.includes('事件粒度')));
+
+  // 没动的集合进不变量，不进目标
+  assert.deepEqual(s.invariants.map((a) => a.scopes), [['menu']]);
+});
+
+test('draft：新增多条时不替人挑判据对象', async () => {
+  const { synthesize } = await import('../src/draft.mjs');
+  const order = (id, status) => ({ id, status, totalAmount: 28, createTime: 1, items: [] });
+  const initial = draftStates([]);
+  const final = draftStates([order(1, 'PENDING'), order(2, 'PENDING')]);
+  const s = synthesize({ initial, final, trace: [], manifest: DRAFT_MANIFEST, steps: [] });
+  assert.ok(!s.goal_assertions.some((a) => a.kind === 'field_equals'));
+  assert.ok(s.todo.some((t) => t.includes('新增 2 条')));
+  // 计数仍然写：条数变化是确定的
+  assert.equal(s.goal_assertions[0].delta, 2);
+});
+
+test('draft：回放 → 草稿 → 自检 pass，且负例能力留在白名单里', async () => {
+  const { createMemoryAdapter } = await import('../src/adapter/memory.mjs');
+  const { replayTrajectory, buildDraftCase } = await import('../src/draft.mjs');
+  const { judge } = await import('../src/runner.mjs');
+  const adapter = createMemoryAdapter();
+  const manifest = await adapter.manifest();
+
+  const steps = [
+    { id: 's1', capability: 'order.create', as: 'customer', expected_outcome: 'applied', arguments: { items: [{ dishName: '拿铁', qty: 1 }] } },
+    { id: 's2', capability: 'kitchen.accept', as: 'staff', expected_outcome: 'applied', bindings: { orderId: '$s1.orderId' } },
+    { id: 's3', capability: 'order.pick', as: 'customer2', expected_outcome: 'rejected', bindings: { orderId: '$s1.orderId' } },
+  ];
+
+  const r = await replayTrajectory({ adapter, steps, scopes: manifest.scopes, seed: {} });
+  assert.equal(r.ok, true);
+  assert.equal(r.final.orders.length, 1);
+
+  const { case: c } = buildDraftCase({
+    id: 'draft/neg',
+    adapterName: 'memory',
+    seed: {},
+    source: 'test',
+    steps,
+    initial: r.initial,
+    final: r.final,
+    trace: r.trace,
+    manifest,
+    scopes: manifest.scopes,
+  });
+  assert.deepEqual(validateCase(c), []);
+  // 被拒绝的步也必须在白名单里，否则 runner 在调用适配器之前就判 invalid_action
+  assert.ok(c.task.allowed_capabilities.includes('order.pick'));
+  assert.equal(c.draft.status, 'unconfirmed');
+  // 断言里不许出现具体 id：内存适配器从 1001 起编号，换到真实后端就是 2
+  assert.ok(!JSON.stringify(c.task.goal_assertions).includes('1001'), '断言里钉死了环境相关的 id');
+
+  const v = await judge({ case: c, adapter, adapterName: 'memory' });
+  assert.equal(v.status, 'pass', v.detail);
+});
+
+test('draft：轨迹跑不通就不生成草稿', async () => {
+  const { createMemoryAdapter } = await import('../src/adapter/memory.mjs');
+  const { replayTrajectory } = await import('../src/draft.mjs');
+  const adapter = createMemoryAdapter();
+  const manifest = await adapter.manifest();
+  const steps = [
+    { id: 's1', capability: 'order.pick', as: 'customer', expected_outcome: 'applied', arguments: { orderId: 999 } },
+  ];
+  const r = await replayTrajectory({ adapter, steps, scopes: manifest.scopes, seed: {} });
+  assert.equal(r.ok, false);
+  assert.equal(r.aborted.code, 'unexpected_rejection');
+  assert.equal(r.aborted.at, 0);
+});

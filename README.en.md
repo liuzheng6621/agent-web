@@ -183,6 +183,127 @@ After the fix, all seven agree. Full write-up: [docs/FINDING-001.en.md](docs/FIN
 
 ---
 
+## Judging someone else's trajectory, not just an implementation
+
+A case's `reference_trajectory` answers exactly one question: can this path be walked at all. When you evaluate an agent, what you judge is **the path it actually took**.
+
+```bash
+agent-web verify cases/memory-demo --adapter=memory --trajectory=examples/candidate-trajectories
+```
+
+`examples/candidate-trajectories/` ships two demo trajectories and they come out opposite:
+
+| case | reference | candidate | what happened |
+| --- | --- | --- | --- |
+| `happy-path` | pass | **fail** | the candidate placed the order and called it done |
+| `goal-not-reached` | fail | **pass** | the candidate took an extra `kitchen.ready` and got there |
+
+The second row is the interesting one: same case, reference fails, candidate passes. The assertions test **whether the goal was reached**, not **whether the actions were copied**. Trajectory files share the case structure and the same validation.
+
+In candidate mode, ✓/✗ are relative to `expected.json` (which describes the reference). The gap is the finding.
+
+---
+
+## Detecting whether the system under test moved
+
+```bash
+agent-web verify cases/x --adapter=X --out=before.jsonl
+# ... the app ships a new version ...
+agent-web drift before.jsonl after.jsonl
+```
+
+`drift` compares the **canonical-view fingerprint** of the initial state across two batches: same / drifted / only-old / only-new, exit code 1 on drift. Drift is not a wrong verdict — it is the question "does this case still describe the app it was written for". Add one menu item, reshape one field, and a case whose fingerprint doesn't move stays green for no reason at all.
+
+---
+
+## From real traffic to a trajectory: record
+
+Candidate trajectories used to be hand-written, and that is exactly what separated "can judge an agent" from "usable". `record` closes the gap: it eats the request log an agent produced and writes a file `verify --trajectory` consumes directly.
+
+```bash
+node bin/agent-web.mjs record examples/agent-traces/happy-path.jsonl \
+  --adapter=taixianglian --case=taixianglian/happy-path \
+  --out=examples/agent-traces/recorded/happy-path.json
+```
+
+Input is JSONL (or a single array), one request per line, at minimum `as`, `method`, `path`, optionally `body`, `status`, `response`:
+
+```json
+{"as":"customer","method":"POST","path":"/waiter/order","body":{"dishList":[{"dishName":"拿铁","count":1}]},"status":200,"response":{"code":200,"data":{"id":2}}}
+```
+
+Already-normalized actions (`capability` + `arguments` + `outcome`) are accepted too — a runtime will find that the cheapest thing to emit.
+
+What comes back:
+
+```
+read 8 entries, reconstructed 4 steps
+  s1 order.create as=customer applied {"items":[{"dishName":"拿铁","qty":1}]}
+  s2 kitchen.accept as=staff applied {"orderId":"$s1.orderId"}
+  s3 kitchen.ready as=staff applied {"orderId":"$s1.orderId"}
+  s4 order.pick as=customer applied {"orderId":"$s1.orderId"}
+
+skipped 4: unmapped_request×3 read_skipped×1
+```
+
+Three things worth stating plainly:
+
+**Bindings are inferred.** When a step's argument equals an entity id returned by an earlier step, it becomes `$s1.orderId`. Without that, a recorded `orderId: 2` is only true in that one environment — reset the database and it is all wrong.
+
+**Writes only, by default.** Reads are how the agent finds ids; they are not the actions being judged, and mixing them in collides with `allowed_capabilities`, turning a good trajectory into `invalid_action`. Pass `--include-reads` to keep them.
+
+**Unrecognized means skipped, not guessed.** Every skip carries a reason (`unmapped_request` / `missing_as` / `no_outcome` / `unparsable_arguments`) in the output's `skipped` field. Quietly inserting one fake action is far more dangerous than one missing step.
+
+---
+
+## From trajectory to case: draft
+
+`record` settled where trajectories come from. The remaining question was where **cases** come from. Until now that was manual: stare at the final state, hand-write `field_equals` one at a time, then worry whether the `id` you just froze belongs to that one run.
+
+`draft` turns it into a replay:
+
+```bash
+node bin/agent-web.mjs draft examples/agent-traces/recorded/happy-path.json \
+  --adapter=memory --out=examples/agent-traces/drafts/happy-path.case.json
+```
+
+```
+replayed 4 steps, final state (initial fingerprint fnv1a32:f584a774)
+  menu        3 -> 3      unchanged
+  orders      0 -> 1      +1
+  status_log  0 -> 4      +4
+
+3 goal assertions
+  [0] {"kind":"count_delta","selector":{"collection":"orders"},"delta":1}
+  [1] {"kind":"field_equals","selector":{"collection":"orders","index":0},"path":"status","value":"PICKED"}
+      └ status stops at "PICKED" (that is where this run ended, not where it should end)
+  [2] {"kind":"status_transition","selector":{"collection":"orders","index":0},"path":"status","transitions":[["PENDING","MAKING"],["MAKING","READY"],["READY","PICKED"]]}
+
+1 invariant
+  [0] {"kind":"unchanged","scopes":["menu"]}
+
+5 things to confirm
+  - status_log is the event stream (manifest.events_scope); no count_delta for it...
+  - every assertion above was reverse-engineered from what happened, so the replay always passes.
+  - add at least one negative case: unauthorized pickup, illegal transition, duplicate submit.
+  - allowed_capabilities is copied from usage, not from intent.
+  - delete the draft block once you have confirmed it.
+
+self-check: pass (ok) — this says the draft is well-formed and replayable, not that it is correct.
+```
+
+Four things worth stating plainly.
+
+**The output is always green.** The assertions were copied from this run's final state, so of course the replay passes. That sentence has to be printed, or the next person will use it as a judgement. What draft delivers is not a test — it is a **confirmation checklist**: is this value right, should this assertion exist, which negative case is missing.
+
+**Environment-bound fields are never written.** `id`, `createTime`, `pickupNo`, `username` change with a single reset; putting them in an assertion nails the case to one run. Binding expressions (`$s1.orderId`) handle those values. Assertions cannot — there is no `$s1` syntax inside an assertion.
+
+**What it cannot prove, it does not write.** Event-stream counts depend on how finely an implementation logs; choosing which of several new entities is the subject is a business judgement. Both go to `todo` with a reason. Writing one assertion too few is safer than one too many: a wrong assertion stays green forever.
+
+**Negative steps need their capability in the whitelist.** The runner checks `allowed_capabilities` before it ever calls the adapter, so leaving it out turns an `expected_outcome: rejected` step into `invalid_action` before the system gets a chance to reject it — the negative case is locked out by its own whitelist. This was found while building draft; a test guards it.
+
+---
+
 ## Three concepts
 
 | Concept | What it is |
@@ -320,6 +441,7 @@ Written down so people know where the edges are, not out of modesty.
 4. **No promotion path for the `inferred` evidence level.** Capabilities marked `inferred` (say, a multipart image upload) stay honestly marked forever; there's no flow from inferred up to validated.
 5. **One adapter, one run, serial.** No concurrency, no distribution across machines.
 6. **Complexity labels are just labels.** `complex` is computed from step count, write count and role switches. It is not a difficulty calibration — don't use it as one.
+7. **`draft` only copies what happened.** It cannot write the things that must *not* happen — negative cases, forbidden events, time limits. Those still require a human. The tool can only remind you to think about them.
 
 ---
 
@@ -327,7 +449,7 @@ Written down so people know where the edges are, not out of modesty.
 
 ```
 agent-web/
-├── bin/agent-web.mjs          CLI: selftest / verify / report / compare / capabilities / init
+├── bin/agent-web.mjs          CLI: selftest / verify / report / compare / record / draft / drift / capabilities / init
 ├── src/
 │   ├── three-valued.mjs       Kleene three-valued logic (true / false / unknown, and/or/not)
 │   ├── values.mjs             normalization, deep equality, stable stringify, structural fingerprint
@@ -338,6 +460,8 @@ agent-web/
 │   ├── runner.mjs             the six-step verdict pipeline
 │   ├── report.mjs             Wilson intervals, summary metrics, agreement, text output
 │   ├── view.mjs               view contract: declaration checks, state checks, cross-impl diff
+│   ├── record.mjs             traffic → candidate trajectory (http template lookup, binding inference)
+│   ├── draft.mjs              trajectory → case draft (replay, assertion synthesis, to-confirm list)
 │   └── adapter/
 │       ├── contract.mjs       adapter contract (manifest checks, four outcomes, evidence levels)
 │       ├── load.mjs           adapter loading (built-in name / file path / package name)
@@ -348,12 +472,13 @@ agent-web/
 │   └── taixianglian/          the same seven, byte-identical except for adapter
 ├── examples/
 │   ├── README.md              the reference system under test (coffee shop)
-│   └── adapter-template/      a runnable adapter skeleton + four example cases
+│   ├── adapter-template/      a runnable adapter skeleton + four example cases
+│   └── agent-traces/          real traffic log → record output → draft case
 ├── docs/
 │   ├── SPEC.md                case format specification
 │   ├── FINDING-001.md         the false pass caused by collapsed identities
 │   └── FINDING-001.en.md      same, in English
-└── test/engine.test.mjs       32 unit tests (node --test, zero dependencies)
+└── test/engine.test.mjs       44 unit tests (node --test, zero dependencies)
 ```
 
 ---
@@ -369,9 +494,11 @@ agent-web/
 
 ## Roadmap
 
-- `0.1` (current): in-memory adapter + real HTTP adapter + seven assertion kinds + cross-adapter verdict comparison, working.
-- `0.2`: cross-view mapping so cases travel between differently-named collections; multi-backend concurrency; a promotion path for `inferred`.
-- After that: record a trajectory into a case (a human runs it once, assertion drafts are generated, a human confirms); reuse cases across systems.
+- `0.1`: in-memory adapter + real HTTP adapter + seven assertion kinds + cross-adapter verdict comparison + view contracts, working.
+- `0.2`: judging someone else's trajectory; event vocabulary; initial-state drift detection.
+- `0.3`: `record` — real traffic reconstructed into a candidate trajectory.
+- `0.4` (current): `draft` — a trajectory replayed into a case draft, turning "write a case" into "confirm a short list".
+- After that: cross-view mapping so cases travel between differently-named collections; multi-backend concurrency; a promotion path for `inferred`.
 
 ---
 
