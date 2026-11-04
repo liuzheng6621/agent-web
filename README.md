@@ -367,6 +367,8 @@ node .\\bin\\agent-web.mjs compare examples/animal-tracking --adapters=examples/
 
 真实适配器没有默认目标，强制要求隔离确认与 loopback HTTP 地址；每次 `reset` 会创建新的居民/志愿者账号并写入任务，H2 实例应是一次性的。
 
+
+
 实跑结论（一次性 H2、2026-11-04）：案例 `pass`、探针 6/6、跨适配器一致率 100%。过程中修掉一个真实冲突：后端对登录接口限流，`reset()` 每次重登 admin 会撞 429 把判决打成 unknown——admin token 现在按进程缓存。
 
 ## 现在做不到什么
@@ -388,6 +390,7 @@ node .\\bin\\agent-web.mjs compare examples/animal-tracking --adapters=examples/
 | 文件 | 内容 |
 | --- | --- |
 | [docs/GUIDE.md](docs/GUIDE.md) | 完整说明：每条命令的细节、判决顺序怎么来的、踩过的坑怎么修的 |
+| [docs/ADAPTER-GUIDE.md](docs/ADAPTER-GUIDE.md) | 接到你自己的网站：三档路径与手写适配器要改的四处 |
 | [docs/SPEC.md](docs/SPEC.md) | 格式规范：案例、断言、适配器契约、判决顺序表 |
 | [docs/FINDING-001.md](docs/FINDING-001.md) | 一次假通过的全过程 |
 | [docs/museum/](docs/museum/) | 六件失败展品，每件都能复现 |

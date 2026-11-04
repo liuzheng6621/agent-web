@@ -8,10 +8,18 @@ Gitee Release v0.6.0 三个数，谁看都是三个项目。
 
 ## 0.23.0
 
+
+
 - 新增第二个领域案例：`examples/animal-tracking/`（流浪动物救助任务）。正确性全是不变量：未审核不可接取、非执行者不可完成、重复完成不可重复领积分。
+
 - 真实 Spring 后端（一次性 H2）已实跑：verify pass、探针 6/6、跨适配器一致率 100%。
+
 - 适配器安全边界：强制 `ANIMAL_TEST_ISOLATED=1` 显式确认、只接受无凭据的 loopback HTTP、没有默认目标。
+
+- 新增 `docs/ADAPTER-GUIDE.md`：接到你自己的网站——三档路径（discover / 日志 / 手写适配器）与手写要改的四处（能力表、返回口径、规范视图、隔离）。
 - 修了一个真实冲突：被测系统对登录接口限流，`reset()` 每次重新登录 admin 会触发 429把判决打成 unknown。admin token 现在按进程缓存，失效才重登。
+
+
 
 ## 0.22.0
 
