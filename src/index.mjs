@@ -30,3 +30,18 @@ export {
   formatTraps,
 } from './traps.mjs';
 export { COVERAGE_VERSION, collectUsage, summarizeCoverage, formatCoverage, coverageVerdict } from './coverage.mjs';
+export {
+  MUTATIONS,
+  mutate,
+  mutationIds,
+  describeMutations,
+} from './mutate.mjs';
+export {
+  certify,
+  certifyCase,
+  certifyExit,
+  certificate,
+  probe,
+  flatAssertions,
+  formatCertify,
+} from './certify.mjs';

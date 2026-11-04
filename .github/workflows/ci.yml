@@ -79,6 +79,12 @@ jobs:
           console.log('盲区率', r.blind_rate);
           JS
 
+      - name: 判据准入：变异体必须全被抓到
+        run: node bin/agent-web.mjs certify cases/coffee --adapter=memory
+
+      - name: 判据准入自己能被证伪
+        run: node scripts/certify-can-fail.mjs
+
       - name: 假绿必须被判红
         run: |
           node bin/agent-web.mjs verify cases/coffee --adapter=memory --out=/tmp/oracle.jsonl

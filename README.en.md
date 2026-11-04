@@ -299,6 +299,58 @@ Four states, and they must not be conflated:
 
 It reports by default and does not gate. Pass `--max-blind=0.2` to make it fail the build above a threshold. There is no default threshold because the blind rate is structural — "terminal state only" is often wrong for a whole batch — and a default would turn CI permanently red, get switched off by one flag, and never be looked at again.
 
+## Why an assertion earns its place: certification
+
+An assertion whose removal leaves the verdict unchanged is not a criterion, it is a comment.
+
+You cannot see "is it useful" by reading it. So ask a different question: **can it catch the bug?**
+Copy the correct implementation into several bodies that are broken in exactly one way — money off by
+a cent, status frozen at PENDING, the event log emptied, a foreign order appearing in the list, a
+cross-tenant write let through, a transition that should have been refused — then ask each assertion:
+
+> True on the correct implementation, false on this body?
+
+Two kinds of "true" do not count: still true on the body (it cannot see that bug), or turned
+*unknown* (it has nothing to say). The second is this project's three-valued discipline applied to
+itself: `unknown` is not "roughly right", and it cannot earn an assertion any credit.
+
+This repository's own account:
+
+```
+agent-web certify cases/coffee --adapter=memory --detail
+```
+
+| Body | Layer | What catches it |
+| --- | --- | --- |
+| `m-money-off-by-cent` | observation | `happy-path#goal[4]` (amount 28) |
+| `m-status-frozen` | observation | `cancel-before-pickup#goal[0]`, `happy-path#goal[1]`, and one more |
+| `m-history-empty` | observation | `happy-path#inv[1]` (four log entries) |
+| `m-extra-foreign-order` | observation | `happy-path#goal[3]` (order count +1) |
+| `m-foreign-write-allowed` | execution | verdict level — a negative step that stopped refusing |
+| `m-no-reject` | execution | verdict level — same |
+
+**The first run looked bad, and that bad result is the feature.** With 13 assertions and 6 bodies:
+10 could be evaluated, only 5 caught anything, and **four bodies walked through untouched** —
+nothing asserted about money, "there must be no `order.canceled` event" came out vacuously true
+on an emptied log, and the two execution-level bodies are only visible to negative steps that the
+cases did not have. After adding two assertions (amount = 28, four log entries), all six bodies are
+caught, 7 of 12 evaluable assertions are useful, and the **minimal set covering every
+assertion-caught body is 4**.
+
+That last number is the one worth repeating: of 12 assertions, 4 do the work. The other 8 are this
+repository writing notes to itself.
+
+Boundaries worth knowing:
+
+- **Exit code** is 1 when any body survives. `--strict` also fails when an assertion eats a slot and
+  catches nothing (off by default: being temporarily useless is a normal intermediate state, and a
+  blunt gate makes people switch the whole command off).
+- `unknown` on a body is not a kill. It only means the criterion had nothing to say.
+- `audit` needs two implementations to know true from false. `certify` needs one correct
+  implementation plus a set of ways to be wrong — no second implementation at all.
+- It does not prove the cases are right. Bodies only cover the bugs you thought of; the list of
+  bodies is itself something to review, which is why it lives in the repository and not inside CI.
+
 ## One copy of the cases
 
 `cases/coffee/` is not duplicated per implementation. The same directory hits different systems by switching `--adapter`:

@@ -8,6 +8,7 @@
   agent-web accept <文件> --by=NAME     确认草稿，确认后才能判决
   agent-web audit <可信.jsonl> <被审.jsonl>  用真实判决当尺子，量假绿/假红
   agent-web traps <结果.jsonl> --cases=目录  陷阱普查：这批判决有多少条在盲区里
+  agent-web certify <案例目录> --adapter=SPEC  判据准入：哪些断言真的抓得住东西
  *   agent-web capabilities             打印适配器的能力清单与证据等级
  *   agent-web prepare <动作日志>       一次生成轨迹、案例草稿与流程预览
  *   agent-web draft <轨迹文件>          回放一条轨迹，反推案例草稿
@@ -33,6 +34,8 @@ import { loadAdapter, listBuiltins } from '../src/adapter/load.mjs';
 import { diffViews } from '../src/view.mjs';
 import { auditRuns, formatAudit } from '../src/audit.mjs';
 import { summarizeTraps, formatTraps, trapVerdict } from '../src/traps.mjs';
+import { certify, formatCertify, certifyExit } from '../src/certify.mjs';
+import { MUTATIONS, describeMutations } from '../src/mutate.mjs';
 import { collectUsage, summarizeCoverage, formatCoverage, coverageVerdict } from '../src/coverage.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -199,6 +202,40 @@ function loadCaseDir(dir) {
     if (c && c.id) out.set(c.id, c);
   }
   return out;
+}
+
+async function cmdCertify(args, flags) {
+  if (args.length < 1) {
+    console.error('用法：agent-web certify <案例目录> [--adapter=memory] [--mutations=id,id] [--timeout=5000] [--strict] [--detail] [--json]');
+    console.error('  它把正确实现复制成若干个"只坏一处"的变异体，逐条断言问：你能把它抓出来吗？');
+    console.error('  抓不住任何变异体的断言，就是该被拒收的断言。');
+    console.error(`  内置变异体：${describeMutations().map((m) => m.id).join(', ')}`);
+    return 2;
+  }
+  const spec = flags.adapter ?? 'memory';
+  const wanted = typeof flags.mutations === 'string' ? new Set(flags.mutations.split(',').map((x) => x.trim()).filter(Boolean)) : null;
+  const used = wanted ? MUTATIONS.filter((m) => wanted.has(m.id)) : MUTATIONS;
+  if (used.length === 0) {
+    console.error(`--mutations 没有匹配到任何内置变异体；可用的：${MUTATIONS.map((m) => m.id).join(', ')}`);
+    return 2;
+  }
+
+  const map = loadCaseDir(args[0]);
+  const cases = [...map.values()].sort((a, b) => String(a.id).localeCompare(String(b.id)));
+  if (cases.length === 0) {
+    console.error(`没有在 ${args[0]} 里找到案例`);
+    return 2;
+  }
+  const report = await certify({
+    cases,
+    adapterFactory: async () => loadAdapter(spec, {}, process.cwd()),
+    adapterName: spec,
+    timeoutMs: flags.timeout ? Number(flags.timeout) : 5000,
+    mutations: used,
+  });
+  if (flags.json) console.log(JSON.stringify(report, null, 2));
+  else console.log(formatCertify(report, { detail: flags.detail === true }));
+  return certifyExit(report, { strict: flags.strict === true });
 }
 
 async function cmdTraps(args, flags) {
@@ -1096,6 +1133,7 @@ const HELP = `agent-web —— 给 Agent 写机器可判的集成测试
   agent-web accept <文件> --by=NAME     确认草稿，确认后才能判决
   agent-web capabilities [--adapter=SPEC]     打印能力清单与证据等级
   agent-web coverage <案例> --adapter=SPEC    能力覆盖率对账（--min=0.8 设门槛）
+  agent-web certify <案例> --adapter=SPEC     判据准入：变异体 × 断言杀伤矩阵
   agent-web compare <案例> --adapters=A,B     同一份案例喂多个实现，比判决
   agent-web drift <旧.jsonl> <新.jsonl>      比较两次跑批的初态形状（漂移检测）
   agent-web record <动作日志> --adapter=SPEC   把 Agent 的实际动作还原成候选轨迹
@@ -1151,6 +1189,8 @@ async function main() {
         return await cmdCapabilities(args, flags);
       case 'traps':
         return await cmdTraps(args, flags);
+      case 'certify':
+        return await cmdCertify(args, flags);
       case 'audit':
         return await cmdAudit(args, flags);
       case 'accept':
