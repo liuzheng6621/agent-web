@@ -94,7 +94,7 @@ memory                                   内置名
 }
 ```
 
-### 4.1 七种 kind
+### 4.1 八种 kind
 
 | kind | 必填参数 | 相位 |
 | --- | --- | --- |
@@ -105,8 +105,35 @@ memory                                   内置名
 | `status_transition` | `selector`, `path`, `transitions`(二元组数组) | trace |
 | `event_absent` | `type` 或 `selector` | trace |
 | `composite` | `op`(`and`/`or`/`not`), `args` | 由子断言决定 |
+| `relation` | `op`, 见 4.3 | final |
 
 **没有 `llm_judge`，也不接受自定义扩展 kind。** 未知 kind 一律 `invalid_case`。
+
+### 4.3 relation：字段之间的关系
+
+前七种只能写「这个字段等于这个值」「这个集合多了几条」。真实系统里最值钱的判据
+往往是**字段之间的关系**，写死具体值反而把案例绑到了某个实现上。
+
+| op | 必填 | 含义 |
+| --- | --- | --- |
+| `eq` | `left`, `right` | 同一实体上两个字段必须相等 |
+| `sum_equals` | `items`, `of`, `path` | 明细数组某项之和 == 实体字段（如 `totalAmount == Σ items.subTotal`） |
+| `product_equals` | `items`, `left`, `right`, `path` | 每条明细满足 `path == left × right`（如 `subTotal == unitPrice × count`） |
+| `sorted` | `path` | 集合该字段单调不减（如取餐号不会倒着发） |
+
+相位**只能是 final**。中途的关系往往合法地不成立（订单刚建、总额还没算那一瞬间），
+按 trace 求值会把正常实现判红 —— 这是它和 `status_transition` 的关键差别。
+
+四条规则：
+
+1. 元素缺失或类型不对时判 `unknown / missing_observation`，**不判假**。判不了就是判不了。
+2. 违反时判 `FALSE / relation_violated`，message 必须写出两边的实际数值。
+3. 只收**结构性**关系（任何一次运行上都应成立），不收统计式不变式（在 N 次运行里成立过）。
+4. `draft` 提议关系式前必须先验证：不在这条轨迹上成立的关系，一条也不提。
+
+为什么要这第八种 kind：只在「拿铁 ×1」的单子上断言金额，等于没断言金额 ——
+「漏乘数量」和「正确算法」在数量为 1 时算出同一个数。关系式不吃这个亏：
+它在数量为 1 时同样要求 `subTotal == unitPrice × count`，数量为 3 时直接把它抓出来。
 
 ### 4.2 相位
 

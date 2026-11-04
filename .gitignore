@@ -11,5 +11,8 @@ agent-web-output/
 # 本地工作记忆，不进公开仓库
 .workbuddy-ai/
 
-# 出题目录是生成物（agent-web drill 的产物）
-drills/
+# 出题目录是生成物（agent-web drill 的产物）。
+# 必须写成 /drills/ —— 只锚定仓库根。
+# 写成 drills/ 会连带忽略 examples/drills/，那份是人写的示例提交，
+# 是 CI 里「好提交必须满分」那一步的输入，漏提交等于让 CI 在新克隆上必挂。
+/drills/

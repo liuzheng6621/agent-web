@@ -15,10 +15,10 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 /** 已知盲区：案例集当前确实没有对应刻度的地方。改这个表等于改一份公开的欠账清单。 */
 const KNOWN_SURVIVORS = [
-  'm-item-count-flattened',
+  // 观测层能看见它（pickupNo 从 1001 变成 1），但取餐号的算法是各实现自己的事：
+  // 内置实现的 100+id 与真实后端的 100+id 恰好相同，写死具体值就把案例绑到某个实现上了。
+  // 要抓它得写 pickupNo 与 id 的关系式，而「偏移 100」不是能跨实现断言的东西。
   'm-pickup-no-offset',
-  'm-total-single-unit',
-  'm-subtotal-stale',
 ];
 
 let report;

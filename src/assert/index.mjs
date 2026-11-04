@@ -14,6 +14,7 @@
 import { TRUE, FALSE, UNKNOWN, and, assertValue } from '../three-valued.mjs';
 import { validateSelector } from '../select.mjs';
 import * as K from './kinds.mjs';
+import { relation, RELATION_OPS } from './relation.mjs';
 
 export const KINDS = Object.freeze([
   'entity_exists',
@@ -23,6 +24,7 @@ export const KINDS = Object.freeze([
   'unchanged',
   'event_absent',
   'composite',
+  'relation',
 ]);
 
 export const PHASES = Object.freeze(['final', 'trace', 'initial_vs_final']);
@@ -37,9 +39,12 @@ export const PHASE_MATRIX = Object.freeze({
   event_absent: { default: 'trace', allowed: ['trace'] },
   // composite 的时机由子断言决定，本身不做相位约束
   composite: { default: null, allowed: [...PHASES] },
+  // 关系式只判终态。中途的关系往往合法地不成立（新建订单还没算总额那一瞬间），
+  // 按 trace 求值会把正常实现判红 —— 这是它和 status_transition 的关键差别。
+  relation: { default: 'final', allowed: ['final'] },
 });
 
-const SELECTOR_KINDS = new Set(['entity_exists', 'field_equals', 'count_delta', 'status_transition']);
+const SELECTOR_KINDS = new Set(['entity_exists', 'field_equals', 'count_delta', 'status_transition', 'relation']);
 
 export function phaseOf(a) {
   if (a.phase !== undefined) return a.phase;
@@ -103,6 +108,26 @@ export function validateAssertion(a, at = 'assertion') {
     if (!Array.isArray(a.scopes) && !a.scope) errors.push(`${at} 需要 scopes`);
   }
 
+  if (a.kind === 'relation') {
+    if (!RELATION_OPS.includes(a.op)) {
+      errors.push(`${at}.op=${JSON.stringify(a.op)} 不在 ${RELATION_OPS.join('/')}`);
+    } else if (a.op === 'eq') {
+      if (typeof a.left !== 'string' || a.left === '') errors.push(`${at}.left 必填（字段路径）`);
+      if (typeof a.right !== 'string' || a.right === '') errors.push(`${at}.right 必填（字段路径）`);
+    } else if (a.op === 'sum_equals') {
+      if (typeof a.items !== 'string' || a.items === '') errors.push(`${at}.items 必填（明细数组的路径）`);
+      if (typeof a.of !== 'string' || a.of === '') errors.push(`${at}.of 必填（明细里要求和的那个字段）`);
+      if (typeof a.path !== 'string' || a.path === '') errors.push(`${at}.path 必填（实体上用来对账的字段）`);
+    } else if (a.op === 'product_equals') {
+      if (typeof a.items !== 'string' || a.items === '') errors.push(`${at}.items 必填`);
+      if (typeof a.left !== 'string' || a.left === '') errors.push(`${at}.left 必填`);
+      if (typeof a.right !== 'string' || a.right === '') errors.push(`${at}.right 必填`);
+      if (typeof a.path !== 'string' || a.path === '') errors.push(`${at}.path 必填`);
+    } else if (a.op === 'sorted') {
+      if (typeof a.path !== 'string' || a.path === '') errors.push(`${at}.path 必填`);
+    }
+  }
+
   if (a.kind === 'composite') {
     if (!['and', 'or', 'not'].includes(a.op)) errors.push(`${at}.op 必须是 and/or/not`);
     if (!Array.isArray(a.args) || a.args.length === 0) {
@@ -141,6 +166,8 @@ export function evalAssertion(a, ctx, depth = 0) {
       return K.event_absent(a, ctx);
     case 'composite':
       return K.composite(a, ctx, (sub, c) => evalAssertion(sub, c, depth + 1));
+    case 'relation':
+      return relation(a, ctx);
     default:
       return { status: UNKNOWN, code: 'invalid_case', message: `未知断言 ${a.kind}` };
   }

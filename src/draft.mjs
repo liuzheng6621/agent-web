@@ -21,6 +21,7 @@
 
 import { fingerprint, getPath, deepEqual } from './values.mjs';
 import { selectEntities } from './select.mjs';
+import { discoverRelations } from './relations.mjs';
 import { SCHEMA_VERSION, resolveArguments, BindingError } from './case.mjs';
 
 /**
@@ -216,6 +217,29 @@ export function synthesize({ initial, final, trace = [], manifest = {}, steps = 
     if (idx !== 0) {
       notes.push({ at: `selector ${name}#${idx}`, why: '用下标定位；若被测系统的集合顺序不稳定，改成 where 谓词' });
     }
+  }
+
+  // 关系型断言：字段之间的关系比字段的具体值更耐移植，也更难被「碰巧正确」蒙过。
+  // 只提议在这条轨迹上已经成立的关系；置信度低的进 todo，让人自己决定要不要。
+  const relations = discoverRelations({ initial, final, manifest });
+  const weak = [];
+  for (const r of relations) {
+    if (r.confidence === 'structural') {
+      pushGoal(r.assertion, `${r.why} —— 关系式，比写死具体值更耐移植`);
+    } else {
+      weak.push(r);
+    }
+  }
+  for (const r of weak) {
+    pushGoal(
+      r.assertion,
+      `${r.why} —— 但这条轨迹只有 1 条明细或数量为 1，此时它几乎恒真：` +
+        '「漏乘数量」「少算一项」都会碰巧满足。补一条「两种饮品、数量大于 1」的订单，它才算真正在测东西',
+    );
+    todo.push(
+      `关系式 ${JSON.stringify(r.assertion)} 目前在 ${r.sample} 上成立，但区分力不足；` +
+        '补一条多明细、数量大于 1 的案例，或确认后删掉这条断言',
+    );
   }
 
   // 读操作占了轨迹但没写断言：提醒一句，免得人以为草稿漏了。

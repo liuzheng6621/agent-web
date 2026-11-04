@@ -351,6 +351,34 @@ Boundaries worth knowing:
 - It does not prove the cases are right. Bodies only cover the bugs you thought of; the list of
   bodies is itself something to review, which is why it lives in the repository and not inside CI.
 
+### Relations beat hard-coded values
+
+Asserting the amount on a single "one latte, quantity 1" order asserts nothing about the
+amount: "forgot to multiply by quantity" and "correct" produce the same number when the
+quantity is 1. That is the actual reason four mutants walked through this case set untouched.
+
+The eighth assertion kind, `relation`, is for exactly this:
+
+```json
+{"kind":"relation","op":"sum_equals","selector":{"collection":"orders","index":0},
+ "items":"items","of":"subTotal","path":"totalAmount"}
+{"kind":"relation","op":"product_equals","selector":{"collection":"orders","index":0},
+ "items":"items","left":"count","right":"unitPrice","path":"subTotal"}
+```
+
+The first says "the total equals the sum of the line items"; the second says "each subtotal
+equals unit price times quantity". Neither names an amount, so both survive a change of
+implementation.
+
+`draft` discovers those relations and proposes them — but **verifies before proposing**: a
+relation that does not hold on the observed trajectory is never emitted, and a relation seen
+on a single line item with quantity 1 is marked "almost trivially true, insufficient
+discriminating power" and goes to the todo list instead.
+
+Measured: adding one "two lattes plus three americanos" case took the catch rate from
+**8/12 to 11/12**. Deleting the hard-coded total from that case and keeping only the two
+relations still catches all four of those mutants — the relations are not decoration.
+
 ### It does not just point at the hole, it tells you which assertion to add
 
 An escapee is not simply filed as debt. `certify` flattens the canonical view of the correct

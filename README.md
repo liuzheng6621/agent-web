@@ -363,6 +363,30 @@ agent-web certify cases/coffee --adapter=memory --detail
 现在是 **8 / 12，漏网 4 个，`certify` 退出码为 1**。这是它应有的行为：它在告诉你
 这套案例还不够狠。
 
+### 关系式：比写死具体值更耐移植
+
+只在「拿铁 ×1」的单子上断言金额，等于没断言金额——「漏乘数量」和「正确算法」
+在数量为 1 时算出同一个数。这是这套案例集漏掉四个变异体的真实原因。
+
+第八种断言 `relation` 专门管这件事：
+
+```json
+{"kind":"relation","op":"sum_equals","selector":{"collection":"orders","index":0},
+ "items":"items","of":"subTotal","path":"totalAmount"}
+{"kind":"relation","op":"product_equals","selector":{"collection":"orders","index":0},
+ "items":"items","left":"count","right":"unitPrice","path":"subTotal"}
+```
+
+第一句说「总额等于明细之和」，第二句说「每条小计等于单价乘数量」。两句都不写具体金额，
+换一个实现照样成立。
+
+`draft` 会自己发现这两条关系并提议成断言，但**先验证再提议**：不在这条轨迹上成立的
+关系一条也不提；只有一条明细、数量为 1 的关系会被标成「几乎恒真，区分力不足」并进待办。
+
+实测：补齐一个「拿铁两杯 + 美式三杯」的案例后，抓获率从 **8/12 升到 11/12**，
+而把写死总价的那条断言删掉、只留两条关系式，那四个变异体依然全被抓到——
+关系式不是装饰。
+
 ### 它不止告诉你哪里有洞，还告诉你补哪条
 
 漏网的变异体不是一律记成"欠账"。`certify` 会把正确实现和坏实现的规范视图逐叶子比一遍：
