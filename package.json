@@ -21,7 +21,8 @@
   "scripts": {
     "test": "node --test test/engine.test.mjs",
     "selftest": "node bin/agent-web.mjs selftest",
-    "compare": "node bin/agent-web.mjs compare cases/coffee --adapters=memory,taixianglian"
+    "compare": "node bin/agent-web.mjs compare cases/coffee --adapters=memory,taixianglian",
+    "gh-proxy": "node scripts/gh-proxy.mjs"
   },
   "keywords": [
     "agent",

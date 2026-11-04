@@ -347,6 +347,23 @@ test/engine.test.mjs    自动测试（49 条）
 
 ---
 
+## 往 GitHub 镜像推送
+
+仓库在 Gitee 和 GitHub 各有一份。如果这台机器的 `hosts` 把 `github.com` 指到了 `127.0.0.1`（症状：`curl https://github.com` 返回 `000`，而 `dns` 和 `conn` 都只有几毫秒、`tls` 是 `0`），`git push github` 会卡在 TLS 握手。改 `hosts` 要管理员权限，还可能被写这些行的脚本覆盖回去。
+
+`scripts/gh-proxy.mjs` 绕开它：把域名用 DNS 单独解析一次（跳过 `hosts`），再建隧道原样转发。TLS 仍是 git 与 GitHub 端到端握手，SNI 不变，证书校验正常，不需要关掉任何校验。
+
+```bash
+node scripts/gh-proxy.mjs &                                     # 127.0.0.1:8899
+git -c http.proxy=http://127.0.0.1:8899 push github main
+# 只给这一个远端设上，省得每次带参数（代理关掉后记得删掉这条配置）
+git config --local http.https://github.com.proxy http://127.0.0.1:8899
+```
+
+它只监听本机，只负责把 CONNECT 透传到 DNS 解出的地址，用完关掉即可。**这不是给用户用的东西**，是维护者在这台机器上发版时的临时通道。
+
+---
+
 ## 版本与后续
 
 当前版本 `0.7`：可以跑案例、检查助手实际操作，从请求日志生成可重放步骤与待确认草稿，并且开始管住「判决本身可不可信」——一份案例不按实现复制、没经人确认的草稿不产生判决、假绿审计能把「看起来全绿」的判决判红。

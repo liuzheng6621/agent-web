@@ -347,6 +347,23 @@ Common commands: `prepare` (create steps, a draft case, and a flow preview in on
 
 ---
 
+## Pushing to the GitHub mirror
+
+The repo lives on both Gitee and GitHub. On a machine whose `hosts` file points `github.com` at `127.0.0.1` (symptom: `curl https://github.com` returns `000` while `dns` and `conn` take a few milliseconds and `tls` is `0`), `git push github` dies in the TLS handshake. Editing `hosts` needs admin rights and may be overwritten by whatever script wrote those lines.
+
+`scripts/gh-proxy.mjs` routes around it: resolve the name once through DNS (bypassing `hosts`), then relay the tunnel byte for byte. TLS is still negotiated end to end between git and GitHub with the same SNI, so certificate validation stays on and nothing gets disabled.
+
+```bash
+node scripts/gh-proxy.mjs &                                     # 127.0.0.1:8899
+git -c http.proxy=http://127.0.0.1:8899 push github main
+# or set it for this remote only, and delete the config once the proxy is gone
+git config --local http.https://github.com.proxy http://127.0.0.1:8899
+```
+
+It binds to loopback only and does nothing but relay CONNECT to the address DNS returned; shut it down when you are done. **This is not a feature for users** — it is a maintainer's temporary channel on this particular machine.
+
+---
+
 ## Version and next steps
 
 Current version: `0.7`. It runs cases, checks an assistant's actions, turns a request log into replayable steps and a draft case, and has started policing the verdict itself: one copy of the cases, no verdict from an unreviewed draft, and a false-green audit that turns a suspiciously all-green verdict red.
