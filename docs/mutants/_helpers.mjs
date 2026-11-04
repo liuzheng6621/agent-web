@@ -7,6 +7,12 @@ export const clone = (v) =>
 export function wrapState(inner, tamper) {
   return {
     ...inner,
+    /**
+     * certify 的快路径要用它：state 层变异体只改观测、不改执行，
+     * 所以它的 ctx 可以由 P⁺ 的 ctx 直接变换得到，不必重放整条轨迹。
+     * 这个字段是「我可以免重放」的凭据，不是给业务代码看的。
+     */
+    _agentWebStateFn: tamper,
     async observe(runId, scopes) {
       const res = await inner.observe(runId, scopes);
       const state = clone(res.state);

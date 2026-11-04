@@ -73,11 +73,93 @@ export async function probe(caseObj, adapterImpl, { adapterName = 'unknown', tim
   return { verdict, results, traceOk, observations: obs.length, ctx };
 }
 
+function dupValue(v) {
+  return typeof structuredClone === 'function' ? structuredClone(v) : JSON.parse(JSON.stringify(v));
+}
+
+/**
+ * state 层变异体只改观测、不改执行：每一步的结局与正确实现完全相同，
+ * 唯一不同的是 observe() 返回的规范视图被 tamper 过。
+ *
+ * 所以它的 ctx 不必靠重放整条轨迹得到——把 P⁺ 的 ctx 里每个快照复制一份、
+ * 应用同一个 tamper，就得到变异体看到的 ctx。
+ *
+ * 等价性：变异体重放时第 i 次 observe 返回 tamper(clone(s_i))，s_i 是 P⁺
+ * 第 i 次 observe 的返回值。wrapState 只包 observe，内部执行逻辑与 P⁺ 相同，
+ * 因此它观察到的 s_i 序列与 P⁺ 逐项相同 ⇒ 两边 tamper 的输入相同、输出相同。
+ * 前提是 tamper 为纯函数（变异体目录第 1 条要求：只坏一处、不留隐藏状态）。
+ */
+function transformCtx(baseCtx, tamper) {
+  const ctx = {
+    ...baseCtx,
+    initial: dupValue(baseCtx.initial),
+    final: dupValue(baseCtx.final),
+    trace: (baseCtx.trace ?? []).map((t) => ({ stateAfter: dupValue(t.stateAfter) })),
+  };
+  tamper(ctx.initial);
+  tamper(ctx.final);
+  for (const t of ctx.trace) tamper(t.stateAfter);
+  return ctx;
+}
+
+/**
+ * 执行结局与 P⁺ 相同时，判决只可能因断言结果而变：
+ * 本来 pass 的，有 goal 断言变假 → fail/assertion_false；只剩不变量变假 → fail/invariant_violated。
+ * 本来就不是 pass 的，结局没变，签名也不变。
+ */
+function deriveVerdict(baseVerdict, flat, results) {
+  const status = baseVerdict?.status ?? 'unknown';
+  if (status !== 'pass') return { status, reason_code: baseVerdict?.reason_code ?? null };
+  let goalFailed = false;
+  let invFailed = false;
+  for (let i = 0; i < flat.length; i += 1) {
+    if (results[i]?.status !== 'false') continue;
+    if (String(flat[i].label).startsWith('inv')) invFailed = true;
+    else goalFailed = true;
+  }
+  if (goalFailed) return { status: 'fail', reason_code: 'assertion_false' };
+  if (invFailed) return { status: 'fail', reason_code: 'invariant_violated' };
+  return { status: 'pass', reason_code: baseVerdict?.reason_code ?? null };
+}
+
+/** 不重放轨迹，直接用变换后的 ctx 求值断言。 */
+export function fastProbe(caseObj, base, tamper) {
+  const flat = flatAssertions(caseObj);
+  const ctx = transformCtx(base.ctx, tamper);
+  const results = flat.map(({ assertion }) => evalAssertions([assertion], ctx).results[0]);
+  return {
+    verdict: deriveVerdict(base.verdict, flat, results),
+    results,
+    traceOk: base.traceOk,
+    observations: base.observations,
+    ctx,
+    reused: true,
+  };
+}
+
+/**
+ * 同一条案例跑两遍，差异路径就是「漂移」——自增 id、时间戳、取餐号、操作人。
+ *
+ * 这些东西在两次重放之间本来就会变，把它们算成「变异体留下的见证」，等于把
+ * 编号增长当故障：真实后端上 certify 会凭空多出几条 killable，还会建议写
+ * 「orders.0.id 等于 196」这种换个实现就红的断言。
+ */
+function driftPaths(a, b) {
+  const set = new Set();
+  if (!a || !b) return set;
+  for (const w of diffLeaves(a.final, b.final, '', [], 400)) set.add(w.path);
+  for (const w of diffLeaves(a.initial, b.initial, '', [], 200)) set.add('initial.' + w.path);
+  return set;
+}
+
 /** 一个案例上，所有变异体的杀伤矩阵。 */
 export async function certifyCase(caseObj, adapterFactory, { adapterName = 'unknown', timeoutMs, mutations = MUTATIONS } = {}) {
   const base = await probe(caseObj, await adapterFactory(), { adapterName, timeoutMs });
   const armed = base.results.map((r) => r.status === 'true');
   const manifest = await (await adapterFactory()).manifest();
+  // 先量一次漂移：把正确实现跑第二遍，两次之间本来就不一样的地方不算见证。
+  const base2 = await probe(caseObj, await adapterFactory(), { adapterName, timeoutMs });
+  const drift = driftPaths(base.ctx, base2.ctx);
   const rows = [];
 
   for (const m of mutations) {
@@ -85,7 +167,21 @@ export async function certifyCase(caseObj, adapterFactory, { adapterName = 'unkn
       rows.push({ mutation: m.id, title: m.title, layer: m.layer, notApplicable: true });
       continue;
     }
-    const p = await probe(caseObj, m.wrap(await adapterFactory()), { adapterName, timeoutMs });
+    // state 层变异体免重放：它只改观测，ctx 可以直接由 P⁺ 的 ctx 变换得到。
+    // execute 层（换身份 / 改结局）改了执行，必须真的重放一遍整条轨迹。
+    //
+    // 唯一不能省的情况：base 是 unknown/missing_observation。这条 reason 在判决顺序表里
+    // 出现两次（第 4 条在执行期、第 16 条在断言期），无法只凭代码区分；而第 16 条排在
+    // assertion_false 之后，意味着断言变假时真判决会翻成 fail，fastProbe 推不出来。
+    // 数量很少，直接退回重放。
+    const wrapped = m.wrap(await adapterFactory());
+    const reusable = process.env.AGENT_WEB_CERTIFY_SLOW !== '1'
+      && m.layer === 'state'
+      && typeof wrapped._agentWebStateFn === 'function'
+      && !(base.verdict?.status === 'unknown' && base.verdict?.reason_code === 'missing_observation');
+    const p = reusable
+      ? fastProbe(caseObj, base, wrapped._agentWebStateFn)
+      : await probe(caseObj, wrapped, { adapterName, timeoutMs });
     const cells = p.results.map((r, i) => {
       if (!armed[i]) return 'unarmed';
       if (r.status === 'false') return 'killed';
@@ -95,7 +191,9 @@ export async function certifyCase(caseObj, adapterFactory, { adapterName = 'unkn
     // 这个变异体在这条案例上留下了什么可观测差异？没有差异说明这条案例看不见它，
     // 有差异说明它一定杀得掉——只差一条还没写出来的断言。
     const witnesses = diffLeaves(base.ctx?.final, p.ctx?.final, '', [], 12)
-      .concat(diffLeaves(base.ctx?.initial, p.ctx?.initial, 'initial.', [], 6));
+      .concat(diffLeaves(base.ctx?.initial, p.ctx?.initial, 'initial.', [], 6))
+      // 漂移路径剔除：同一实现跑两遍都会变的字段，不能拿来当「这个变异体被看见了」的证据。
+      .filter((w) => !drift.has(w.path));
     const suggestions = [];
     for (const w of witnesses) {
       if (w.path.startsWith('initial.')) continue;

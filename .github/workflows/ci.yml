@@ -129,6 +129,11 @@ jobs:
       - name: 判据准入自己能被证伪
         run: node scripts/certify-can-fail.mjs
 
+      # 快路径是本仓库唯一的性能优化，也最容易悄悄变成"结果不一样但没人发现"。
+      # 这一步逐格比对"变换 ctx"与"重放轨迹"两条路径。
+      - name: 快路径必须与重放逐格相同
+        run: node scripts/state-equivalence.mjs
+
       - name: 假绿必须被判红
         run: |
           node bin/agent-web.mjs verify cases/coffee --adapter=memory --out=/tmp/oracle.jsonl
