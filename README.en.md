@@ -559,6 +559,27 @@ Keep the two apart: **unused** means the cases are not demanding enough, **missi
 
 `--min=0.8` turns it into a gate: no gaps and the rate must clear the bar. Observation scopes get their own line — if a case reads a collection the manifest never declares, those assertions can only be `unknown`.
 
+## First ask whether the adapter is lying
+
+Every command above assumes the adapter reports the truth. Nothing used to check that.
+
+A lying adapter does not raise. It is quietly precise: `observe` keeps returning the same
+cached view after a write, `reset` claims to reset while the last run's rows are still there,
+the view carries a timestamp. Verdicts stay stable and stop measuring what you think.
+
+```
+agent-web probe --adapter=memory --detail
+```
+
+Six things a machine can decide: five-method contract, reset idempotence, observation
+stability, no state leakage across resets, empty-argument calls that must not throw, and a
+write that claims success while the view does not change (warning only, since notifications
+and audit writes legitimately leave the canonical view untouched).
+
+It cannot see a trimmed view (a whole field omitted), an inverted semantic mapping, or a lie
+that only shows up under specific arguments. The conclusion is "no contradiction in these
+mechanically checkable respects", never "this adapter is trustworthy".
+
 ## An adapter is executable code
 
 `--adapter=./xxx.mjs` does not read a config file; it imports that file as a plain Node module. It runs on your machine, as you: it can read environment variables (tokens included), touch the filesystem, and make network calls.
@@ -680,8 +701,11 @@ This section matters more than the table above.
 7. **The equivalent-mutant problem is not solved**, only turned into a state (`undetermined`)
    that demands evidence when you claim equivalence. `m-pickup-no-offset` is the live example:
    the observation shows it, but "offset by 100" is each implementation's own convention.
-8. **Adapters can lie.** A trimmed `observe` view or an `execute` that only pretends will not
-   be caught here — the guarantee is "given this observation, this is how the verdict followed".
+8. **Adapters can lie.** `probe` catches the mechanically checkable contradictions: a reset
+   that does not reset, an observation that drifts, state leaking across runs. It does not
+   catch a trimmed view (a whole field omitted), an inverted mapping, or a lie that only
+   appears under specific arguments. The guarantee is "given this observation, this is how
+   the verdict followed".
 9. **Validated in one domain only** (a coffee shop: menu, orders, state machine, two roles).
 
 Next: make it easier for different systems to share cases, turn the reference-versus-real-backend

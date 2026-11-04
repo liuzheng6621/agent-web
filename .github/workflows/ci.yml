@@ -111,6 +111,9 @@ jobs:
   # 这不是缺口，是边界——cross-implementation 对照要么两边都真，要么就不做。
   # 本地跑法见 README「快速开始」第 3 条。
 
+      - name: 探针：内置适配器必须自洽（复位/稳定/不泄漏）
+        run: node bin/agent-web.mjs probe --adapter=memory --detail
+
       - name: 出题与批改：好提交必须满分，偷懒提交必须零分
         run: |
           node bin/agent-web.mjs drill cases/coffee --adapter=memory --out=.tmp-drill

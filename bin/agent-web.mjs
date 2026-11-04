@@ -39,6 +39,7 @@ import { certify, formatCertify, formatSuggestions, certifyExit } from '../src/c
 import { MUTATIONS, describeMutations } from '../src/mutate.mjs';
 import { buildDrills, gradeDrills, writeDrills, readDrills, readSubmissions, formatGrade, gradeExit } from '../src/drill.mjs';
 import { collectUsage, summarizeCoverage, formatCoverage, coverageVerdict } from '../src/coverage.mjs';
+import { probeAdapter, formatProbe, probeExit } from '../src/probe.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..');
@@ -333,6 +334,19 @@ function cmdMutants(args, flags) {
   return 0;
 }
 
+async function cmdProbe(flags) {
+  const spec = flags.adapter ?? "memory";
+  const adapter = await loadAdapter(spec, {}, process.cwd());
+  const result = await probeAdapter({
+    adapter,
+    adapterName: spec,
+    timeoutMs: flags.timeout ? Number(flags.timeout) : 5000,
+    allowVolatile: flags["allow-volatile"] === true,
+  });
+  if (flags.json) console.log(JSON.stringify(result, null, 2));
+  else console.log(formatProbe(result, { detail: flags.detail === true }));
+  return probeExit(result);
+}
 async function cmdCertify(args, flags) {
   if (args.length < 1) {
     console.error('用法：agent-web certify <案例目录> [--adapter=memory] [--mutations=id,id] [--timeout=5000] [--strict] [--detail] [--suggest] [--json]');
@@ -1264,6 +1278,7 @@ const HELP = `agent-web —— 给 Agent 写机器可判的集成测试
   agent-web accept <文件> --by=NAME     确认草稿，确认后才能判决
   agent-web capabilities [--adapter=SPEC]     打印能力清单与证据等级
   agent-web coverage <案例> --adapter=SPEC    能力覆盖率对账（--min=0.8 设门槛）
+  agent-web probe --adapter=SPEC              探针：查适配器自己有没有在撒谎
   agent-web certify <案例> --adapter=SPEC     判据准入：变异体 × 断言杀伤矩阵
   agent-web drill <案例> --adapter=SPEC       出题：对真盲区出题（题面不含答案）
   agent-web drill grade <题目> --submissions=DIR  批改：只认跑出来的结果
@@ -1332,6 +1347,8 @@ async function main() {
         return await cmdAudit(args, flags);
       case 'accept':
         return cmdAccept(args, flags);
+      case 'probe':
+        return await cmdProbe(flags);
       case 'coverage':
         return await cmdCoverage(args, flags);
       case 'init':

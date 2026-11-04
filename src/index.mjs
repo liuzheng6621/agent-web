@@ -32,6 +32,7 @@ export {
   formatTraps,
 } from './traps.mjs';
 export { COVERAGE_VERSION, collectUsage, summarizeCoverage, formatCoverage, coverageVerdict } from './coverage.mjs';
+export { PROBE_VERSION, probeAdapter, formatProbe, probeExit } from './probe.mjs';
 export {
   MUTATIONS,
   mutate,
