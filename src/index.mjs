@@ -63,6 +63,9 @@ export {
   runReads,
   discover,
   formatDiscover,
+  synthesizeBody,
+  writePlanOf,
+  buildWriteCases,
 } from './discover.mjs';
 export {
   DRILL_VERSION,

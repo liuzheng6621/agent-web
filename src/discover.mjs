@@ -154,7 +154,8 @@ export async function probeSite(baseUrl, { timeoutMs = 8000 } = {}) {
       if (r.status !== 200 || !r.json) continue;
       const parsed = parseOpenApi(r.json, base);
       if (parsed.capabilities.length === 0) continue;
-      report.openapi = { url: base + candidate, ...parsed, baseUrl: base };
+      // doc 是原始描述文件：生成写计划要从里面读请求体结构。它不进 report，避免 --json 变成几兆。
+      report.openapi = { url: base + candidate, ...parsed, baseUrl: base, doc: r.json };
       break;
     } catch (e) {
       report.failures.push({ where: candidate, error: String(e && e.message ? e.message : e) });
@@ -184,7 +185,43 @@ const ADAPTER_TEMPLATE = [
   '',
   'const WRITES = __WRITES__;',
   '',
+  'const WRITE_PLAN = __WRITE_PLAN__;',
+  '',
   'const CAPABILITIES = __CAPABILITIES__;',
+  '',
+  '// 写请求：路径里的 {id} 从 arguments 里取，body 优先用案例给的，其次用探测推出来的。',
+  'async function sendWrite(plan, action, timeoutMs) {',
+  '  const args = (action && action.arguments) || {};',
+  '  let p = plan.path;',
+  '  for (const [k, v] of Object.entries(args)) {',
+  '    if (v !== null && typeof v === "object") continue;',
+  '    p = p.split("{" + k + "}").join(encodeURIComponent(String(v)));',
+  '  }',
+  '  if (/\{[A-Za-z0-9_]+\}/.test(p)) {',
+  '    return { outcome: "unsupported", error: { code: "missing_path_param", message: "路径里还有没填的参数：" + p } };',
+  '  }',
+  '  const body = args.body !== undefined ? args.body : plan.body;',
+  '  const ac = new AbortController();',
+  '  const timer = setTimeout(() => ac.abort(), timeoutMs);',
+  '  try {',
+  '    const res = await fetch(BASE + p, {',
+  '      method: plan.method,',
+  '      signal: ac.signal,',
+  '      headers: { accept: "application/json", "content-type": "application/json" },',
+  '      body: body === undefined ? undefined : JSON.stringify(body),',
+  '    });',
+  '    const text = await res.text();',
+  '    let json = null;',
+  '    try { json = JSON.parse(text); } catch { json = null; }',
+  '    if (res.status >= 500) return { outcome: "infra_error", error: { code: "http_" + res.status } };',
+  '    if (res.status >= 400) return { outcome: "rejected", error: { code: "http_" + res.status, message: text.slice(0, 200) } };',
+  '    return { outcome: "applied", payload: json };',
+  '  } catch (e) {',
+  '    return { outcome: "infra_error", error: { code: "network", message: String(e && e.message ? e.message : e) } };',
+  '  } finally {',
+  '    clearTimeout(timer);',
+  '  }',
+  '}',
   '',
   'async function getJson(p, timeoutMs) {',
   '  const ac = new AbortController();',
@@ -258,6 +295,8 @@ const ADAPTER_TEMPLATE = [
   '        }',
   '      }',
   '      if (WRITES_BY_ID[action.capability]) {',
+  '        const plan = WRITE_PLAN[action.capability];',
+  '        if (plan) return sendWrite(plan, action, timeoutMs);',
   '        return {',
   '          outcome: "unsupported",',
   '          error: { code: "write_not_implemented", message: "生成只给了读；写要你照着这个文件的形状自己接" },',
@@ -283,6 +322,125 @@ function jsonLiteral(value) {
   return JSON.stringify(value, null, 2).split('\n').map((l, i) => (i === 0 ? l : '  ' + l)).join('\n');
 }
 
+// ---------------------------------------------------------------------------
+// 写操作：能机械推的只有「往返语义」，推不出来的是业务规则
+// ---------------------------------------------------------------------------
+
+const MAX_SYNTH_DEPTH = 4;
+
+/**
+ * 从 JSON Schema 造一份"形状对"的请求体。
+ *
+ * 它造不出正确的业务数据 —— 名字叫什么都行，数量是不是 1 都行。它只保证一件事：
+ * 服务器不会因为我们送错类型而拒收。所以生成出来的写案例断言的是
+ * 「写之后列表多了一条」，不是「写之后内容正确」。
+ */
+export function synthesizeBody(schema, depth = 0, components = {}) {
+  if (!schema || typeof schema !== 'object' || depth > MAX_SYNTH_DEPTH) return null;
+  if (schema.$ref) {
+    const ref = String(schema.$ref);
+    const name = ref.split('/').pop();
+    const target = components[name];
+    if (!target) return null;
+    return synthesizeBody(target, depth + 1, components);
+  }
+  if (Array.isArray(schema.enum) && schema.enum.length > 0) return schema.enum[0];
+  if (schema.example !== undefined) return schema.example;
+  if (schema.default !== undefined) return schema.default;
+  const type = schema.type || (schema.properties ? 'object' : undefined);
+  switch (type) {
+    case 'object': {
+      const out = {};
+      const props = schema.properties || {};
+      for (const [key, sub] of Object.entries(props)) {
+        const v = synthesizeBody(sub, depth + 1, components);
+        if (v !== null) out[key] = v;
+      }
+      return out;
+    }
+    case 'array': {
+      const item = synthesizeBody(schema.items, depth + 1, components);
+      return item === null ? [] : [item];
+    }
+    case 'integer':
+    case 'number':
+      return schema.minimum !== undefined ? schema.minimum : 1;
+    case 'boolean':
+      return true;
+    case 'string':
+      return schema.minLength && schema.minLength > 1 ? 'x'.repeat(schema.minLength) : 'x';
+    default:
+      return null;
+  }
+}
+
+/** 把探测到的写接口分成 create / update / delete，并带上要送出去的 body。 */
+export function writePlanOf(capabilities, openapiDoc = null) {
+  const components = (openapiDoc && openapiDoc.components && openapiDoc.components.schemas) || {};
+  const paths = (openapiDoc && openapiDoc.paths) || {};
+  const plan = {};
+  for (const c of capabilities) {
+    if (c.kind !== 'write') continue;
+    const hasPathParam = c.path.includes('{') || c.path.includes(':');
+    const kind = !hasPathParam && c.method === 'POST'
+      ? 'create'
+      : c.method === 'DELETE'
+        ? 'delete'
+        : c.method === 'PUT' || c.method === 'PATCH'
+          ? 'update'
+          : null;
+    if (!kind) continue;
+    // 只有 create 能在「什么都没准备」的情况下跑起来：delete / update 都要先有一条真的实体。
+    // 探测阶段拿不到实体 id，硬编一个去打就是我方造出来的 404。所以只对 create 出计划。
+    if (kind !== 'create') continue;
+    const op = paths[c.path] && paths[c.path][String(c.method).toLowerCase()];
+    let body = null;
+    if (op && op.requestBody && op.requestBody.content) {
+      const content = op.requestBody.content;
+      const schema = (content['application/json'] && content['application/json'].schema) || null;
+      body = synthesizeBody(schema, 0, components);
+    }
+    plan[c.id] = { path: c.path, method: c.method, body };
+  }
+  return plan;
+}
+
+/** 写案例：只断「往返」—— 写完之后那个集合确实多了一条。 */
+export function buildWriteCases({ adapterName, baseUrl, capabilities, writePlan = {}, confirmedBy = null, now = new Date() }) {
+  const docs = [];
+  for (const [id, plan] of Object.entries(writePlan)) {
+    const resource = resourceOf(plan.path);
+    const doc = {
+      schema_version: 'agent-web/0.1',
+      id: `discovered/${resource}-create`,
+      environment: { adapter: adapterName, seed: 1, clock_policy: 'frozen' },
+      task: {
+        natural_goal: `创建一条 ${resource}，检查列表是不是真的多了一条（由 ${baseUrl} 推断生成）`,
+        allowed_capabilities: [id],
+        goal_assertions: [
+          { kind: 'count_delta', selector: { collection: resource }, delta: 1 },
+        ],
+        invariants: [],
+      },
+      observability: { declared_scopes: [resource] },
+      reference_trajectory: [
+        {
+          id: 's1',
+          capability: id,
+          as: 'viewer',
+          arguments: plan.body === null ? {} : { body: plan.body },
+          expected_outcome: 'applied',
+        },
+      ],
+    };
+    doc.draft = confirmedBy
+      ? { status: 'confirmed', reviewed_by: confirmedBy, reviewed_at: now.toISOString() }
+      : { status: 'unconfirmed', source: 'agent-web discover --writes', generated_at: now.toISOString() };
+    docs.push(doc);
+  }
+  return docs;
+}
+
 export function pickReadEndpoints(capabilities) {
   // 每个资源挑一个不带参数的 GET 当读入口。它决定 observe() 能看见什么。
   const reads = {};
@@ -296,7 +454,7 @@ export function pickReadEndpoints(capabilities) {
   return reads;
 }
 
-export function buildAdapterSource({ adapterName, baseUrl, capabilities, generatedAt }) {
+export function buildAdapterSource({ adapterName, baseUrl, capabilities, generatedAt, writePlan = {} }) {
   const reads = pickReadEndpoints(capabilities);
   const writes = capabilities.filter((c) => c.kind === 'write');
   const scopes = Object.keys(reads);
@@ -317,6 +475,7 @@ export function buildAdapterSource({ adapterName, baseUrl, capabilities, generat
     .replace('__SCOPES__', jsonLiteral(scopes))
     .replace('__READS__', jsonLiteral(reads))
     .replace('__WRITES__', jsonLiteral(writes.map((w) => w.id)))
+    .replace('__WRITE_PLAN__', jsonLiteral(writePlan))
     .replace('__CAPABILITIES__', jsonLiteral(capList));
 }
 
@@ -409,7 +568,7 @@ export async function runReads(baseUrl, capabilities, { timeoutMs = 8000 } = {})
 // ---------------------------------------------------------------------------
 
 export async function discover(baseUrl, opts = {}) {
-  const { outDir = './agent-web-site', run = false, accept = null, timeoutMs = 8000 } = opts;
+  const { outDir = './agent-web-site', run = false, accept = null, timeoutMs = 8000, writes = false } = opts;
   const startedAt = new Date();
   const probe = await probeSite(baseUrl, { timeoutMs });
 
@@ -439,6 +598,7 @@ export async function discover(baseUrl, opts = {}) {
 
   const adapterName = path.basename(path.resolve(outDir)) || 'discovered';
   const caps = probe.openapi.capabilities;
+  const writePlan = writes ? writePlanOf(caps, probe.openapi.doc) : {};
   const reads = pickReadEndpoints(caps);
   report.readEndpoints = reads;
 
@@ -446,7 +606,7 @@ export async function discover(baseUrl, opts = {}) {
   const adapterPath = path.join(outDir, 'adapter.mjs');
   writeFileSync(
     adapterPath,
-    buildAdapterSource({ adapterName, baseUrl: probe.baseUrl, capabilities: caps, generatedAt: report.generatedAt }),
+    buildAdapterSource({ adapterName, baseUrl: probe.baseUrl, capabilities: caps, generatedAt: report.generatedAt, writePlan }),
     'utf8',
   );
   report.written.push(adapterPath);
@@ -459,9 +619,24 @@ export async function discover(baseUrl, opts = {}) {
     report.written.push(file);
   }
 
+  for (const doc of buildWriteCases({ adapterName, baseUrl: probe.baseUrl, capabilities: caps, writePlan, confirmedBy: accept, now: startedAt })) {
+    const file = path.join(casesDir, `${doc.id.split('/')[1]}.json`);
+    writeFileSync(file, JSON.stringify(doc, null, 2) + String.fromCharCode(10), 'utf8');
+    report.written.push(file);
+  }
+  report.writePlan = Object.keys(writePlan);
+  report.writeTodo = caps
+    .filter((c) => c.kind === 'write' && !writePlan[c.id])
+    .map((c) => ({ id: c.id, http: c.http, why: c.path.includes('{') ? '需要先有一条真实实体（delete / update）' : '不是 create，语义要人给' }));
+
   if (run) report.reads = await runReads(probe.baseUrl, caps, { timeoutMs });
 
-  report.limits.push('写操作全部没有实现：execute() 对它们是 unsupported，因为「该保证什么」需要业务知识');
+  if (Object.keys(writePlan).length > 0) {
+    report.limits.push('写案例只断「往返」：写完之后那个集合多了一条。它不断言写进去的内容对不对 —— 那需要业务知识');
+    report.limits.push('delete / update 没有生成：探测阶段拿不到真实实体 id，硬编一个去打就是自己造的 404');
+  } else {
+    report.limits.push('写操作全部没有实现：execute() 对它们是 unsupported，因为「该保证什么」需要业务知识');
+  }
   report.limits.push('没有登录流程：如果接口需要鉴权，生成的文件会在 observe 里把它们记成 missingScopes');
   report.limits.push('字段语义没猜：案例只断言「读不改变状态」，没有断言任何业务含义');
   if (!accept) report.limits.push('生成的案例是草稿，判决前要先人工确认（agent-web accept <文件> --by=<你的名字>）');
@@ -533,6 +708,16 @@ export function formatDiscover(report, { detail = false } = {}) {
     const ran = report.reads.filter((r) => !r.skipped);
     const okCount = ran.filter((r) => r.ok).length;
     push('    ' + okCount + '/' + ran.length + ' 可用' + (report.reads.length > ran.length ? '，' + (report.reads.length - ran.length) + ' 个需要参数没打' : ''));
+    push('');
+  }
+
+  if (Array.isArray(report.writePlan) && report.writePlan.length > 0) {
+    push('  写案例（只断往返）：');
+    for (const id of report.writePlan) push('    ' + id);
+    if (Array.isArray(report.writeTodo) && report.writeTodo.length > 0) {
+      push('  这些写接口没生成案例：');
+      for (const t of report.writeTodo) push('    ' + String(t.id).padEnd(24) + String(t.http).padEnd(34) + t.why);
+    }
     push('');
   }
 

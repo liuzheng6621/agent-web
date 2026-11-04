@@ -6,6 +6,29 @@
 CI 也在查。这条规则是买来的：这个仓库曾经同时存在 `package.json` 0.16、README 0.9、
 Gitee Release v0.6.0 三个数，谁看都是三个项目。
 
+## 0.22.0
+
+第 1 条限制的能做的部分：`discover --writes`。
+
+- 新增 `synthesizeBody()`：从 OpenAPI 的 `requestBody` schema 造一份「形状对」的请求体
+  （字符串填 `x`、数字填 `minimum` 或 1、枚举取第一个、数组取一个元素、`$ref` 顺着
+  `components.schemas` 解开）。造不出就返回 `null`，不编假的。
+- 新增 `writePlanOf()`：只给 `POST` 到集合路径的 create 出计划。`delete` / `update`
+  需要先有一条真实实体，探测阶段拿不到 id，硬编一个去打就是自己造的 404，所以不出。
+- 新增 `buildWriteCases()`：每个 create 一条往返案例，断言只有
+  `count_delta{collection, delta: 1}` —— 断「多了一条」，不断「内容对不对」。
+  默认草稿，`--accept=名字` 才转正。
+- 生成的适配器现在能真的发写请求（`sendWrite()`）：路径里的 `{id}` 从 `arguments` 取，
+  body 优先用案例给的。没生成计划的写能力仍然返回 `unsupported`。
+- `report.writeTodo` 把没生成案例的写接口连同原因列出来，不默默略过。
+- 实测（同一批生成物，两个实现）：真写进去判 `pass`；回 200 但没写判
+  `fail / assertion_false`，理由 `orders 变化 0（期望 1）`。这就是它能抓「接口假装成功」。
+- 测试 164 → 170（discover 17 条，新增 6 条含一个起两台服务器的端到端对照）。
+
+踩坑两条，记在这里免得下次再踩：`loadAdapter` 不吃 `file://` URL（当文件名解析），
+测试里要传绝对路径；测试里 `server.close()` 会被 fetch 的 keep-alive 连接池挂住，
+必须先 `closeAllConnections()`。
+
 ## 0.21.0
 
 断言能说的，比「第 0 行等于 56」多。四种形状断言：`unique` / `type_of` / `subset` / `sorted_by`。

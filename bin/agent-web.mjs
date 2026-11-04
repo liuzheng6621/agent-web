@@ -431,9 +431,10 @@ async function cmdProbe(flags) {
 }
 async function cmdDiscover(args, flags) {
   if (args.length < 1) {
-    console.error("用法：agent-web discover <网址> [--out=目录] [--run] [--detail] [--accept=名字] [--timeout=8000] [--json]");
+    console.error("用法：agent-web discover <网址> [--out=目录] [--run] [--writes] [--detail] [--accept=名字] [--timeout=8000] [--json]");
     console.error("  输入一个网址，探测它有哪些接口，生成一个能跑的只读适配器与一批只读案例。");
     console.error("  它不会猜写操作该保证什么 —— 那需要业务知识，猜出来的判决没有意义。");
+  console.error("  --writes：给 create 类接口生成往返案例（只断「写完多了一条」，不断内容对不对）。");
     return 2;
   }
   const report = await discover(args[0], {
@@ -441,6 +442,7 @@ async function cmdDiscover(args, flags) {
     run: flags.run === true,
     accept: typeof flags.accept === "string" ? flags.accept : null,
     timeoutMs: flags.timeout ? Number(flags.timeout) : 8000,
+    writes: flags.writes === true,
   });
   if (flags.json) console.log(JSON.stringify(report, null, 2));
   else console.log(formatDiscover(report, { detail: flags.detail === true }));

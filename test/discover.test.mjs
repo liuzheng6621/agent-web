@@ -18,6 +18,9 @@ import {
   buildCaseDocs,
   runReads,
   discover,
+  synthesizeBody,
+  writePlanOf,
+  buildWriteCases,
 } from '../src/discover.mjs';
 import { validateCase, draftBlocker, acceptCase } from '../src/case.mjs';
 import { validateManifest } from '../src/adapter/contract.mjs';
@@ -215,4 +218,131 @@ test('版本号与候选位置是常量，别被随手改掉', () => {
   assert.equal(DISCOVER_VERSION, 'agent-web/discover-1');
   assert.ok(OPENAPI_CANDIDATES.includes('/openapi.json'));
   assert.ok(OPENAPI_CANDIDATES.length >= 5);
+});
+
+// ---------------------------------------------------------------------------
+// 写操作：能机械推的只有往返语义
+// ---------------------------------------------------------------------------
+
+test('synthesizeBody：照着 schema 造出形状对的请求体，不造业务数据', () => {
+  const schema = {
+    type: 'object',
+    properties: {
+      title: { type: 'string' },
+      amount: { type: 'number' },
+      tags: { type: 'array', items: { type: 'string' } },
+      status: { enum: ['A', 'B'] },
+      withDefault: { type: 'integer', default: 7 },
+    },
+  };
+  const body = synthesizeBody(schema);
+  assert.equal(typeof body.title, 'string');
+  assert.equal(typeof body.amount, 'number');
+  assert.deepEqual(body.tags, ['x']);
+  assert.equal(body.status, 'A');
+  assert.equal(body.withDefault, 7);
+});
+
+test('synthesizeBody：$ref 能顺着 components 解开，解不开就返回 null', () => {
+  const components = { Item: { type: 'object', properties: { n: { type: 'integer' } } } };
+  const body = synthesizeBody({ type: 'object', properties: { item: { $ref: '#/components/schemas/Item' } } }, 0, components);
+  assert.equal(body.item.n, 1);
+  const missing = synthesizeBody({ $ref: '#/components/schemas/Nope' }, 0, components);
+  assert.equal(missing, null);
+});
+
+test('writePlanOf：只给 create 出计划，delete/update 要真实实体才能打所以不出', () => {
+  const parsed = parseOpenApi(spec(), 'http://127.0.0.1:1');
+  const plan = writePlanOf(parsed.capabilities, spec());
+  assert.deepEqual(Object.keys(plan), ['orders.create'], '只该有 create');
+  assert.equal(plan['orders.create'].method, 'POST');
+  assert.equal(plan['orders.create'].path, '/api/orders');
+});
+
+test('writePlanOf：没有 requestBody 时 body 为 null，不编一个假请求体', () => {
+  const doc = spec();
+  const parsed = parseOpenApi(doc, 'http://127.0.0.1:1');
+  const plan = writePlanOf(parsed.capabilities, doc);
+  assert.equal(plan['orders.create'].body, null);
+});
+
+test('buildWriteCases：默认草稿；断言只有一条 count_delta；body 从 schema 来', () => {
+  const doc = spec();
+  doc.paths['/api/orders'].post = {
+    requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { total: { type: 'number' } } } } } },
+  };
+  const parsed = parseOpenApi(doc, 'http://127.0.0.1:1');
+  const plan = writePlanOf(parsed.capabilities, doc);
+  const [draftCase] = buildWriteCases({ adapterName: 'site', baseUrl: 'http://127.0.0.1:1', capabilities: parsed.capabilities, writePlan: plan });
+  assert.equal(validateCase(draftCase).length, 0, JSON.stringify(validateCase(draftCase)));
+  assert.equal(draftBlocker(draftCase).status, 'unconfirmed');
+  assert.deepEqual(draftCase.task.goal_assertions.map((a) => a.kind), ['count_delta']);
+  assert.equal(draftCase.task.goal_assertions[0].delta, 1);
+  assert.equal(draftCase.reference_trajectory[0].arguments.body.total, 1);
+  const accepted = acceptCase(JSON.parse(JSON.stringify(draftCase)), { by: 'YG' });
+  assert.equal(accepted.draft.status, 'confirmed');
+});
+
+test('写案例真的能判：写完多一条就 pass，只是回了 200 没写就 fail', async () => {
+  const { judge } = await import('../src/runner.mjs');
+  const { loadAdapter } = await import('../src/adapter/load.mjs');
+  const doc = {
+    openapi: '3.0.0',
+    info: { title: '写夹具', version: '1.0.0' },
+    paths: { '/api/orders': { get: {}, post: {} } },
+  };
+  const makeServer = (append) => {
+    const rows = [{ id: 1 }];
+    const server = http.createServer((req, res) => {
+      if (req.url === '/api/orders' && req.method === 'GET') {
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(JSON.stringify(rows));
+        return;
+      }
+      if (req.url === '/api/orders' && req.method === 'POST') {
+        let body = '';
+        req.on('data', (c) => (body += c));
+        req.on('end', () => {
+          if (append) rows.push({ id: rows.length + 1 });
+          res.writeHead(200, { 'content-type': 'application/json' });
+          res.end('{}');
+        });
+        return;
+      }
+      res.writeHead(404);
+      res.end('{}');
+    });
+    return new Promise((r) => server.listen(0, '127.0.0.1', () => r(server)));
+  };
+
+  const good = await makeServer(true);
+  const bad = await makeServer(false);
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-w-'));
+
+  const run = async (server) => {
+    const base = 'http://127.0.0.1:' + server.address().port;
+    const parsed = parseOpenApi(doc, base);
+    const plan = writePlanOf(parsed.capabilities, doc);
+    const source = buildAdapterSource({ adapterName: 'w', baseUrl: base, capabilities: parsed.capabilities, generatedAt: new Date().toISOString(), writePlan: plan });
+    const file = path.join(dir, 'adapter-' + server.address().port + '.mjs');
+    fs.writeFileSync(file, source, 'utf8');
+    const [caseObj] = buildWriteCases({ adapterName: 'w', baseUrl: base, capabilities: parsed.capabilities, writePlan: plan, confirmedBy: 'YG' });
+    const adapter = await loadAdapter(file, {}, process.cwd());
+    const verdict = await judge({ case: caseObj, adapter, adapterName: 'w' });
+    await adapter.close();
+    return verdict;
+  };
+
+  const ok = await run(good);
+  const broken = await run(bad);
+  // fetch 用 keep-alive 连接池，光 close() 会一直等空闲 socket 断开，测试就挂住了。
+  for (const server of [good, bad]) {
+    server.closeAllConnections();
+    server.close();
+  }
+  fs.rmSync(dir, { recursive: true, force: true });
+
+  assert.equal(ok.status, 'pass', JSON.stringify(ok.reason));
+  assert.equal(broken.status, 'fail');
+  assert.equal(broken.reason_code, 'assertion_false');
 });
