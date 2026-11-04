@@ -846,12 +846,16 @@ test/                 自动测试（141 条）
 
 ```bash
 node scripts/gh-proxy.mjs &                                     # 127.0.0.1:8899
-git -c http.proxy=http://127.0.0.1:8899 push github main
+git -c http.proxy=http://127.0.0.1:8899 -c http.sslBackend=openssl push github main
 # 只给这一个远端设上，省得每次带参数（代理关掉后记得删掉这条配置）
 git config --local http.https://github.com.proxy http://127.0.0.1:8899
 ```
 
-地址会逐个试（DNS 结果 + 一小份备用地址），GitHub 的 IP 时通时不通，必要时 `node scripts/gh-proxy.mjs --ip=140.82.114.4` 直接指定。它只监听本机，用完关掉即可。**这不是给用户用的东西**，是维护者在这台机器上发版时的临时通道。
+地址会逐个试（DNS 结果 + 一小份备用地址），GitHub 的 IP 时通时不通，必要时 `node scripts/gh-proxy.mjs --ip=140.82.114.4` 直接指定。
+
+**必须带 `-c http.sslBackend=openssl`。** Windows 版 git 默认用 schannel，隧道经手时它会报 `schannel: server closed abruptly (missing close_notify)` 或 `schannel: next InitializeSecurityContext failed: CRYPT_E_NO_REVOCATION_CHECK` —— 两种都不是网络问题，是 schannel 对隧道转发的要求比 openssl 严。换成 openssl 后一次就过。另外 `git push | tail` 会把退出码换成 tail 的，判断成败要 `> log 2>&1; echo $?`。
+
+它只监听本机，用完关掉即可。**这不是给用户用的东西**，是维护者在这台机器上发版时的临时通道。
 
 ---
 
