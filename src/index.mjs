@@ -45,3 +45,15 @@ export {
   flatAssertions,
   formatCertify,
 } from './certify.mjs';
+export {
+  DRILL_VERSION,
+  buildDrills,
+  gradeDrills,
+  gradeExit,
+  formatGrade,
+  taskSheet,
+  writeDrills,
+  readDrills,
+  readSubmissions,
+  safeName,
+} from './drill.mjs';

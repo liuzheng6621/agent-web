@@ -10,3 +10,6 @@ agent-web-output/
 
 # 本地工作记忆，不进公开仓库
 .workbuddy-ai/
+
+# 出题目录是生成物（agent-web drill 的产物）
+drills/

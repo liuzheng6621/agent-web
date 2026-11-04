@@ -1,6 +1,6 @@
 {
   "name": "agent-web",
-  "version": "0.12.0",
+  "version": "0.13.0",
   "description": "给 Agent 写机器可判的集成测试：一份案例，多个实现，判决必须一致。",
   "type": "module",
   "bin": {
@@ -21,17 +21,19 @@
     "./traps": "./src/traps.mjs",
     "./certify": "./src/certify.mjs",
     "./mutate": "./src/mutate.mjs",
-    "./mutants": "./docs/mutants/index.mjs"
+    "./mutants": "./docs/mutants/index.mjs",
+    "./drill": "./src/drill.mjs"
   },
   "scripts": {
-    "test": "node --test test/engine.test.mjs test/traps.test.mjs test/museum.test.mjs test/certify.test.mjs",
+    "test": "node --test test/engine.test.mjs test/traps.test.mjs test/museum.test.mjs test/certify.test.mjs test/drill.test.mjs",
     "selftest": "node bin/agent-web.mjs selftest",
     "compare": "node bin/agent-web.mjs compare cases/coffee --adapters=memory,taixianglian",
     "gh-proxy": "node scripts/gh-proxy.mjs",
     "museum": "node --test test/museum.test.mjs",
     "traps": "node bin/agent-web.mjs traps",
     "certify": "node bin/agent-web.mjs certify cases/coffee --adapter=memory --detail",
-    "mutants": "node bin/agent-web.mjs mutants"
+    "mutants": "node bin/agent-web.mjs mutants",
+    "drill": "node bin/agent-web.mjs drill cases/coffee --adapter=memory"
   },
   "keywords": [
     "agent",

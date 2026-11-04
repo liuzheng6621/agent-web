@@ -37,6 +37,7 @@ import { auditRuns, formatAudit } from '../src/audit.mjs';
 import { summarizeTraps, formatTraps, trapVerdict } from '../src/traps.mjs';
 import { certify, formatCertify, certifyExit } from '../src/certify.mjs';
 import { MUTATIONS, describeMutations } from '../src/mutate.mjs';
+import { buildDrills, gradeDrills, writeDrills, readDrills, readSubmissions, formatGrade, gradeExit } from '../src/drill.mjs';
 import { collectUsage, summarizeCoverage, formatCoverage, coverageVerdict } from '../src/coverage.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -203,6 +204,113 @@ function loadCaseDir(dir) {
     if (c && c.id) out.set(c.id, c);
   }
   return out;
+}
+
+// 案例目录 → [{file, case}]，file 相对仓库根，题目里要记住它才能批改时重跑。
+function loadCaseEntries(dir) {
+  const out = [];
+  let names = [];
+  try {
+    names = fs.readdirSync(dir).filter((n) => n.endsWith('.json') && n !== 'expected.json').sort();
+  } catch (e) {
+    throw new Error('读不了案例目录 ' + dir + '：' + (e && e.message));
+  }
+  for (const n of names) {
+    const abs = path.join(dir, n);
+    const c = JSON.parse(fs.readFileSync(abs, 'utf8'));
+    if (c && c.id) out.push({ file: path.relative(ROOT, abs).split(path.sep).join('/'), case: c });
+  }
+  return out;
+}
+
+function drillMutations(flags) {
+  const wanted = typeof flags.mutations === 'string'
+    ? new Set(flags.mutations.split(',').map((x) => x.trim()).filter(Boolean))
+    : null;
+  const used = wanted ? MUTATIONS.filter((m) => wanted.has(m.id)) : MUTATIONS;
+  return { used, wanted };
+}
+
+async function cmdDrill(args, flags) {
+  if (args[0] === 'grade') return await cmdDrillGrade(args.slice(1), flags);
+
+  if (args.length < 1) {
+    console.error('用法：agent-web drill <案例目录> [--adapter=memory] [--mutations=id,id] [--out=DIR] [--json]');
+    console.error('      agent-web drill grade <题目目录> --submissions=DIR [--min=0.8] [--detail] [--json]');
+    console.error('  出题：对"整套断言都没抓住"的案例出题，题面不含答案。');
+    console.error('  批改：不看提交说了什么，只看它跑出来什么——在正确实现上为真、在坏实现上为假才算抓到。');
+    return 2;
+  }
+
+  const spec = flags.adapter ?? 'memory';
+  const { used, wanted } = drillMutations(flags);
+  if (used.length === 0) {
+    console.error('--mutations 没有匹配到任何变异体；可用的：' + MUTATIONS.map((m) => m.id).join(', '));
+    return 2;
+  }
+  const entries = loadCaseEntries(args[0]);
+  if (entries.length === 0) {
+    console.error('没有在 ' + args[0] + ' 里找到案例');
+    return 2;
+  }
+
+  const report = await buildDrills({
+    entries,
+    adapterFactory: async () => loadAdapter(spec, {}, process.cwd()),
+    adapterName: spec,
+    timeoutMs: flags.timeout ? Number(flags.timeout) : 5000,
+    mutations: used,
+  });
+
+  const outDir = path.resolve(flags.out ?? 'drills');
+  const index = flags.json ? null : await writeDrills(outDir, report);
+
+  if (flags.json) {
+    console.log(JSON.stringify({ generated: report.generated, items: report.items.map((i) => i.id) }, null, 2));
+    return 0;
+  }
+  const g = report.generated;
+  console.log('出题 · ' + g.cases + ' 案例 × ' + g.mutants + ' 变异体 = ' + g.pairs + ' 对');
+  console.log('  出题 ' + g.asked + ' 道（另外 ' + g.skipped + ' 对已被案例本身抓住，不算题）');
+  console.log('  写进 ' + path.relative(process.cwd(), outDir) + '：每题 .task.md 是题面，.json 含答案');
+  for (const row of index.items) console.log('    ' + row.id);
+  if (g.asked === 0) {
+    console.log('');
+    console.log('  没有题可出——这套断言把所有变异体都抓住了。');
+    console.log('  想加题，就加变异体（docs/mutants/），别稀释断言。');
+  }
+  return 0;
+}
+
+async function cmdDrillGrade(args, flags) {
+  const tasksDir = flags.tasks ?? args[0];
+  const subsDir = flags.submissions;
+  if (!tasksDir || !subsDir) {
+    console.error('用法：agent-web drill grade <题目目录> --submissions=DIR [--adapter=memory] [--min=0.8] [--detail] [--json]');
+    return 2;
+  }
+
+  const { items } = await readDrills(path.resolve(tasksDir));
+  if (items.length === 0) {
+    console.error('题目目录里没有题：' + tasksDir);
+    return 2;
+  }
+  const submissions = await readSubmissions(path.resolve(subsDir));
+  const spec = flags.adapter ?? 'memory';
+
+  const report = await gradeDrills({
+    items,
+    submissions,
+    adapterName: spec,
+    adapterFactory: async () => loadAdapter(spec, {}, process.cwd()),
+    loadCase: async (file) => JSON.parse(fs.readFileSync(path.join(ROOT, file), 'utf8')),
+    timeoutMs: flags.timeout ? Number(flags.timeout) : 5000,
+  });
+
+  if (flags.json) console.log(JSON.stringify(report, null, 2));
+  else console.log(formatGrade(report, { detail: flags.detail === true }));
+
+  return gradeExit(report, { min: flags.min !== undefined ? Number(flags.min) : null });
 }
 
 function cmdMutants(args, flags) {
@@ -1155,6 +1263,8 @@ const HELP = `agent-web —— 给 Agent 写机器可判的集成测试
   agent-web capabilities [--adapter=SPEC]     打印能力清单与证据等级
   agent-web coverage <案例> --adapter=SPEC    能力覆盖率对账（--min=0.8 设门槛）
   agent-web certify <案例> --adapter=SPEC     判据准入：变异体 × 断言杀伤矩阵
+  agent-web drill <案例> --adapter=SPEC       出题：对真盲区出题（题面不含答案）
+  agent-web drill grade <题目> --submissions=DIR  批改：只认跑出来的结果
   agent-web compare <案例> --adapters=A,B     同一份案例喂多个实现，比判决
   agent-web drift <旧.jsonl> <新.jsonl>      比较两次跑批的初态形状（漂移检测）
   agent-web record <动作日志> --adapter=SPEC   把 Agent 的实际动作还原成候选轨迹
@@ -1214,6 +1324,8 @@ async function main() {
         return await cmdCertify(args, flags);
       case 'mutants':
         return cmdMutants(args, flags);
+      case 'drill':
+        return await cmdDrill(args, flags);
       case 'audit':
         return await cmdAudit(args, flags);
       case 'accept':

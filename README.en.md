@@ -381,6 +381,54 @@ records only transitions, three entries). Rewritten as "exactly one `order.picke
 on both. **Assert event types, not totals** — totals are the implementation's freedom, event types
 are the business fact.
 
+## Drills: labels produced by a mechanism, not a model
+
+Training and evaluation both need labels, and a model cannot be the labeler — a label from a model
+has to be reviewed by another model, and after the review nobody knows who was right. There is one
+that needs no model: **whether an assertion is sharp enough is answered by running it.**
+
+```
+agent-web drill cases/coffee --adapter=memory            # set the questions
+agent-web drill grade drills --submissions=<dir>         # mark them
+```
+
+The 42 "case x mutant" pairs fall into four buckets:
+
+| Bucket | Count | Meaning |
+| --- | --- | --- |
+| already caught by the case | 5 | the assertions already see a difference; no question here |
+| supposed to fail / undecidable | 24 | witness cases are not meant to pass; setting them as questions would be cheating |
+| nothing observable changed | 10 | the mutant changed something outside this case's view — a boundary, not a hole |
+| **real blind spot** | **3** | visible, but nothing asserts it |
+
+Only the last three become questions. **The number of questions is not the number of bugs** — mixing
+the first three buckets in and claiming 34 holes is easy, and it is counting a case's scope as your
+own score.
+
+Each question (`<id>.task.md`) says the case still passes on a broken implementation, what is broken,
+and which assertions it currently uses; it asks for a new set. **The answer is not in the sheet** —
+the `.json` holds it for the grader.
+
+Marking looks only at what the submission *does when run*:
+
+- every submitted assertion must be true on the **correct** implementation, else `unarmed`
+- at least one must be false on the **broken** one, else `missed`
+- true on both = it cannot see the failure; undecidable on both = `blind`
+
+`examples/drills/` ships two submissions to compare:
+
+```
+solved 3 / gradable 3 -> 100.0%   (good: every assertion watches one concrete value)
+solved 0 / gradable 3 ->  0.0%    (lazy: copies the case's own assertions back)
+```
+
+The `lazy` one is worth reading: **every assertion it submits is a true assertion.** Judged as "did you
+write assertions", it is not noise; judged as "did you catch the failure", it scores nothing. That
+difference cannot be read off the code — only run.
+
+That is why this works as a training target: the label comes from the mechanism, not from a rater.
+Any model solving the same mutants gets a comparable score, because the grader only honours results.
+
 ## One copy of the cases
 
 `cases/coffee/` is not duplicated per implementation. The same directory hits different systems by switching `--adapter`:

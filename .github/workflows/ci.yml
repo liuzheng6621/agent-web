@@ -110,3 +110,11 @@ jobs:
   # 真实后端那一半不在 CI 里：它需要一个跑着的 Spring Boot 实例。
   # 这不是缺口，是边界——cross-implementation 对照要么两边都真，要么就不做。
   # 本地跑法见 README「快速开始」第 3 条。
+
+      - name: 出题与批改：好提交必须满分，偷懒提交必须零分
+        run: |
+          node bin/agent-web.mjs drill cases/coffee --adapter=memory --out=.tmp-drill
+          node bin/agent-web.mjs drill grade .tmp-drill --submissions=examples/drills/good
+          if node bin/agent-web.mjs drill grade .tmp-drill --submissions=examples/drills/lazy; then
+            echo "偷懒提交居然通过了，批改器有问题"; exit 1
+          fi
