@@ -11,6 +11,7 @@ import {
   verifySuggestion,
   formatSuggestions,
   isPortablePath,
+  appliesTo,
 } from '../src/certify.mjs';
 import { MUTATIONS, mutate, mutationIds } from '../src/mutate.mjs';
 import { createMemoryAdapter } from '../src/adapter/memory.mjs';
@@ -71,7 +72,7 @@ test('补齐断言后，金额与流水这两个变异体必须被抓回来', as
   for (const id of ['m-money-off-by-cent', 'm-history-empty']) {
     assert.ok(byId.get(id).caught, `${id} 又漏了：对应断言被删了？`);
   }
-  assert.equal(report.summary.caught + report.summary.survived, report.summary.mutations);
+  assert.equal(report.summary.caught + report.summary.survived + report.summary.notApplicable, report.summary.mutations);
   assert.equal(certifyExit(report), report.summary.survived > 0 ? 1 : 0);
 });
 
@@ -172,8 +173,11 @@ test('差异翻断言：字段用 field_equals，长度用 count_delta，认不�
 
 test('建议断言必须当场验过才允许出现；给不出的必须说明卡在哪', async () => {
   const report = await certify({ cases: all(), adapterFactory: () => createMemoryAdapter() });
-  const uncaught = report.mutations.filter((m) => !m.caught);
+  const uncaught = report.mutations.filter((m) => !m.caught && m.status !== 'not_applicable');
   assert.ok(uncaught.length > 0);
+  // 适用范围机制上线后，跨域变异体会被单独归为 not_applicable，不该混进欠账
+  const na = report.mutations.filter((m) => m.status === 'not_applicable');
+  assert.equal(report.summary.notApplicable, na.length, 'notApplicable 计数与实际一致');
   for (const m of uncaught) {
     assert.equal(m.status, 'killable', `${m.id} 没有可观测差异，应当是 undetermined 而不是静默算进欠账`);
     if (m.suggestion) {
@@ -186,6 +190,25 @@ test('建议断言必须当场验过才允许出现；给不出的必须说明�
       assert.ok(m.witness, `${m.id} 连见证都没有，那就不该是 killable`);
     }
   }
+});
+
+test('适用范围：声明了能力或集合的变异体，在别的域里不算漏网', async () => {
+  // m-ledger-sign-flip 只认 trial 集合。memory 适配器没有 trial，所以它是不适用，
+  // 而不是「漏网」——把跨域变异体混进分母，会让每个新域都把抓获率砸出个大坑。
+  const coffee = await certify({ cases: all(), adapterFactory: () => createMemoryAdapter() });
+  const na = coffee.mutations.filter((m) => m.status === 'not_applicable');
+  assert.equal(na.length, 3, '三个账本变异体在咖啡域应全部不适用：' + na.map((m) => m.id).join(','));
+  assert.equal(coffee.mutations.find((m) => m.id === 'm-ledger-sign-flip').status, 'not_applicable');
+  assert.equal(coffee.summary.applicable + coffee.summary.notApplicable, coffee.summary.mutations);
+  assert.equal(coffee.summary.survived, coffee.summary.applicable - coffee.summary.caught);
+  assert.equal(coffee.summary.caughtRate, coffee.summary.caught / coffee.summary.applicable);
+
+  // 反向：没声明的照旧适用；声明了缺集合就不适用
+  const plain = { id: 'm-test-plain', title: 'x', layer: 'state', wrap: (a) => a };
+  assert.equal(appliesTo(plain, { capabilities: [{ id: 'order.create' }], scopes: ['orders'] }), true);
+  const scoped = { id: 'm-test-scoped', title: 'x', layer: 'state', applies_to: { collections: ['trial'] }, wrap: (a) => a };
+  assert.equal(appliesTo(scoped, { scopes: ['orders', 'transactions'] }), false, '缺声明集合时不应适用');
+  assert.equal(appliesTo(scoped, { scopes: ['orders', 'trial'] }), true);
 });
 
 test('不可移植字段不许被建议成断言', () => {

@@ -7,6 +7,7 @@ export const meta = {
   symptom: '查询没按当前用户过滤，别人的单出现在我的列表里',
   mechanism: '复制一条订单、改掉 id 与 username 后追加进 orders',
   catch_hint: 'count_delta 断言订单数；和"订单存在"这类断言无关',
+  applies_to: { collections: ['orders'] },
 };
 
 export function wrap(adapter) {

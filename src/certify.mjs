@@ -77,9 +77,14 @@ export async function probe(caseObj, adapterImpl, { adapterName = 'unknown', tim
 export async function certifyCase(caseObj, adapterFactory, { adapterName = 'unknown', timeoutMs, mutations = MUTATIONS } = {}) {
   const base = await probe(caseObj, await adapterFactory(), { adapterName, timeoutMs });
   const armed = base.results.map((r) => r.status === 'true');
+  const manifest = await (await adapterFactory()).manifest();
   const rows = [];
 
   for (const m of mutations) {
+    if (!appliesTo(m, manifest)) {
+      rows.push({ mutation: m.id, title: m.title, layer: m.layer, notApplicable: true });
+      continue;
+    }
     const p = await probe(caseObj, m.wrap(await adapterFactory()), { adapterName, timeoutMs });
     const cells = p.results.map((r, i) => {
       if (!armed[i]) return 'unarmed';
@@ -159,6 +164,16 @@ export function isPortablePath(path) {
   if (NON_PORTABLE.has(last)) return false;
   // createdAt / startAt / xxxTime 这类后缀一律算时钟或外部生成的
   if (/(At|Time|_at|_time)$/.test(last)) return false;
+  return true;
+}
+
+export function appliesTo(meta, manifest) {
+  const need = meta && meta.applies_to;
+  if (!need) return true;
+  const caps = new Set((manifest && manifest.capabilities || []).map((c) => c.id));
+  const scopes = new Set(manifest && manifest.scopes || []);
+  for (const c of need.capabilities || []) if (!caps.has(c)) return false;
+  for (const s of need.collections || []) if (!scopes.has(s)) return false;
   return true;
 }
 
@@ -250,6 +265,7 @@ export async function certify({ cases, adapterFactory, adapterName = 'unknown', 
     for (const cr of per) {
       const row = cr.rows.find((r) => r.mutation === m.id);
       if (!row) continue;
+      if (row.notApplicable) continue;
       flatAssertionsOf(cases, cr, []).forEach((meta, i) => {
         const cell = row.cells[i];
         const key = `${cr.caseId}#${meta.label}`;
@@ -259,6 +275,22 @@ export async function certify({ cases, adapterFactory, adapterName = 'unknown', 
       });
       if (row.caseCaught) verdictKills += 1;
     }
+    let anyApplicable = false;
+    for (const cr of per) {
+      const row = cr.rows.find((r) => r.mutation === m.id);
+      if (row && !row.notApplicable) anyApplicable = true;
+    }
+    if (!anyApplicable) {
+      return {
+        id: m.id, title: m.title, layer: m.layer, symptom: m.symptom,
+        caught: false, status: 'not_applicable',
+        killedBy: [], blindBy: [], survivedIn: [], verdictKills: 0,
+        witnessCount: 0, suggestionBlocked: false,
+        witness: null, suggestion: null, suggestionCount: 0,
+        equivalence: m.equivalence_evidence ?? null,
+      };
+    }
+
     const caught = killedBy.length > 0 || verdictKills > 0;
 
     // 三档状态：抓住 / 欠账（可杀，缺断言）/ 说不清（一条案例上都看不出差异）。
@@ -270,6 +302,7 @@ export async function certify({ cases, adapterFactory, adapterName = 'unknown', 
     for (const cr of per) {
       const row = cr.rows.find((r) => r.mutation === m.id);
       if (!row) continue;
+      if (row.notApplicable) continue;
       if (row.witness) witnesses.push({ caseId: cr.caseId, ...row.witness });
       if (row.suggestionBlocked) blockedIn += 1;
       for (const sg of row.suggestions) suggestions.push({ caseId: cr.caseId, path: sg.path, assertion: sg.assertion, proof: sg.proof });
@@ -295,18 +328,21 @@ export async function certify({ cases, adapterFactory, adapterName = 'unknown', 
     };
   });
 
+  const applicable = mutationsSummary.filter((m) => m.status !== 'not_applicable').length;
   const caught = mutationsSummary.filter((m) => m.caught).length;
   const killable = mutationsSummary.filter((m) => m.status === 'killable').length;
   const undetermined = mutationsSummary.filter((m) => m.status === 'undetermined').length;
   const summary = {
     cases: per.length,
     mutations: mutations.length,
+    applicable,
+    notApplicable: mutations.length - applicable,
     caught,
-    survived: mutations.length - caught,
+    survived: applicable - caught,
     killable,
     undetermined,
     suggestions: mutationsSummary.reduce((n, m) => n + (m.caught ? 0 : m.suggestionCount), 0),
-    caughtRate: mutations.length === 0 ? null : caught / mutations.length,
+    caughtRate: applicable === 0 ? null : caught / applicable,
   };
   const base = { version: 'agent-web/certify-1', adapter: adapterName, cases: per.map((p) => ({ caseId: p.caseId, verdict: p.base.verdict.status, traceOk: p.base.traceOk })), assertions, mutations: mutationsSummary, summary };
   return certificate(base);
@@ -319,8 +355,8 @@ function flatAssertionsOf(cases, cr, sink) {
   list.forEach((meta, i) => {
     const kind = meta.assertion.kind;
     const row = cr.rows;
-    const kills = row.filter((r) => r.cells[i] === 'killed').map((r) => r.mutation);
-    const blind = row.filter((r) => r.cells[i] === 'blind').map((r) => r.mutation);
+    const kills = row.filter((r) => r.cells && r.cells[i] === 'killed').map((r) => r.mutation);
+    const blind = row.filter((r) => r.cells && r.cells[i] === 'blind').map((r) => r.mutation);
     const rec = { key: `${cr.caseId}#${meta.label}`, caseId: cr.caseId, label: meta.label, kind, unarmed: !cr.armed[i], kills, blind };
     out.push(rec);
     sink.push(rec);
@@ -371,11 +407,12 @@ export function formatCertify(report, { detail = false } = {}) {
   L.push('变异体（实现能坏的方式）');
   const w = Math.max(...report.mutations.map((m) => m.id.length), 10);
   for (const m of report.mutations) {
-    const mark = m.caught ? '抓到' : m.status === 'killable' ? '欠账' : '说不清';
+    const mark = m.caught ? '抓到' : m.status === 'killable' ? '欠账' : m.status === 'not_applicable' ? '不适用' : '说不清';
     const by = m.killedBy.map((k) => `${k.caseId}#${k.assertion.split('#')[1]}`).slice(0, 3).join(' ');
     let tail;
     if (m.caught) tail = by || `判决级 ×${m.verdictKills}`;
     else if (m.status === 'killable') tail = `可杀，缺断言（${m.witnessCount} 处可观测差异）`;
+    else if (m.status === 'not_applicable') tail = '该适配器没有它声明的能力或集合';
     else tail = m.equivalence ? `说不清（投稿人声称等价：${m.equivalence}）` : '一条案例上都看不出差异——可能等价，也可能案例没走到';
     L.push(`  [${mark}] ${m.id.padEnd(w)}  ${String(m.layer).padEnd(7)}  ${tail}`);
   }
@@ -399,10 +436,12 @@ export function formatCertify(report, { detail = false } = {}) {
   L.push('');
 
   const rate = s.caughtRate === null ? '—（分母为 0）' : `${(s.caughtRate * 100).toFixed(1)}%`;
-  L.push(`变异体抓获率 ${s.caught}/${s.mutations} = ${rate}`);
-  if (s.survived > 0) L.push(`漏网 ${s.survived} 个：${report.mutations.filter((m) => !m.caught).map((m) => m.id).join(' ')}`);
+  L.push(`变异体抓获率 ${s.caught}/${s.applicable} = ${rate}（目录共 ${s.mutations} 个，${s.notApplicable} 个不适用）`);
+  if (s.survived > 0) L.push(`漏网 ${s.survived} 个：${report.mutations.filter((m) => !m.caught && m.status !== 'not_applicable').map((m) => m.id).join(' ')}`);
   if (s.killable > 0) L.push(`  其中 ${s.killable} 个已被证明杀得掉，只差断言没写`);
   if (s.undetermined > 0) L.push(`  其中 ${s.undetermined} 个连差异都造不出来——先别急着补断言，先确认案例走没走到`);
+  const notApplicable = report.mutations.filter((m) => m.status === 'not_applicable').map((m) => m.id);
+  if (notApplicable.length > 0) L.push(`不适用 ${notApplicable.length} 个：${notApplicable.join(' ')}（声明了能力或集合，这个适配器没有——不算漏网）`);
 
   const withSuggestion = report.mutations.filter((m) => !m.caught && m.suggestion);
   if (withSuggestion.length > 0) {

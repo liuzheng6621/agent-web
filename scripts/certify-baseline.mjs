@@ -42,7 +42,7 @@ try {
   report = JSON.parse(e.stdout);
 }
 
-const survivors = report.mutations.filter((m) => !m.caught).map((m) => m.id).sort();
+const survivors = report.mutations.filter((m) => !m.caught && m.status !== 'not_applicable').map((m) => m.id).sort();
 const known = [...KNOWN_SURVIVORS].sort();
 const grew = survivors.filter((id) => !known.includes(id));
 const shrunk = known.filter((id) => !survivors.includes(id));
@@ -50,7 +50,7 @@ const shrunk = known.filter((id) => !survivors.includes(id));
 // 光"名字对得上"不够：每个欠账都必须被证明杀得掉。
 // 如果某个变异体在任何案例上都造不出差异，它可能等价于原程序 —— 那不是欠账，
 // 那是目录写错了。这种情况直接把基线判失败，让人回去看，而不是挂着一条永远清不掉的账。
-const undetermined = report.mutations.filter((m) => !m.caught && m.status !== 'killable');
+const undetermined = report.mutations.filter((m) => !m.caught && m.status !== 'killable' && m.status !== 'not_applicable');
 // 第三种合法状态：杀得掉、但差异全落在不可移植字段上（id / 时间 / 取餐号）。
 // 那不是缺模板，是「换个实现必变」—— 硬写成断言等于给自己造一条会红的假账。
 // 这种不判失败，只要求它被显式标出来（suggestionBlocked），否则沉默会被读成工具没找到洞。
@@ -82,7 +82,7 @@ if (blocked.length > 0) {
 if (grew.length === 0 && shrunk.length === 0) {
   console.log(`准入基线：漏网 ${survivors.length} 个，与基线一致`);
   console.log(`  已知欠账：${known.join(' ')}`);
-  console.log(`  抓到 ${report.mutations.length - survivors.length} / ${report.mutations.length}，${report.summary.suggestions} 条建议断言可补`);
+  console.log(`  抓到 ${report.summary.caught} / ${report.summary.applicable}（目录 ${report.summary.mutations} 个，${report.summary.notApplicable} 个不适用），${report.summary.suggestions} 条建议断言可补`);
   for (const m of report.mutations) {
     if (m.caught || !m.suggestion) continue;
     console.log(`    ${m.id} → ${m.suggestion.caseId}：${JSON.stringify(m.suggestion.assertion)}`);

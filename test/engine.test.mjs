@@ -249,7 +249,8 @@ test('isPathSpec：路径与包名要分得开', () => {
 });
 
 test('内置适配器通过加载器拿到，且符合契约', async () => {
-  assert.deepEqual(listBuiltins().sort(), ['memory', 'taixianglian']);
+  const names = listBuiltins().sort();
+  assert.ok(names.includes('memory') && names.includes('taixianglian'), String(names));
   const a = await loadAdapter('memory');
   for (const f of ['manifest', 'reset', 'observe', 'execute', 'close']) {
     assert.equal(typeof a[f], 'function', f);

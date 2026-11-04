@@ -22,6 +22,15 @@ import { pathToFileURL } from 'node:url';
 import { validateAdapter } from './contract.mjs';
 
 const BUILTINS = {
+  // 示例域：账本（两个独立实现，用来验证案例可移植性）
+  'ledger-a': async () => {
+    const m = await import('../../examples/ledger/adapter-a.mjs');
+    return m.createAdapter();
+  },
+  'ledger-b': async () => {
+    const m = await import('../../examples/ledger/adapter-b.mjs');
+    return m.createAdapter();
+  },
   memory: async () => {
     const m = await import('./memory.mjs');
     return m.createMemoryAdapter();

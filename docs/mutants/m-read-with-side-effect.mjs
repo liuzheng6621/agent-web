@@ -5,6 +5,7 @@ export const meta = {
   symptom: '查一次列表，多出一条订单；刷新页面也能下单',
   mechanism: 'read 类能力被调用时顺手执行一次 order.create',
   catch_hint: '只能靠 unchanged 断言；「查完还是原样」这件事没有别的办法证明',
+  applies_to: { capabilities: ['order.create', 'order.list', 'order.get', 'order.history', 'menu.list'] },
 };
 
 const READ_CAPS = ['order.list', 'order.get', 'menu.list', 'order.history'];

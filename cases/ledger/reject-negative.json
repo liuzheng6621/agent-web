@@ -1,0 +1,76 @@
+{
+  "schema_version": "agent-web/0.1",
+  "id": "ledger/reject-negative",
+  "environment": {
+    "adapter": "ledger-a",
+    "seed": {}
+  },
+  "task": {
+    "natural_goal": "金额写成负数必须记不进去——方向已经由 debit/credit 表达了。",
+    "goal_assertions": [
+      {
+        "kind": "count_delta",
+        "selector": {
+          "collection": "transactions"
+        },
+        "delta": 0
+      },
+      {
+        "kind": "unchanged",
+        "scopes": [
+          "transactions"
+        ]
+      }
+    ]
+  },
+  "reference_trajectory": [
+    {
+      "capability": "account.create",
+      "as": "clerk",
+      "expected_outcome": "applied",
+      "arguments": {
+        "name": "现金",
+        "type": "asset"
+      },
+      "id": "s1"
+    },
+    {
+      "capability": "account.create",
+      "as": "clerk",
+      "expected_outcome": "applied",
+      "arguments": {
+        "name": "主营收入",
+        "type": "income"
+      },
+      "id": "s2"
+    },
+    {
+      "id": "s3",
+      "capability": "transaction.post",
+      "as": "clerk",
+      "expected_outcome": "rejected",
+      "arguments": {
+        "description": "负数",
+        "entries": [
+          {
+            "accountId": 1,
+            "direction": "debit",
+            "amount": -100
+          },
+          {
+            "accountId": 2,
+            "direction": "credit",
+            "amount": -100
+          }
+        ]
+      }
+    }
+  ],
+  "observability": {
+    "declared_scopes": [
+      "accounts",
+      "transactions",
+      "trial"
+    ]
+  }
+}

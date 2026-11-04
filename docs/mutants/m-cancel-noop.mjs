@@ -6,6 +6,7 @@ export const meta = {
   mechanism: 'order.cancel 不执行真实迁移，直接返回 applied 与 CANCELED 的 payload',
   catch_hint:
     '只改写动作结局的假成功：终态断言（status 仍是 PENDING）能抓，只看"返回成功"抓不到',
+  applies_to: { capabilities: ['order.cancel'] },
 };
 
 export function wrap(adapter) {

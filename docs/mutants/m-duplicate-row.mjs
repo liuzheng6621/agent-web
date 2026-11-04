@@ -17,6 +17,7 @@ export const meta = {
   symptom: '列表里两条记录的 id 一样',
   mechanism: '把最后一行覆盖成第一行的副本，条数不变',
   catch_hint: 'unique on id',
+  applies_to: { collections: ['orders'] },
 };
 
 export function wrap(adapter) {

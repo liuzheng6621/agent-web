@@ -7,6 +7,7 @@ export const meta = {
   symptom: '点了 3 杯只收 1 杯的钱；对账时金额对不上流水',
   mechanism: '把 totalAmount 改成所有明细单价之和（不乘 count）',
   catch_hint: '一条 field_equals 断言 order.totalAmount；只断言状态或订单数抓不到',
+  applies_to: { collections: ['orders'] },
 };
 
 export function wrap(adapter) {

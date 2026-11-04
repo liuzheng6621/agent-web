@@ -165,3 +165,8 @@ jobs:
           if node bin/agent-web.mjs drill grade .tmp-drill --submissions=examples/drills/lazy; then
             echo "偷懒提交居然通过了，批改器有问题"; exit 1
           fi
+
+      - name: 第三域：账本的两个独立实现必须判决一致
+        run: |
+          node bin/agent-web.mjs verify cases/ledger --adapter=ledger-a
+          node bin/agent-web.mjs compare cases/ledger --adapters=ledger-a,ledger-b

@@ -16,6 +16,7 @@ export const meta = {
   symptom: "status 出现状态机里没有的 'PROCESSING'",
   mechanism: '把所有 status 换成一个未定义的值',
   catch_hint: 'subset on status',
+  applies_to: { collections: ['orders'] },
 };
 
 export function wrap(adapter) {

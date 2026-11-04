@@ -8,6 +8,7 @@ export const meta = {
   mechanism: '把 items[].subTotal 改成 unitPrice（不乘 count），totalAmount 保持正确',
   catch_hint:
     '必须断言到明细行（items[i].subTotal 或 composite）；只断言 totalAmount 抓不到——总额是对的',
+  applies_to: { collections: ['orders'] },
 };
 
 export function wrap(adapter) {

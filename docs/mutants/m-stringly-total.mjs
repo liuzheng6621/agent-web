@@ -16,6 +16,7 @@ export const meta = {
   symptom: 'totalAmount 是 "56" 而不是 56',
   mechanism: '把总额转成字符串',
   catch_hint: 'type_of on totalAmount',
+  applies_to: { collections: ['orders'] },
 };
 
 export function wrap(adapter) {

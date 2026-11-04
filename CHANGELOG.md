@@ -6,6 +6,15 @@
 CI 也在查。这条规则是买来的：这个仓库曾经同时存在 `package.json` 0.16、README 0.9、
 Gitee Release v0.6.0 三个数，谁看都是三个项目。
 
+## 0.27.0
+
+- 第三个域：账本。`examples/ledger/` 是同一套规则的两个独立实现（整数分 vs 两位小数字符串、分录随交易存 vs 挂账户），`cases/ledger/` 四条案例两边判决一致，`compare` 视图契约逐字相同。
+- 账本的正确性是不变量（借贷必须平衡），不是状态机——这是对断言词汇的一次换形状拷问。
+- 变异体目录 19 → 22：`m-ledger-sign-flip`（负余额符号翻正）、`m-ledger-total-lies`（合计装平）、`m-ledger-any-balance`（不平也报成功）。账本域适用 5 个抓住 4 个。
+- 变异体新增 `applies_to` 声明（能力 / 集合）：适配器没有它声明的东西就是「不适用」，不进抓获率分母。咖啡域 17/19，3 个账本变异体不再被误报成漏网。
+- 公开一条词汇缺口：`unchanged` 只能断整段轨迹的初态对终态，「从被拒步之后不许变」表达不了（见 `examples/ledger/README.md`）。
+- 内置适配器从 2 个变 4 个：`ledger-a` / `ledger-b`。
+
 ## 0.26.0
 
 - 变异体从 16 个扩到 19 个，新加的三个都在执行层：`m-read-with-side-effect`（读也写）、`m-skip-intermediate`（两步压成一步）、`m-double-effect`（一次操作记两遍账）。

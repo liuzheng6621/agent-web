@@ -16,6 +16,7 @@ export const meta = {
   symptom: '最新创建的订单跑到列表最后',
   mechanism: '把 orders 顺序反转',
   catch_hint: 'sorted_by on createTime',
+  applies_to: { collections: ['orders'] },
 };
 
 export function wrap(adapter) {

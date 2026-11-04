@@ -23,6 +23,9 @@ import * as unsortedOrders from './m-unsorted-orders.mjs';
 import * as readWithSideEffect from './m-read-with-side-effect.mjs';
 import * as skipIntermediate from './m-skip-intermediate.mjs';
 import * as doubleEffect from './m-double-effect.mjs';
+import * as ledgerSignFlip from './m-ledger-sign-flip.mjs';
+import * as ledgerTotalLies from './m-ledger-total-lies.mjs';
+import * as ledgerAnyBalance from './m-ledger-any-balance.mjs';
 
 const ENTRIES = [
   ['m-money-off-by-cent', moneyOffByCent],
@@ -44,6 +47,9 @@ const ENTRIES = [
   ['m-read-with-side-effect', readWithSideEffect],
   ['m-skip-intermediate', skipIntermediate],
   ['m-double-effect', doubleEffect],
+  ['m-ledger-sign-flip', ledgerSignFlip],
+  ['m-ledger-total-lies', ledgerTotalLies],
+  ['m-ledger-any-balance', ledgerAnyBalance],
 ];
 
 const LAYERS = new Set(['state', 'execute']);

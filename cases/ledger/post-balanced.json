@@ -1,0 +1,114 @@
+{
+  "schema_version": "agent-web/0.1",
+  "id": "ledger/post-balanced",
+  "environment": {
+    "adapter": "ledger-a",
+    "seed": {}
+  },
+  "task": {
+    "natural_goal": "开两个账户，记一笔借贷平衡的账，账本要能对上。",
+    "goal_assertions": [
+      {
+        "kind": "entity_exists",
+        "selector": {
+          "collection": "transactions"
+        },
+        "min": 1
+      },
+      {
+        "kind": "field_equals",
+        "selector": {
+          "collection": "transactions",
+          "index": 0
+        },
+        "path": "total",
+        "value": 0
+      },
+      {
+        "kind": "count_delta",
+        "selector": {
+          "collection": "transactions"
+        },
+        "delta": 1
+      },
+      {
+        "kind": "field_equals",
+        "selector": {
+          "collection": "trial",
+          "where": [
+            {
+              "field": "accountId",
+              "eq": 1
+            }
+          ]
+        },
+        "path": "balance",
+        "value": 100
+      },
+      {
+        "kind": "field_equals",
+        "selector": {
+          "collection": "trial",
+          "where": [
+            {
+              "field": "accountId",
+              "eq": 2
+            }
+          ]
+        },
+        "path": "balance",
+        "value": -100
+      }
+    ]
+  },
+  "reference_trajectory": [
+    {
+      "capability": "account.create",
+      "as": "clerk",
+      "expected_outcome": "applied",
+      "arguments": {
+        "name": "现金",
+        "type": "asset"
+      },
+      "id": "s1"
+    },
+    {
+      "capability": "account.create",
+      "as": "clerk",
+      "expected_outcome": "applied",
+      "arguments": {
+        "name": "主营收入",
+        "type": "income"
+      },
+      "id": "s2"
+    },
+    {
+      "id": "s3",
+      "capability": "transaction.post",
+      "as": "clerk",
+      "expected_outcome": "applied",
+      "arguments": {
+        "description": "卖货收现金",
+        "entries": [
+          {
+            "accountId": 1,
+            "direction": "debit",
+            "amount": 100
+          },
+          {
+            "accountId": 2,
+            "direction": "credit",
+            "amount": 100
+          }
+        ]
+      }
+    }
+  ],
+  "observability": {
+    "declared_scopes": [
+      "accounts",
+      "transactions",
+      "trial"
+    ]
+  }
+}

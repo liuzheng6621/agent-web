@@ -1,0 +1,6 @@
+{
+  "ledger/post-balanced": "pass",
+  "ledger/reject-unbalanced": "pass",
+  "ledger/reject-negative": "pass",
+  "ledger/reject-unknown-account": "pass"
+}

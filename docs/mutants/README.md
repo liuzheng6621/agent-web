@@ -24,6 +24,10 @@ export const meta = {
   symptom: '用户投诉长什么样',
   mechanism: '具体改了什么',
   catch_hint: '什么样的断言能抓住它；什么样的抓不住',
+  applies_to: {                 // 可选：这个变异体只对哪些适配器有意义
+    capabilities: ['order.cancel'], // 能力不在适配器里 = 不适用（certify 不计入分母）
+    collections: ['orders'],        // 两个都能省略；全空 = 所有域都适用
+  },
 };
 
 export function wrap(adapter) {
@@ -62,10 +66,14 @@ export function wrap(adapter) {
 | `m-read-with-side-effect` | execute | 读操作偷偷写了一条 |
 | `m-skip-intermediate` | execute | 两步迁移压成一步，终态对、序列错 |
 | `m-double-effect` | execute | 一次操作记两遍账 |
+| `m-ledger-sign-flip` | state | 负余额的符号被翻正 |
+| `m-ledger-total-lies` | state | 交易合计说成非零（装平） |
+| `m-ledger-any-balance` | execute | 不平的账也报成功（接口撒谎） |
 
 看完整说明：`agent-web mutants`。
 
-**现在的战绩：19 个里抓住 17 个。** 漏网的两个都记在 `scripts/certify-baseline.mjs` 的
+**现在的战绩：咖啡域 17/19，账本域 4/5。** 目录共 22 个变异体，其中 20 个声明了
+`applies_to`——账本变异体在咖啡适配器上标记「不适用」，不进分母。 漏网的两个都记在 `scripts/certify-baseline.mjs` 的
 `KNOWN_SURVIVORS` 里，理由分别是「取餐号的 +100 偏移是各实现自有的约定」和
 「排序本来就没写进契约」——都不是尺子不够长，是这两样东西不该跨实现断言。
 

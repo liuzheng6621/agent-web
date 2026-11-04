@@ -5,6 +5,7 @@ export const meta = {
   symptom: '订单没进过"制作中"，直接从已接单跳到可取餐；审计日志少一段',
   mechanism: '调用 kitchen.accept 时连做 accept + ready，中间态一闪而过',
   catch_hint: '只能靠 status_transition 的完整序列；只看终态的实现会以为一切正常',
+  applies_to: { capabilities: ['kitchen.accept', 'kitchen.ready'] },
 };
 
 export function wrap(adapter) {

@@ -8,6 +8,7 @@ export const meta = {
   mechanism: '把每条明细的 count 无条件改成 1，subTotal 与总额都不动',
   catch_hint:
     '要断言 items[i].count 或 items[i].subTotal；只断言 totalAmount 抓不到（总额是对的）',
+  applies_to: { collections: ['orders'] },
 };
 
 export function wrap(adapter) {
