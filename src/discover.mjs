@@ -214,7 +214,10 @@ const ADAPTER_TEMPLATE = [
   '    let json = null;',
   '    try { json = JSON.parse(text); } catch { json = null; }',
   '    if (res.status >= 500) return { outcome: "infra_error", error: { code: "http_" + res.status } };',
-  '    if (res.status >= 400) return { outcome: "rejected", error: { code: "http_" + res.status, message: text.slice(0, 200) } };',
+      '// TODO(2) 返回口径：你的后端拿什么状态码表「业务拒绝」？这里默认 4xx 全算 rejected。',
+    '// 如果你的后端用 403 表业务拒绝（而不是鉴权故障），要在这里按语义分流；',
+    '// 401 / 429 / 5xx 永远是 infra_error —— 那是环境问题，不是 Agent 的错。',
+    'if (res.status >= 400) return { outcome: "rejected", error: { code: "http_" + res.status, message: text.slice(0, 200) } };',
   '    return { outcome: "applied", payload: json };',
   '  } catch (e) {',
   '    return { outcome: "infra_error", error: { code: "network", message: String(e && e.message ? e.message : e) } };',
@@ -252,19 +255,27 @@ const ADAPTER_TEMPLATE = [
   '        description: __DESC_LITERAL__,',
   '        scopes: __SCOPES__,',
   '        events_complete: false,',
-  '        roles: ["viewer"],',
+          '// TODO(1) 能力表与角色：写接口已列在 CAPABILITIES 里，但 roles 还是空的。',
+        '// 把每个能力的 roles 填成你应用里的角色名（参考 examples/animal-tracking/adapter.mjs）。',
+        'roles: ["viewer"],',
   '        capabilities: CAPABILITIES,',
   '      };',
   '    },',
   '',
-  '    // 只读适配器没有可复位的东西：它不写，也就不需要隔离。',
+      '// TODO(4) 隔离：接写操作时按你的应用重实现这里。',
+    '// 三条路按便宜程度：identity（自带账号体系，每次注册新账号）> reseed（自建后端清库重灌）> snapshot。',
+    '// 注意：你的后端可能对登录限流，reset 频繁登录会撞 429 —— 长寿命账号的 token 按进程缓存。',
+    '// 只读适配器没有可复位的东西：它不写，也就不需要隔离。',
   '    // 换成有写操作的版本时，这里要按你的应用重新实现（新账号 / 重建库 / 换快照）。',
   '    async reset() {',
   '      seq += 1;',
   '      return { runId: "discover-" + seq, roleBindings: { viewer: null } };',
   '    },',
   '',
-  '    async observe(runId, scopes) {',
+      '// TODO(3) 规范视图：把你的资源投影成集合，字段跨实现必须同名。',
+    '// 两条铁律：不可移植字段（id / 时间戳 / username）可以观测但别断言；',
+    '// 字典 / 枚举值要和对照实现对齐（mock 的菜名必须逐字等于真实后端的菜名）。',
+    'async observe(runId, scopes) {',
   '      const wanted = Array.isArray(scopes) && scopes.length > 0 ? scopes : Object.keys(READS);',
   '      const state = {};',
   '      const missingScopes = [];',
@@ -610,6 +621,9 @@ export async function discover(baseUrl, opts = {}) {
     'utf8',
   );
   report.written.push(adapterPath);
+  const nextPath = path.join(outDir, 'NEXT.md');
+  writeFileSync(nextPath, buildNextSteps({ baseUrl: probe.baseUrl, capabilities: caps, writePlan }), 'utf8');
+  report.written.push(nextPath);
 
   const casesDir = path.join(outDir, 'cases');
   mkdirSync(casesDir, { recursive: true });
@@ -644,6 +658,62 @@ export async function discover(baseUrl, opts = {}) {
   return report;
 }
 
+/**
+ * 施工单：discover 的产物自带「从只读到完整适配器」的下一步清单。
+ * 四个 TODO 在生成的 adapter.mjs 里都有对应标记（搜 TODO(1) 到 TODO(4)）。
+ */
+export function buildNextSteps({ baseUrl, capabilities, writePlan = {} }) {
+  const reads = capabilities.filter((c) => c.kind === 'read').length;
+  const writes = capabilities.filter((c) => c.kind === 'write').length;
+  return [
+    '# 下一步：从只读适配器到完整适配器',
+    '',
+    '站点 ' + baseUrl + '，探测到 ' + capabilities.length + ' 个接口（只读 ' + reads + '、写 ' + writes + '）。',
+    '这份施工单按顺序填，每步填完都有机器验收。四个位置在 adapter.mjs 里搜 TODO(1) 到 TODO(4)。',
+    '',
+    '## 1 能力表与角色',
+    '',
+    '写接口已经在 CAPABILITIES 里，roles 是空的。把每个能力的 roles 填成你应用里的角色名。',
+    '',
+    '验收：node bin/agent-web.mjs capabilities --adapter=adapter.mjs',
+    '',
+    '## 2 返回口径',
+    '',
+    '你的后端拿什么状态码表「业务拒绝」？400 走默认即可；如果用 403 表业务拒绝（而不是鉴权故障），',
+    '要按语义分流。一分钟搞清的办法：故意发一个会被业务拒绝的请求（比如空 body），看回什么。',
+    '完整范例：examples/animal-tracking/adapter.mjs 的 classify()。',
+    '',
+    '验收：跑一条带 expected_outcome: "rejected" 的步，能拿到 rejected 而不是 unknown。',
+    '',
+    '## 3 规范视图',
+    '',
+    '把你的资源投影成集合，字段跨实现同名。两条铁律：',
+    '不可移植字段（id / 时间戳 / username）可以观测但别断言；字典值要和对照实现逐字对齐。',
+    '',
+    '验收：node bin/agent-web.mjs probe --adapter=adapter.mjs（六项全绿）。',
+    '',
+    '## 4 隔离',
+    '',
+    '有账号体系就走 identity（每次 reset 注册新账号，最便宜）。',
+    '注意你的后端可能对登录限流：长寿命账号的 token 按进程缓存，失效才重登。',
+    '',
+    '验收：probe 的复位幂等与无状态泄漏两项。',
+    '',
+    '## 填完之后（顺序别乱）',
+    '',
+    '```',
+    'node bin/agent-web.mjs probe --adapter=adapter.mjs      # 先证明观测自洽',
+    'node bin/agent-web.mjs verify cases/ --adapter=adapter.mjs',
+    'node bin/agent-web.mjs certify cases/ --adapter=adapter.mjs     # 断言证明自己有用',
+    'node bin/agent-web.mjs compare cases/ --adapters=adapter.mjs,第二个实现   # 终审',
+    '```',
+    '',
+    '## 别人替你踩过的坑（agent-web knowledge 可查）',
+    '',
+    '登录限流打断频繁 reset / mock 字典和真实后端不一致 / 建议断言落到不可移植字段 / 403 口径错位。',
+    '',
+  ].join(String.fromCharCode(10)) + String.fromCharCode(10);
+}
 export function formatDiscover(report, { detail = false } = {}) {
   const out = [];
   const push = (s = '') => out.push(s);
@@ -725,7 +795,7 @@ export function formatDiscover(report, { detail = false } = {}) {
     push('  生成：');
     for (const f of report.written) push('    ' + f);
     push('');
-    push('  下一步：');
+    push('  下一步：完整清单在 ' + report.outDir + '/NEXT.md（四处 TODO 在 adapter.mjs 里搜 TODO(1)）');
     push('    node bin/agent-web.mjs probe --adapter=' + report.outDir + '/adapter.mjs');
     push('    node bin/agent-web.mjs accept ' + report.outDir + '/cases/<某个>.json --by=<你的名字>');
     push('    node bin/agent-web.mjs verify ' + report.outDir + '/cases --adapter=' + report.outDir + '/adapter.mjs');

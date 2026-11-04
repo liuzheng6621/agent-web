@@ -66,6 +66,7 @@ export {
   synthesizeBody,
   writePlanOf,
   buildWriteCases,
+  buildNextSteps,
 } from './discover.mjs';
 export {
   DRILL_VERSION,

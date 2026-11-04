@@ -21,10 +21,12 @@ bash quickstart.sh http://127.0.0.1:8080
 ```
 
 它会探测根路径和 8 个常见的接口描述位置（`/openapi.json`、`/v3/api-docs`、`/swagger.json`……），
-找到就生成两份东西：
+找到就生成三份东西：
 
 - `adapter.mjs`：只读适配器，每个 GET 接口一个能力
 - `cases/*.json`：每资源一条案例，断言只有一条——读操作不得改变任何东西（`unchanged`）
+- `NEXT.md`：施工单。要往下走（写操作、业务规则）照它逐项填，四个待填位置在 `adapter.mjs`
+  里直接标了号（搜 `TODO(1)` 到 `TODO(4)`，正是下面第三档那四处），每步验收命令现成
 
 ```bash
 node bin/agent-web.mjs probe --adapter=adapter.mjs     # 六项自洽检查
@@ -53,7 +55,9 @@ node bin/agent-web.mjs prepare 轨迹.json
 `record` 把请求日志还原成带绑定（`$s1.orderId`）的步骤，`prepare` 生成案例草稿和流程图。
 **日志格式是 JSONL 动作日志，不是 HAR**——先看 `examples/agent-traces/` 里的样子。
 
-## 第三档：手写适配器（半天，这是主路）
+## 第三档：照单施工（原半天，现在从生成物起步）
+
+第三档就是照 `NEXT.md` 填那四个 TODO。下面讲的是每一处为什么难，照单填不等于不用懂。
 
 要测「未审核的任务不能被接取」「只有执行者能完成」「积分只发一次」这类规则，机器帮不了你——
 **这些语义只存在于你的业务里**。但也不吓人：仓库里有两份完整的真实范例，照抄改四处。

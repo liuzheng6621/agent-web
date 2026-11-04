@@ -74,6 +74,35 @@ function tmpdir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'agent-web-discover-'));
 }
 
+test('discover 产物自带施工单 NEXT.md 与 TODO 标记', async () => {
+  const { discover } = await import('../src/discover.mjs');
+  const { readFileSync, existsSync, rmSync } = await import('node:fs');
+  const http = await import('node:http');
+  const srv = http.createServer((req, res) => {
+    if (req.url === '/openapi.json') {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      return res.end(JSON.stringify({ openapi: '3.0.0', info: { title: 't' }, paths: {
+        '/api/items': { get: { summary: 'list' }, post: { summary: 'create' } },
+      } }));
+    }
+    if (req.url === '/api/items') { res.writeHead(200, { 'content-type': 'application/json' }); return res.end('[]'); }
+    res.writeHead(404); res.end('{}');
+  });
+  await new Promise((r) => srv.listen(18195, '127.0.0.1', r));
+  rmSync('.tmp-next', { recursive: true, force: true });
+  const rep = await discover('http://127.0.0.1:18195', { outDir: '.tmp-next', run: true });
+  assert.equal(existsSync('.tmp-next/NEXT.md'), true);
+  const next = readFileSync('.tmp-next/NEXT.md', 'utf8');
+  for (const h of ['1 能力表与角色', '2 返回口径', '3 规范视图', '4 隔离', '填完之后']) {
+    assert.equal(next.includes(h), true, 'NEXT.md 缺章节 ' + h);
+  }
+  const src = readFileSync('.tmp-next/adapter.mjs', 'utf8');
+  for (const m of ['TODO(1)', 'TODO(2)', 'TODO(3)', 'TODO(4)']) {
+    assert.equal(src.includes(m), true, 'adapter 缺标记 ' + m);
+  }
+  assert.equal(rep.written.some((f) => f.endsWith('NEXT.md')), true);
+  srv.closeAllConnections(); srv.close();
+});
 test('能力 id：从路径和动词推出来，末段是名字时用它当动作', () => {
   assert.equal(toCapabilityId('get', '/api/orders'), 'orders.list');
   assert.equal(toCapabilityId('get', '/api/orders/{id}'), 'orders.get');
