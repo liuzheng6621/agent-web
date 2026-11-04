@@ -105,6 +105,11 @@ jobs:
           [ "$V" = "$C" ] || { echo "CHANGELOG 首条与 package.json 不一致"; exit 1; }
           [ "$V" = "$B" ] || { echo "CLI 报的版本与 package.json 不一致"; exit 1; }
 
+      # README 顶上那行数字必须是算出来的。外部读者照着旧文档把项目读成
+      # "0.1 阶段、7 种断言"，代价比多跑一个脚本高得多。
+      - name: README 状态行必须与代码一致
+        run: node scripts/status-line.mjs
+
       - name: 每个案例都必须在 expected.json 里有预期
         run: |
           # two-items 加了三个月都没进 expected.json，而 selftest 只画一个点就过了。

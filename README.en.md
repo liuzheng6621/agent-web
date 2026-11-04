@@ -16,6 +16,15 @@
   <img alt="tests" src="docs/media/badge-tests.svg">
 </p>
 
+<p align="center">
+  <b>v0.28.1</b> · 12 assertion kinds · 24 commands · 22 mutants
+</p>
+
+<p align="center">
+  That line is computed, not written: the version comes from <code>package.json</code>, the kinds from <code>KINDS</code>,
+  the command and mutant counts from the code itself. <code>scripts/status-line.mjs</code> goes red when any of them drifts.
+</p>
+
 ---
 
 ## The problem

@@ -15,6 +15,15 @@
   <img alt="tests" src="docs/media/badge-tests.svg">
 </p>
 
+<p align="center">
+  <b>当前版本 0.28.1</b> · 12 种断言 · 24 条命令 · 22 个变异体
+</p>
+
+<p align="center">
+  这一行不是宣传语，是 CI 逐项算出来的：版本号取自 <code>package.json</code>，断言种类取自 <code>KINDS</code>，
+  命令数与变异体数取自代码本身。任何一处对不上，<code>scripts/status-line.mjs</code> 就会红。
+</p>
+
 ---
 
 ## 它解决的问题

@@ -43,6 +43,7 @@ import { summarizeTraps, formatTraps, trapVerdict } from '../src/traps.mjs';
 import { certify, formatCertify, formatSuggestions, certifyExit } from '../src/certify.mjs';
 import { breedMutants, formatBreed, loadBredMutants, BREED_VERSION } from '../src/breed.mjs';
 import { MUTATIONS, describeMutations } from '../src/mutate.mjs';
+import { KINDS } from '../src/assert/index.mjs';
 import { buildDrills, gradeDrills, writeDrills, readDrills, readSubmissions, formatGrade, gradeExit } from '../src/drill.mjs';
 import { collectUsage, summarizeCoverage, formatCoverage, coverageVerdict } from '../src/coverage.mjs';
 import { probeAdapter, formatProbe, probeExit } from '../src/probe.mjs';
@@ -1497,9 +1498,14 @@ const HELP = `agent-web —— 给 Agent 写机器可判的集成测试
   agent-web prepare <动作日志> --adapter=SPEC  一次生成步骤、案例草稿和流程预览
   agent-web draft <轨迹文件> --adapter=SPEC   回放轨迹，反推案例草稿（要人确认）
   agent-web flow <案例或目录> [--result=FILE]  单案例流程图；给目录则生成判决总览
-  agent-web knowledge                         事故档案：这个仓库踩过的八个坑
+  agent-web discover <网址> --out=DIR         探一个站点：生成只读适配器、案例草稿和施工单
+  agent-web mutants                           变异体目录：谁的坏法、怎么抓、怎么投稿
+  agent-web audit <真实.jsonl> <候选.jsonl>    假绿审计：拿真实后端当尺子量候选实现
+  agent-web traps <结果.jsonl> --cases=DIR    陷阱普查：这批判决有多少是盲的
+  agent-web knowledge                         事故档案：这个仓库踩过的 ${ENTRIES.length} 个坑
   agent-web recall [案例目录]                 比对档案：这次有没有重犯旧错（第二次拦下）
   agent-web init <目录>                       生成案例模板（--adapter 写进 environment）
+  agent-web version                           版本、最近一次变更、以及版本号三处是否一致
 
 适配器 SPEC 可以是：
   内置名        ${listBuiltins().join(' / ')}
@@ -1508,8 +1514,7 @@ const HELP = `agent-web —— 给 Agent 写机器可判的集成测试
 
   接自己的应用只需写一个 .mjs，导出 createAdapter()。见 examples/adapter-template/。
 
-断言：entity_exists / field_equals / count_delta / status_transition /
-      unchanged / event_absent / composite
+断言：${KINDS.join(' / ')}（共 ${KINDS.length} 种，相位见 docs/SPEC.md 第 4 章）
       没有 llm_judge，判不了就记 unknown，并留在分母里。
 
 退出码：0 符合预期；1 存在不符；2 用法或环境错误。`;
@@ -1523,7 +1528,8 @@ async function main() {
   if (flags.version || flags.v) return cmdVersion(flags);
   if (!cmd || flags.help || cmd === 'help') {
     console.log(HELP);
-    return cmd ? 0 : 2;
+    // 主动要帮助是成功；什么参数都不给是用法错误。
+    return flags.help || cmd === 'help' ? 0 : 2;
   }
 
   try {
