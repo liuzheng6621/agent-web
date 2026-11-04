@@ -93,6 +93,15 @@
             "PICKED"
           ]
         ]
+      },
+      {
+        "kind": "field_equals",
+        "selector": {
+          "collection": "orders",
+          "index": 0
+        },
+        "path": "items.0.dishName",
+        "value": "拿铁"
       }
     ],
     "invariants": [

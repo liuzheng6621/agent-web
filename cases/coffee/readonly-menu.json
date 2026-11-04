@@ -21,6 +21,60 @@
           "orders",
           "status_log"
         ]
+      },
+      {
+        "kind": "entity_exists",
+        "selector": {
+          "collection": "menu",
+          "where": [
+            {
+              "field": "dishName",
+              "eq": "拿铁"
+            }
+          ]
+        },
+        "min": 1
+      },
+      {
+        "kind": "field_equals",
+        "selector": {
+          "collection": "menu",
+          "where": [
+            {
+              "field": "dishName",
+              "eq": "拿铁"
+            }
+          ]
+        },
+        "path": "price",
+        "value": 28
+      },
+      {
+        "kind": "entity_exists",
+        "selector": {
+          "collection": "menu",
+          "where": [
+            {
+              "field": "dishName",
+              "eq": "美式咖啡"
+            }
+          ]
+        },
+        "min": 1
+      },
+      {
+        "kind": "field_equals",
+        "selector": {
+          "collection": "menu",
+          "where": [
+            {
+              "field": "dishName",
+              "eq": "美式咖啡"
+            }
+          ]
+        },
+        "path": "price",
+        "value": 22
       }
     ]
   },

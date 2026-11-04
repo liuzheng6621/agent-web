@@ -6,6 +6,30 @@
 CI 也在查。这条规则是买来的：这个仓库曾经同时存在 `package.json` 0.16、README 0.9、
 Gitee Release v0.6.0 三个数，谁看都是三个项目。
 
+## 0.20.0
+
+变异体不再只靠人想。`agent-web breed` 从规范视图的形状生成，恒等算子自动跳过。
+
+手写的十二个变异体是「我们想得到的」，想得到的总会用完。breed 换了个来源：观测到的字段
+有什么类型，就照着这些位置造故障——数值差一/翻倍/丢两位，文本加前缀/转大写/置空，
+集合丢尾/逆序。
+
+生成不等于入库。新变异体要拿 `certify --mutants-dir=` 过一遍，杀不掉任何断言的照样落
+`undetermined`。这是「断言要证明自己有用」的另一半：弹药管够，准入不变。
+
+实测（memory 适配器，orders+menu 两个集合）：
+
+复现命令：`breed --adapter=memory --from-case=cases/coffee/happy-path.json --out=.tmp-bred --max=40`
+（`--max` 默认 24，超出会明说「另有 N 个没写」）。
+
+- 28 个生成变异体，4 个恒等算子当场跳过（`'MAKING'.toUpperCase()` 还是 `'MAKING'`，
+  `'拿铁'` 根本没有大小写——生成了只是把 undetermined 撑大）
+- 全套 40 个变异体里抓到 38 个（95.0%），漏网 2 个：`m-pickup-no-offset`（偏移 100 是
+  各实现自己的约定，跨实现断言不了）、`m-breed-reverse-menu`（菜单没有约定顺序，
+  能看见差别但没有模板该表达它）
+- 生成顺手补出两条真漏洞：`two-items` 少了明细菜品名的断言，`readonly-menu` 只钉住
+  了第一道菜——第二个菜品被改成 `zz_美式咖啡` 时没人看得见
+
 ## 0.19.0
 
 从一个网址开始。`agent-web discover <网址>` + `quickstart.sh`。

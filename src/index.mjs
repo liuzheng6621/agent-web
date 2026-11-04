@@ -74,3 +74,16 @@ export {
   readSubmissions,
   safeName,
 } from './drill.mjs';
+
+// 变异体生成：从规范视图形状造故障，能不能留下由 certify 判
+export {
+  BREED_VERSION,
+  collectLeaves,
+  planMutants,
+  renderMutant,
+  renderIndex,
+  sampleState,
+  breedMutants,
+  loadBredMutants,
+  formatBreed,
+} from './breed.mjs';

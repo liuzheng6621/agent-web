@@ -57,6 +57,17 @@ jobs:
           node bin/agent-web.mjs accept /tmp/draft-check/happy-path.json --by=ci
           node bin/agent-web.mjs verify /tmp/draft-check --adapter=memory
 
+      - name: 生成的变异体必须能被判据准入接住
+        run: |
+          node bin/agent-web.mjs breed --adapter=memory --from-case=cases/coffee/happy-path.json --out=.tmp-bred | tee .tmp-breed.txt
+          grep -q "个变异体" .tmp-breed.txt
+          node bin/agent-web.mjs certify cases/coffee --adapter=memory --mutants-dir=.tmp-bred --json > .tmp-bred-cert.json || true
+          node -e '
+            const r = require("./.tmp-bred-cert.json");
+            const n = r.summary.caught + r.summary.survived;
+            if (n < 30) { console.error("变异体总数只有 " + n + "，说明 breed 没造出东西"); process.exit(1); }
+            console.log("变异体 " + n + " 个，抓到 " + r.summary.caught + " 个");
+          '
       - name: 陷阱普查必须真的指得出盲区
         run: |
           set -e

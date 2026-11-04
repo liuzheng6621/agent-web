@@ -41,6 +41,7 @@ import { diffViews } from '../src/view.mjs';
 import { auditRuns, formatAudit } from '../src/audit.mjs';
 import { summarizeTraps, formatTraps, trapVerdict } from '../src/traps.mjs';
 import { certify, formatCertify, formatSuggestions, certifyExit } from '../src/certify.mjs';
+import { breedMutants, formatBreed, loadBredMutants, BREED_VERSION } from '../src/breed.mjs';
 import { MUTATIONS, describeMutations } from '../src/mutate.mjs';
 import { buildDrills, gradeDrills, writeDrills, readDrills, readSubmissions, formatGrade, gradeExit } from '../src/drill.mjs';
 import { collectUsage, summarizeCoverage, formatCoverage, coverageVerdict } from '../src/coverage.mjs';
@@ -449,9 +450,16 @@ async function cmdDiscover(args, flags) {
   return bad.length > 0 ? 1 : 0;
 }
 
+/** 同名的 flag 给多次时收成数组；只给一次时也收成数组，调用方不用分情况。 */
+function toList(v) {
+  if (v === undefined || v === null || v === false) return [];
+  return Array.isArray(v) ? v.map(String) : [String(v)];
+}
+
 async function cmdCertify(args, flags) {
   if (args.length < 1) {
-    console.error('用法：agent-web certify <案例目录> [--adapter=memory] [--mutations=id,id] [--timeout=5000] [--strict] [--detail] [--suggest] [--json]');
+    console.error('用法：agent-web certify <案例目录> [--adapter=memory] [--mutations=id,id] [--mutants-dir=目录] [--timeout=5000] [--strict] [--detail] [--suggest] [--json]');
+    console.error('  --mutants-dir 额外加载 breed 生成的变异体（可重复给多个）。');
     console.error('  它把正确实现复制成若干个"只坏一处"的变异体，逐条断言问：你能把它抓出来吗？');
     console.error('  抓不住任何变异体的断言，就是该被拒收的断言。');
   console.error('  --suggest 会把「已经被证明杀得掉、只是还没写出来」的断言直接吐出来。');
@@ -459,10 +467,15 @@ async function cmdCertify(args, flags) {
     return 2;
   }
   const spec = flags.adapter ?? 'memory';
+  const bred = [];
+  for (const dir of toList(flags['mutants-dir'] ?? flags.mutantsDir)) {
+    bred.push(...(await loadBredMutants(path.resolve(dir))));
+  }
+  const pool = bred.length > 0 ? [...MUTATIONS, ...bred] : MUTATIONS;
   const wanted = typeof flags.mutations === 'string' ? new Set(flags.mutations.split(',').map((x) => x.trim()).filter(Boolean)) : null;
-  const used = wanted ? MUTATIONS.filter((m) => wanted.has(m.id)) : MUTATIONS;
+  const used = wanted ? pool.filter((m) => wanted.has(m.id)) : pool;
   if (used.length === 0) {
-    console.error(`--mutations 没有匹配到任何内置变异体；可用的：${MUTATIONS.map((m) => m.id).join(', ')}`);
+    console.error(`--mutations 没有匹配到任何变异体；内置：${MUTATIONS.map((m) => m.id).join(', ')}`);
     return 2;
   }
 
@@ -483,6 +496,42 @@ async function cmdCertify(args, flags) {
   else if (flags.suggest === true) console.log(formatSuggestions(report));
   else console.log(formatCertify(report, { detail: flags.detail === true }));
   return certifyExit(report, { strict: flags.strict === true });
+}
+
+async function cmdBreed(args, flags) {
+  const out = flags.out;
+  if (!out) {
+    console.error('用法：agent-web breed --adapter=memory --out=目录 [--from-case=案例.json] [--max=24] [--detail] [--json]');
+    console.error('  从适配器观测到的规范视图形状，自动生成变异体。');
+    console.error('  --from-case 先跑一条案例再观测（不给的话只看得到静态表，看不到订单这类做出来的数据）。');
+    console.error('  --collections 限定在哪些集合里造故障，默认 orders,menu。status_log 是内部流水，');
+    console.error('  生成不等于入库：能不能留下由 certify 判，杀不掉任何断言的一律落 undetermined。');
+    return 2;
+  }
+  const spec = flags.adapter ?? 'memory';
+  const adapter = await loadAdapter(spec, {}, process.cwd());
+  let caseObj = null;
+  if (flags['from-case'] ?? flags.fromCase) {
+    const file = path.resolve(String(flags['from-case'] ?? flags.fromCase));
+    const parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
+    const errors = validateCase(parsed);
+    if (errors.length) {
+      console.error('案例不合法：' + errors.join('；'));
+      return 2;
+    }
+    caseObj = parsed;
+  }
+  const report = await breedMutants({
+    adapter,
+    adapterName: spec,
+    out: path.resolve(out),
+    max: flags.max ? Number(flags.max) : 24,
+    collections: (flags.collections ?? 'orders,menu').split(',').map((x) => x.trim()).filter(Boolean),
+    caseObj,
+  });
+  if (flags.json) console.log(JSON.stringify(report, null, 2));
+  else console.log(formatBreed(report, { detail: flags.detail === true }));
+  return report.written > 0 ? 0 : 1;
 }
 
 async function cmdTraps(args, flags) {
@@ -1385,6 +1434,7 @@ const HELP = `agent-web —— 给 Agent 写机器可判的集成测试
   agent-web coverage <案例> --adapter=SPEC    能力覆盖率对账（--min=0.8 设门槛）
   agent-web probe --adapter=SPEC              探针：查适配器自己有没有在撒谎
   agent-web certify <案例> --adapter=SPEC     判据准入：变异体 × 断言杀伤矩阵
+  agent-web breed --adapter=SPEC --out=目录   照着视图形状自动生成变异体
   agent-web drill <案例> --adapter=SPEC       出题：对真盲区出题（题面不含答案）
   agent-web drill grade <题目> --submissions=DIR  批改：只认跑出来的结果
   agent-web compare <案例> --adapters=A,B     同一份案例喂多个实现，比判决
@@ -1448,6 +1498,8 @@ async function main() {
         return await cmdTraps(args, flags);
       case 'certify':
         return await cmdCertify(args, flags);
+      case 'breed':
+        return await cmdBreed(args, flags);
       case 'mutants':
         return cmdMutants(args, flags);
       case 'drill':
