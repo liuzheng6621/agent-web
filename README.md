@@ -361,7 +361,35 @@ agent-web certify cases/coffee --adapter=memory --detail
 这不是 bug，这是尺子上没有那根刻度。
 
 现在是 **8 / 12，漏网 4 个，`certify` 退出码为 1**。这是它应有的行为：它在告诉你
-这套案例还不够狠。CI 里因此不放「必须全抓到」这种会逼人说谎的断言，而是放
+这套案例还不够狠。
+
+### 它不止告诉你哪里有洞，还告诉你补哪条
+
+漏网的变异体不是一律记成"欠账"。`certify` 会把正确实现和坏实现的规范视图逐叶子比一遍：
+
+| 状态 | 含义 | 该怎么处理 |
+| --- | --- | --- |
+| `caught` | 有断言或负例步杀得掉 | 没事 |
+| `killable` | **有可观测差异，一定杀得掉，只是还没写断言** | 补断言，`--suggest` 直接给你 |
+| `undetermined` | 一条案例上都造不出差异 | 先别补断言，先确认案例走没走到；走不到就可能是等价变异体 |
+
+`undetermined` 和 `killable` 的分开很重要。变异测试领域有个四十年没解决的老问题叫
+equivalent mutant——有些"坏版本"在语义上跟原程序完全一样，**永远杀不掉**。把这种
+东西记成"欠账"，欠账表就会挂着一笔永远清不掉的账，最后没人再看它。
+
+`--suggest` 吐出来的是**已经验过的**断言（在正确实现上为真、在这份坏实现上为假），
+可以直接粘进案例：
+
+```
+$ node bin/agent-web.mjs certify cases/coffee --adapter=memory --suggest
+// coffee/cancel-before-pickup（4 条，每条都已验证能杀死对应变异体）
+//   杀死 m-item-count-flattened  ← 差异在 orders.0.items.0.count
+   {"kind":"field_equals","path":"items.0.count","selector":{"collection":"orders","index":0},"value":2},
+//   杀死 m-total-single-unit  ← 差异在 orders.0.totalAmount
+   {"kind":"field_equals","path":"totalAmount","selector":{"collection":"orders","index":0},"value":56},
+```
+
+这四行就是上面那四个盲区的补法——不是我想出来的，是跑出来的。CI 里因此不放「必须全抓到」这种会逼人说谎的断言，而是放
 `scripts/certify-baseline.mjs`——**漏网的必须正好是这四个**：多一个算退步，少一个
 就要把基线表一起改掉，不然基线本身在撒谎。
 

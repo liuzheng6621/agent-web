@@ -1,7 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
-import { certify, certifyExit, probe, flatAssertions } from '../src/certify.mjs';
+import {
+  certify,
+  certifyExit,
+  probe,
+  flatAssertions,
+  diffLeaves,
+  suggestFromWitness,
+  verifySuggestion,
+  formatSuggestions,
+} from '../src/certify.mjs';
 import { MUTATIONS, mutate, mutationIds } from '../src/mutate.mjs';
 import { createMemoryAdapter } from '../src/adapter/memory.mjs';
 
@@ -132,4 +141,51 @@ test('变异体目录会拒收坏投稿', async () => {
     ['m-ok', { meta: ok, wrap() {} }],
   ]);
   assert.ok(dup.some((e) => e.includes('重复')), '重复 id 必须被拒');
+});
+
+test('差异摊平：把两棵视图的每个不同叶子都报出来', () => {
+  const a = { orders: [{ id: 1, totalAmount: 56, items: [{ count: 2 }] }] };
+  const b = { orders: [{ id: 1, totalAmount: 28, items: [{ count: 1 }] }] };
+  const d = diffLeaves(a, b);
+  const paths = d.map((x) => x.path).sort();
+  assert.deepEqual(paths, ['orders.0.items.0.count', 'orders.0.totalAmount']);
+  assert.equal(d.find((x) => x.path === 'orders.0.totalAmount').correct, 56);
+});
+
+test('差异翻断言：字段用 field_equals，长度用 count_delta，认不出的不猜', () => {
+  const ctx = { initial: { orders: [] }, final: { orders: [{}, {}] } };
+  const len = suggestFromWitness({ path: 'orders.length', correct: 2 }, ctx);
+  assert.deepEqual(len, { kind: 'count_delta', selector: { collection: 'orders' }, delta: 2 });
+
+  const field = suggestFromWitness({ path: 'orders.0.items.0.count', correct: 2 }, ctx);
+  assert.deepEqual(field, {
+    kind: 'field_equals',
+    selector: { collection: 'orders', index: 0 },
+    path: 'items.0.count',
+    value: 2,
+  });
+
+  assert.equal(suggestFromWitness({ path: 'some_unknown_thing', correct: 1 }, ctx), null);
+  assert.equal(suggestFromWitness({ path: 'orders.0', correct: {} }, ctx), null, '整个实体不同不该硬翻成一条字段断言');
+});
+
+test('建议断言必须当场验过才允许出现', async () => {
+  const report = await certify({ cases: all(), adapterFactory: () => createMemoryAdapter() });
+  const uncaught = report.mutations.filter((m) => !m.caught);
+  assert.ok(uncaught.length > 0);
+  for (const m of uncaught) {
+    assert.equal(m.status, 'killable', `${m.id} 没有可观测差异，应当是 undetermined 而不是静默算进欠账`);
+    assert.ok(m.suggestion, `${m.id} 是欠账却拿不出建议断言`);
+    assert.equal(m.suggestion.proof.onBase, 'true', `${m.id} 的建议断言在正确实现上不成立`);
+    assert.equal(m.suggestion.proof.onMutant, 'false', `${m.id} 的建议断言杀不掉它`);
+  }
+});
+
+test('--suggest 的产出能直接粘进案例：每条都带案例名与杀死的变异体', async () => {
+  const report = await certify({ cases: all(), adapterFactory: () => createMemoryAdapter() });
+  const text = formatSuggestions(report);
+  for (const m of report.mutations.filter((x) => !x.caught && x.suggestion)) {
+    assert.ok(text.includes(m.id), `建议里缺 ${m.id}`);
+  }
+  assert.ok(text.includes('field_equals') || text.includes('count_delta'));
 });

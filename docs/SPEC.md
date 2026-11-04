@@ -644,6 +644,32 @@ a(P⁺) = true   且   a(m) = false
 
 默认不对空转断言判红：空转是正常的中间状态，一刀切会让人把命令整个关掉。
 
+### 12.9 三档状态与建议断言
+
+漏网的变异体必须再分一档，否则「欠账」和「永远清不掉的账」会混在一起：
+
+| 状态 | 判定条件 | 含义 |
+| --- | --- | --- |
+| `caught` | 存在断言 `a`：`a(P⁺)=true` 且 `a(m)=false`，或判决签名不同 | 已抓住 |
+| `killable` | 任意一条案例上，`final`（或 `initial`）的摊平视图存在叶子差异 | **一定杀得掉**，只是还没写断言 |
+| `undetermined` | 所有案例上逐叶子比较均无差异 | 可能等价，也可能案例没走到 |
+
+`killable` 是构造性的：差异本身就是见证。给定差异路径 `p` 与正确值 `v`，
+`{kind:"field_equals", selector, path, value:v}` 必然杀死它。
+
+建议断言的生成规则（`suggestFromWitness`）只翻两种形态，翻不出来就返回 null，**不许猜**：
+
+- `orders.length`（数组长度差异）→ `count_delta`，`delta = 正确的终态长度 − 正确实现的初态长度`
+- `<col>.<i>.<path>`（集合内实体字段差异）→ `field_equals`，`selector={collection,col,index:i}`
+
+`<col> ∈ {orders, menu, status_log}`（规范视图的三个集合）。落在集合外的差异、
+把整个实体换掉的差异、`undefined` 取值，一律不翻。
+
+**每条建议断言必须当场验证**：在 `P⁺` 上求值为 `true`、在 `m` 上求值为 `false`，
+才允许出现在报告里（`verifySuggestion`）。没验过的建议等于没给。
+
+`certify --suggest` 按案例分组输出可直接粘进案例的片段。退出码规则不变（有漏网仍为 1）。
+
 ### 12.8 变异体目录的格式
 
 变异体不放代码里，放目录里：`docs/mutants/`。一个文件一个变异体，文件名即 id。

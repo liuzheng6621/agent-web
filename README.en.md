@@ -351,6 +351,37 @@ Boundaries worth knowing:
 - It does not prove the cases are right. Bodies only cover the bugs you thought of; the list of
   bodies is itself something to review, which is why it lives in the repository and not inside CI.
 
+### It does not just point at the hole, it tells you which assertion to add
+
+An escapee is not simply filed as debt. `certify` flattens the canonical view of the correct
+implementation and of each mutant, then diffs every leaf:
+
+| Status | Meaning | What to do |
+| --- | --- | --- |
+| `caught` | Some assertion or negative step kills it | nothing |
+| `killable` | **A visible difference exists, so it is killable — the assertion just is not written yet** | add it; `--suggest` prints it |
+| `undetermined` | No case produces any difference at all | check whether the case reaches that logic; it may be equivalent |
+
+Keeping `undetermined` apart from `killable` matters. Mutation testing has a forty-year-old open
+problem called the *equivalent mutant*: some broken versions are semantically identical to the
+original and can never be killed. Filing those as debt leaves an entry in the ledger that can never
+be cleared, and after a while nobody reads the ledger.
+
+`--suggest` emits assertions that have **already been verified** — true on the correct
+implementation, false on this mutant — ready to paste into a case:
+
+```
+$ node bin/agent-web.mjs certify cases/coffee --adapter=memory --suggest
+// coffee/cancel-before-pickup (4, each verified to kill its mutant)
+//   kills m-total-single-unit  <- difference at orders.0.totalAmount
+   {"kind":"field_equals","path":"totalAmount","selector":{"collection":"orders","index":0},"value":56},
+//   kills m-pickup-no-offset  <- difference at orders.0.pickupNo
+   {"kind":"field_equals","path":"pickupNo","selector":{"collection":"orders","index":0},"value":1101},
+```
+
+Those lines were not authored — they were produced by running the thing, and each one was checked
+against both implementations before it was allowed into the output.
+
 ### The list of bodies is open for contribution
 
 The six bodies live in `docs/mutants/`, one file each, carrying `symptom` (what the user complains

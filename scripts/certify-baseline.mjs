@@ -43,10 +43,37 @@ const known = [...KNOWN_SURVIVORS].sort();
 const grew = survivors.filter((id) => !known.includes(id));
 const shrunk = known.filter((id) => !survivors.includes(id));
 
+// 光"名字对得上"不够：每个欠账都必须被证明杀得掉。
+// 如果某个变异体在任何案例上都造不出差异，它可能等价于原程序 —— 那不是欠账，
+// 那是目录写错了。这种情况直接把基线判失败，让人回去看，而不是挂着一条永远清不掉的账。
+const undetermined = report.mutations.filter((m) => !m.caught && m.status !== 'killable');
+const noSuggestion = report.mutations.filter((m) => !m.caught && m.status === 'killable' && !m.suggestion);
+
+if (undetermined.length > 0) {
+  console.error(`准入基线：${undetermined.length} 个漏网变异体连"可观测差异"都造不出来`);
+  for (const m of undetermined) {
+    console.error(`  ${m.id}${m.equivalence ? '（投稿人声称等价：' + m.equivalence + '）' : ''}`);
+  }
+  console.error('  它们可能真的等价于原程序（那就不该留在目录里），也可能只是案例根本没走到那段逻辑。');
+  console.error('  两种都不是"补一条断言"能解决的：先把案例走到，或者删掉这个变异体。');
+  process.exit(1);
+}
+
+if (noSuggestion.length > 0) {
+  console.error(`准入基线：${noSuggestion.length} 个欠账拿不出建议断言 —— 差异找得到，但没有模板能表达它`);
+  for (const m of noSuggestion) console.error(`  ${m.id}  第一处差异在 ${m.witness?.path}`);
+  console.error('  给 suggestFromWitness 补一个模板，或者手工写这条断言。');
+  process.exit(1);
+}
+
 if (grew.length === 0 && shrunk.length === 0) {
   console.log(`准入基线：漏网 ${survivors.length} 个，与基线一致`);
-  console.log(`  已知盲区：${known.join(' ')}`);
-  console.log(`  抓到 ${report.mutations.length - survivors.length} / ${report.mutations.length}`);
+  console.log(`  已知欠账：${known.join(' ')}`);
+  console.log(`  抓到 ${report.mutations.length - survivors.length} / ${report.mutations.length}，${report.summary.suggestions} 条建议断言可补`);
+  for (const m of report.mutations) {
+    if (m.caught || !m.suggestion) continue;
+    console.log(`    ${m.id} → ${m.suggestion.caseId}：${JSON.stringify(m.suggestion.assertion)}`);
+  }
   process.exit(0);
 }
 

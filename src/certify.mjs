@@ -15,6 +15,7 @@
 import { judge } from './runner.mjs';
 import { evalAssertions } from './assert/index.mjs';
 import { MUTATIONS, mutate } from './mutate.mjs';
+import { stableStringify } from './values.mjs';
 
 const TRUE_STATUS = 'pass';
 
@@ -69,7 +70,7 @@ export async function probe(caseObj, adapterImpl, { adapterName = 'unknown', tim
   };
 
   const results = flatAssertions(caseObj).map(({ assertion }) => evalAssertions([assertion], ctx).results[0]);
-  return { verdict, results, traceOk, observations: obs.length };
+  return { verdict, results, traceOk, observations: obs.length, ctx };
 }
 
 /** 一个案例上，所有变异体的杀伤矩阵。 */
@@ -86,6 +87,18 @@ export async function certifyCase(caseObj, adapterFactory, { adapterName = 'unkn
       if (r.status === 'unknown') return 'blind';
       return 'survived';
     });
+    // 这个变异体在这条案例上留下了什么可观测差异？没有差异说明这条案例看不见它，
+    // 有差异说明它一定杀得掉——只差一条还没写出来的断言。
+    const witnesses = diffLeaves(base.ctx?.final, p.ctx?.final, '', [], 12)
+      .concat(diffLeaves(base.ctx?.initial, p.ctx?.initial, 'initial.', [], 6));
+    const suggestions = [];
+    for (const w of witnesses) {
+      if (w.path.startsWith('initial.')) continue;
+      const assertion = suggestFromWitness(w, base.ctx);
+      if (!assertion) continue;
+      const proof = verifySuggestion(assertion, base.ctx, p.ctx);
+      if (proof.kills) suggestions.push({ assertion, proof, path: w.path });
+    }
     rows.push({
       mutation: m.id,
       title: m.title,
@@ -96,9 +109,65 @@ export async function certifyCase(caseObj, adapterFactory, { adapterName = 'unkn
       baseSignature: sig(base.verdict),
       mutantSignature: sig(p.verdict),
       caseCaught: sig(base.verdict) !== sig(p.verdict),
+      witness: witnesses[0] ?? null,
+      witnessCount: witnesses.length,
+      suggestions: suggestions.slice(0, 3),
     });
   }
   return { caseId: caseObj.id, base, armed, rows };
+}
+
+/** 把两份规范视图摊平，找出所有取值不同的叶子路径。 */
+export function diffLeaves(a, b, prefix = '', out = [], budget = 200) {
+  if (out.length >= budget) return out;
+  const isObj = (v) => v !== null && typeof v === 'object';
+  if (!isObj(a) || !isObj(b)) {
+    if (stableStringify(a) !== stableStringify(b)) out.push({ path: prefix, correct: a, mutant: b });
+    return out;
+  }
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+  for (const k of keys) {
+    diffLeaves(a?.[k], b?.[k], prefix === '' ? String(k) : prefix + '.' + k, out, budget);
+    if (out.length >= budget) break;
+  }
+  return out;
+}
+
+const VIEW_COLLECTIONS = ['orders', 'menu', 'status_log'];
+
+/**
+ * 把一处可观测差异翻成一条断言。返回 null 表示没有现成模板能表达它。
+ * 只翻"正确实现上一定为真、坏实现上一定为假"的那种——翻不出来就不猜。
+ */
+export function suggestFromWitness(witness, baseCtx) {
+  const parts = String(witness.path).split('.');
+  const collection = parts[0];
+  if (!VIEW_COLLECTIONS.includes(collection)) return null;
+
+  // orders.length 这种：用 count_delta 表达增量
+  if (parts[1] === 'length') {
+    const initLen = Array.isArray(baseCtx?.initial?.[collection]) ? baseCtx.initial[collection].length : null;
+    if (initLen === null) return null;
+    return { kind: 'count_delta', selector: { collection }, delta: witness.correct - initLen };
+  }
+
+  const index = Number(parts[1]);
+  if (!Number.isInteger(index) || index < 0) return null;
+  const path = parts.slice(2).join('.');
+  if (path === '') return null;
+
+  const selector = { collection, index };
+  const value = witness.correct;
+  if (value === undefined) return null;
+  return { kind: 'field_equals', selector, path, value };
+}
+
+/** 拿一条候选断言到两个实现上各跑一遍，确认它真的是杀手。 */
+export function verifySuggestion(assertion, baseCtx, mutantCtx) {
+  const check = (ctx) => evalAssertions([assertion], ctx).results[0]?.status;
+  const onBase = check(baseCtx);
+  const onMutant = check(mutantCtx);
+  return { onBase, onMutant, kills: onBase === 'true' && onMutant === 'false' };
 }
 
 export function certificate(report) {
@@ -166,15 +235,50 @@ export async function certify({ cases, adapterFactory, adapterName = 'unknown', 
       });
       if (row.caseCaught) verdictKills += 1;
     }
-    return { id: m.id, title: m.title, layer: m.layer, symptom: m.symptom, caught: killedBy.length > 0 || verdictKills > 0, killedBy, blindBy, survivedIn, verdictKills };
+    const caught = killedBy.length > 0 || verdictKills > 0;
+
+    // 三档状态：抓住 / 欠账（可杀，缺断言）/ 说不清（一条案例上都看不出差异）。
+    // 「说不清」不等于「等价」——也可能只是案例根本没走到那段逻辑。要升成
+    // equivalent，得由投稿人给出可区分性证明（meta.equivalence_evidence）。
+    const witnesses = [];
+    const suggestions = [];
+    for (const cr of per) {
+      const row = cr.rows.find((r) => r.mutation === m.id);
+      if (!row) continue;
+      if (row.witness) witnesses.push({ caseId: cr.caseId, ...row.witness });
+      for (const sg of row.suggestions) suggestions.push({ caseId: cr.caseId, path: sg.path, assertion: sg.assertion, proof: sg.proof });
+    }
+    const status = caught ? 'caught' : suggestions.length > 0 ? 'killable' : witnesses.length > 0 ? 'killable' : 'undetermined';
+    return {
+      id: m.id,
+      title: m.title,
+      layer: m.layer,
+      symptom: m.symptom,
+      caught,
+      status,
+      killedBy,
+      blindBy,
+      survivedIn,
+      verdictKills,
+      witnessCount: witnesses.length,
+      witness: witnesses[0] ?? null,
+      suggestion: suggestions[0] ?? null,
+      suggestionCount: suggestions.length,
+      equivalence: m.equivalence_evidence ?? null,
+    };
   });
 
   const caught = mutationsSummary.filter((m) => m.caught).length;
+  const killable = mutationsSummary.filter((m) => m.status === 'killable').length;
+  const undetermined = mutationsSummary.filter((m) => m.status === 'undetermined').length;
   const summary = {
     cases: per.length,
     mutations: mutations.length,
     caught,
     survived: mutations.length - caught,
+    killable,
+    undetermined,
+    suggestions: mutationsSummary.reduce((n, m) => n + (m.caught ? 0 : m.suggestionCount), 0),
     caughtRate: mutations.length === 0 ? null : caught / mutations.length,
   };
   const base = { version: 'agent-web/certify-1', adapter: adapterName, cases: per.map((p) => ({ caseId: p.caseId, verdict: p.base.verdict.status, traceOk: p.base.traceOk })), assertions, mutations: mutationsSummary, summary };
@@ -203,6 +307,27 @@ export function certifyExit(report, { strict = false } = {}) {
   return 0;
 }
 
+/** 把所有建议断言吐成可直接粘进案例的 JSON（按案例分组）。 */
+export function formatSuggestions(report) {
+  const byCase = new Map();
+  for (const m of report.mutations) {
+    if (m.caught || !m.suggestion) continue;
+    const key = m.suggestion.caseId;
+    if (!byCase.has(key)) byCase.set(key, []);
+    byCase.get(key).push({ mutant: m.id, path: m.suggestion.path, assertion: m.suggestion.assertion });
+  }
+  const out = [];
+  for (const [caseId, rows] of byCase) {
+    out.push(`// ${caseId}（${rows.length} 条，每条都已验证能杀死对应变异体）`);
+    for (const r of rows) {
+      out.push(`//   杀死 ${r.mutant}  ← 差异在 ${r.path}`);
+      out.push('   ' + stableStringify(r.assertion) + ',');
+    }
+    out.push('');
+  }
+  return out.join(String.fromCharCode(10)).replace(/,\s*$/, '');
+}
+
 export function formatCertify(report, { detail = false } = {}) {
   const L = [];
   const s = report.summary;
@@ -212,9 +337,12 @@ export function formatCertify(report, { detail = false } = {}) {
   L.push('变异体（实现能坏的方式）');
   const w = Math.max(...report.mutations.map((m) => m.id.length), 10);
   for (const m of report.mutations) {
-    const mark = m.caught ? '抓到' : '漏网';
+    const mark = m.caught ? '抓到' : m.status === 'killable' ? '欠账' : '说不清';
     const by = m.killedBy.map((k) => `${k.caseId}#${k.assertion.split('#')[1]}`).slice(0, 3).join(' ');
-    const tail = m.caught ? by || `判决级 ×${m.verdictKills}` : '没有任何断言或负例步意识到它';
+    let tail;
+    if (m.caught) tail = by || `判决级 ×${m.verdictKills}`;
+    else if (m.status === 'killable') tail = `可杀，缺断言（${m.witnessCount} 处可观测差异）`;
+    else tail = m.equivalence ? `说不清（投稿人声称等价：${m.equivalence}）` : '一条案例上都看不出差异——可能等价，也可能案例没走到';
     L.push(`  [${mark}] ${m.id.padEnd(w)}  ${String(m.layer).padEnd(7)}  ${tail}`);
   }
   L.push('');
@@ -239,6 +367,22 @@ export function formatCertify(report, { detail = false } = {}) {
   const rate = s.caughtRate === null ? '—（分母为 0）' : `${(s.caughtRate * 100).toFixed(1)}%`;
   L.push(`变异体抓获率 ${s.caught}/${s.mutations} = ${rate}`);
   if (s.survived > 0) L.push(`漏网 ${s.survived} 个：${report.mutations.filter((m) => !m.caught).map((m) => m.id).join(' ')}`);
+  if (s.killable > 0) L.push(`  其中 ${s.killable} 个已被证明杀得掉，只差断言没写`);
+  if (s.undetermined > 0) L.push(`  其中 ${s.undetermined} 个连差异都造不出来——先别急着补断言，先确认案例走没走到`);
+
+  const withSuggestion = report.mutations.filter((m) => !m.caught && m.suggestion);
+  if (withSuggestion.length > 0) {
+    L.push('');
+    L.push('建议断言（已在这两个实现上验过：正确实现为真、坏实现为假）');
+    for (const m of withSuggestion) {
+      L.push(`  ${m.id}`);
+      L.push(`    案例 ${m.suggestion.caseId}  差异在 ${m.suggestion.path}`);
+      L.push(`    ${stableStringify(m.suggestion.assertion)}`);
+    }
+    if (s.suggestions > withSuggestion.length) {
+      L.push(`  （还有 ${s.suggestions - withSuggestion.length} 条备选，用 --suggest 看全部）`);
+    }
+  }
 
   if (detail) {
     L.push('');

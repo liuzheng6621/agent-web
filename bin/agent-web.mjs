@@ -35,7 +35,7 @@ import { loadAdapter, listBuiltins } from '../src/adapter/load.mjs';
 import { diffViews } from '../src/view.mjs';
 import { auditRuns, formatAudit } from '../src/audit.mjs';
 import { summarizeTraps, formatTraps, trapVerdict } from '../src/traps.mjs';
-import { certify, formatCertify, certifyExit } from '../src/certify.mjs';
+import { certify, formatCertify, formatSuggestions, certifyExit } from '../src/certify.mjs';
 import { MUTATIONS, describeMutations } from '../src/mutate.mjs';
 import { buildDrills, gradeDrills, writeDrills, readDrills, readSubmissions, formatGrade, gradeExit } from '../src/drill.mjs';
 import { collectUsage, summarizeCoverage, formatCoverage, coverageVerdict } from '../src/coverage.mjs';
@@ -335,9 +335,10 @@ function cmdMutants(args, flags) {
 
 async function cmdCertify(args, flags) {
   if (args.length < 1) {
-    console.error('用法：agent-web certify <案例目录> [--adapter=memory] [--mutations=id,id] [--timeout=5000] [--strict] [--detail] [--json]');
+    console.error('用法：agent-web certify <案例目录> [--adapter=memory] [--mutations=id,id] [--timeout=5000] [--strict] [--detail] [--suggest] [--json]');
     console.error('  它把正确实现复制成若干个"只坏一处"的变异体，逐条断言问：你能把它抓出来吗？');
     console.error('  抓不住任何变异体的断言，就是该被拒收的断言。');
+  console.error('  --suggest 会把「已经被证明杀得掉、只是还没写出来」的断言直接吐出来。');
     console.error(`  内置变异体：${describeMutations().map((m) => m.id).join(', ')}`);
     return 2;
   }
@@ -363,6 +364,7 @@ async function cmdCertify(args, flags) {
     mutations: used,
   });
   if (flags.json) console.log(JSON.stringify(report, null, 2));
+  else if (flags.suggest === true) console.log(formatSuggestions(report));
   else console.log(formatCertify(report, { detail: flags.detail === true }));
   return certifyExit(report, { strict: flags.strict === true });
 }
