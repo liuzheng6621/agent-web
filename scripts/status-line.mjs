@@ -6,6 +6,7 @@
 // 落后的文档会让读者低估整个项目——这个代价比多跑一个脚本高得多。
 import fs from 'node:fs';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { KINDS } from '../src/assert/index.mjs';
 import { mutants } from '../docs/mutants/index.mjs';
@@ -33,6 +34,36 @@ const changelog = read('CHANGELOG.md');
 const first = changelog.match(/^## ([\d.]+)$/m);
 if (!first || first[1] !== version) {
   problems.push({ file: 'CHANGELOG.md', want: `## ${version}（当前第一条是 ${first ? first[1] : '找不到'}）` });
+}
+
+// 第一行 H1 里也带版本号。理由：状态行在文件中部、还包在 <p align="center"> 里，
+// 只摘标题、只读前几行、或者把页面当纯文本抓的读者会直接漏掉它——
+// "这个项目处于 0.1 阶段"就是这样读出来的。
+const h1 = `# agent-web v${version}`;
+for (const file of ['README.md', 'README.en.md']) {
+  if (!read(file).startsWith(h1)) problems.push({ file, want: `${h1}（必须是文件第一行）` });
+}
+
+// VERSION：不读 package.json 的场合（打包、镜像、外部脚本、发给别人的源码快照）也能拿到版本号。
+if (!fs.existsSync(path.join(ROOT, 'VERSION')) || read('VERSION').trim() !== version) {
+  problems.push({ file: 'VERSION', want: version });
+}
+
+// tag 与 package.json 对齐。页面上除 README 外的版本信号只有 tag 和 Release，
+// 漂了就会出现"仓库里 0.28、标签还停在 0.18"这种自相矛盾。
+// 浅克隆、导出的源码包里可能没有 refs/tags——查不到就跳过，不能因为本地没有版本信息就判红。
+// PR 也跳过：fork 会带着自己分叉那一刻的旧 tag，那不是本仓库的错。
+const inPullRequest = process.env.GITHUB_EVENT_NAME === 'pull_request';
+const tags = inPullRequest ? null : (() => {
+  try {
+    return execFileSync('git', ['tag', '--list'], { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })
+      .split('\n').map((t) => t.trim()).filter(Boolean);
+  } catch {
+    return null;
+  }
+})();
+if (tags && tags.length > 0 && !tags.includes(`v${version}`)) {
+  problems.push({ file: '.git', want: `tag v${version}（当前 tag：${tags.join(' ')}）` });
 }
 
 if (problems.length === 0) {

@@ -1,3 +1,5 @@
+# agent-web v0.28.1
+
 <p align="center">
   <img src="docs/media/hero.png" alt="agent-web: integration tests an agent can be judged on" width="100%">
 </p>
@@ -72,6 +74,23 @@ The third one carries the weight. When observation is missing, or a capability i
 ```
 
 More `unknown` means a lower decidability rate. That number says more than a clean 100%.
+
+## Drift is not a witness
+
+<img src="docs/media/drift.png" alt="run twice, differences that always change are drift" width="100%">
+
+Running the same case twice changes auto-incremented ids, timestamps and pickup numbers.
+Those differences used to be counted as "the mutant was seen": on the real backend the witness
+for `m-duplicate-row` was the order id growing from 196 to 210, and the tool would even suggest
+writing `orders.0.id == 196` — an assertion that goes red on any other implementation.
+
+Now every case is run twice against the correct implementation first; the drift set is subtracted
+from the witnesses before anything is reported.
+
+The same release made state-layer mutants cheap: they only wrap `observe()`, so certify no longer
+replays the whole trajectory — it transforms the correct run's context. On the real backend,
+3 cases went from 44.5s to 15.1s (2.95x). Equivalence with full replay is proven cell by cell by
+`scripts/state-equivalence.mjs`, which runs in CI.
 
 ## Incident archive
 
