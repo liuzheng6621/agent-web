@@ -647,8 +647,45 @@ Addresses are tried in order (DNS results plus a small fallback list); GitHub's 
 
 ## Version and next steps
 
-Current version: `0.9`. It runs cases, checks an assistant's actions, turns a request log into replayable steps and a draft case, polices the verdict itself (one copy of the cases, no verdict from an unreviewed draft, a false-green audit that turns a suspiciously all-green verdict red), and measures how much of the system the case set actually touches.
+Current version: `0.16` (the number in `package.json` is authoritative and the docs track it).
+`verify`/`selftest` runs cases and emits three-valued verdicts; `compare` runs one case set
+against several implementations; `audit` uses one implementation as a ruler for another and
+reports false greens; `traps` asks whether a verdict was produced inside a blind spot;
+`coverage` measures how much of the system the case set touches; `certify` asks whether an
+assertion can kill a mutant and hands back the fix for every survivor; `mutants` lists the
+mutant catalogue; `drill` turns mutants into machine-graded questions; `record`/`prepare`/`draft`
+recover replayable steps from a request log; `accept` promotes a draft under a signature.
 
-Next: make it easier for different systems to share the same cases, run tests against multiple systems at once, and turn abilities that are only inferred into abilities that have been verified in practice.
+## What it cannot do
+
+This section matters more than the table above.
+
+1. **Every target system needs its own adapter.** There is no "point it at a URL". An adapter
+   is code, and loading one executes it with your privileges (SPEC 6.4).
+2. **Field-name differences are mapped by hand.** The canonical view is that mapping layer.
+   Keeping it in the adapter is deliberate: one place to map, so cases stay portable. Automatic
+   mapping inference has no trustworthy method today.
+3. **It judges whether the process was legal, not whether it was good.** There is
+   `status_transition` (path), `traps` (reports the blind-spot rate of terminal-only
+   assertions), and `relation` (terminal relations) — but no "was the number of steps
+   economical", no "did it take a detour", no cost. Judging quality needs a scoring model,
+   and that door stays shut.
+4. **Serial execution.** No concurrency, not even in `compare`.
+5. **Negative cases are written by hand.** `draft` lists them as todo and says why: the
+   criterion for a negative case is "what should be allowed", not "what was actually used",
+   and copying the latter is how you let everything through.
+6. **Twelve mutants, all of them ones we thought of.** That is the fundamental limit of
+   mutation testing: it cannot find the mistake you did not imagine. The catalogue is open
+   source precisely so other people can add their own blind spots.
+7. **The equivalent-mutant problem is not solved**, only turned into a state (`undetermined`)
+   that demands evidence when you claim equivalence. `m-pickup-no-offset` is the live example:
+   the observation shows it, but "offset by 100" is each implementation's own convention.
+8. **Adapters can lie.** A trimmed `observe` view or an `execute` that only pretends will not
+   be caught here — the guarantee is "given this observation, this is how the verdict followed".
+9. **Validated in one domain only** (a coffee shop: menu, orders, state machine, two roles).
+
+Next: make it easier for different systems to share cases, turn the reference-versus-real-backend
+comparison into a subscribable regression, promote inferred capabilities to verified ones, and
+grow the mutant catalogue with other people's contributions.
 
 MIT license. See [LICENSE](LICENSE).
