@@ -268,6 +268,30 @@ node bin/agent-web.mjs certify cases/coffee --adapter=memory --mutants-dir=.tmp-
 出题有三道前置，缺一不出：正确实现上本来就不红的（见证型案例）、已经能抓住的、
 观测里看不见这个改动的——都不出题，而且分别记数，不是悄悄跳过。
 
+## 判决长什么样：一个能打开的页面
+
+命令行的判决是三行字。要看「每一步谁在执行、每条断言为什么是这个结果」，有一个双击就能打开的 HTML：
+
+```bash
+node bin/agent-web.mjs flow cases/coffee/happy-path.json --result=results.jsonl --out=flow.html
+```
+
+<p align="center">
+  <img src="docs/media/flow.png" alt="flow 页面：判决、摘要、每一步的身份与结果" width="100%">
+</p>
+
+页面里每一步标着谁在执行（customer / staff）、结果是 applied 还是 rejected；
+挂上判决结果后，每条断言的三值状态直接写在卡片上。步骤可以点开看参数，
+「只看偏差」一键筛出所有与预期不符的步骤。
+
+<p align="center">
+  <img src="docs/media/flow.gif" alt="点开被拒的一步、再筛出偏差" width="100%">
+</p>
+
+上面这张动图是一条真实失败案例：跳过出餐直接取餐，第 3 步被后端拒绝
+（期望 applied，实际 rejected），点开就是拒绝原因。HTML 自包含全部数据与样式，
+file:// 直接打开，不需要服务器。
+
 ## 事故档案
 
 <p align="center">
@@ -329,7 +353,8 @@ node bin/agent-web.mjs recall        # 扫一遍，看这次有没有重犯
 | `drill <目录> --out=DIR` | 出题：拿变异体当靶子 |
 | `drill grade` | 批改：不看提交说什么，只看它杀了几个靶子 |
 | `knowledge` / `recall` | 事故档案：记过的坑，第二次遇到拦下来 |
-| `selftest` / `capabilities` / `flow` | 自测、能力清单、交互式流程图 |
+| `flow <案例> [--result=]` | 生成可双击打开的交互式判决页面（上一节那两张图就是它） |
+| `selftest` / `capabilities` | 自测、能力清单 |
 
 ## 几个设计选择
 

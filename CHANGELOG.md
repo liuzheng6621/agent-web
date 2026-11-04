@@ -6,6 +6,14 @@
 CI 也在查。这条规则是买来的：这个仓库曾经同时存在 `package.json` 0.16、README 0.9、
 Gitee Release v0.6.0 三个数，谁看都是三个项目。
 
+## 0.24.1
+
+- README 补「判决长什么样：一个能打开的页面」：`flow` 的交互页面之前只在命令表里一行，
+  现在有真实截图（playwright + Edge 对着生成的 HTML 截的，不是画的）和一张动图
+  （点开被拒步看原因、一键筛偏差）
+- 媒体登记进 tools/media/README.md：真实截图的取法（本地 http-server 绕过 file 协议限制）
+
+
 ## 0.24.0
 
 - `discover` 的产物自带施工单：生成 `NEXT.md`（四处 TODO + 每步验收命令 + 常见坑清单），
