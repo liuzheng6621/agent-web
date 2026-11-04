@@ -6,5 +6,6 @@
   "coffee/foreign-pickup": "fail",
   "coffee/goal-not-reached": "fail",
   "coffee/unknown-capability": "unknown",
-  "coffee/two-items": "pass"
+  "coffee/two-items": "pass",
+  "coffee/shape": "pass"
 }

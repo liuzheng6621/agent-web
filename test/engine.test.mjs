@@ -948,7 +948,12 @@ test('--out 的父目录不存在时自己建出来（干净克隆上 CI 就死�
   assert.equal(r.status, 0, r.stderr);
   assert.equal(fs.existsSync(target), true, '父目录不存在时 verify 必须自己建出来');
   const lines = fs.readFileSync(target, 'utf8').trim().split('\n');
-  assert.equal(lines.length, 8);
+  // 条数从 expected.json 推，不写死 —— 写死的话每加一条案例就要来改这里，
+  // 而这个测试要守的是「父目录被建出来了」，不是案例数量。
+  const expectedCount = Object.keys(
+    JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'cases', 'coffee', 'expected.json'), 'utf8')),
+  ).length;
+  assert.equal(lines.length, expectedCount);
   fs.rmSync(root, { recursive: true, force: true });
 });
 

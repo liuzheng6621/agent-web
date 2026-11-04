@@ -1,6 +1,6 @@
 {
   "name": "agent-web",
-  "version": "0.20.0",
+  "version": "0.21.0",
   "description": "给 Agent 写机器可判的集成测试：一份案例，多个实现，判决必须一致。",
   "type": "module",
   "bin": {
@@ -27,10 +27,11 @@
     "./knowledge": "./knowledge/index.mjs",
     "./recall": "./src/recall.mjs",
     "./discover": "./src/discover.mjs",
-    "./breed": "./src/breed.mjs"
+    "./breed": "./src/breed.mjs",
+    "./assert/shape": "./src/assert/shape.mjs"
   },
   "scripts": {
-    "test": "node --test test/engine.test.mjs test/traps.test.mjs test/museum.test.mjs test/certify.test.mjs test/drill.test.mjs test/relation.test.mjs test/probe.test.mjs test/recall.test.mjs test/discover.test.mjs test/breed.test.mjs",
+    "test": "node --test test/engine.test.mjs test/traps.test.mjs test/museum.test.mjs test/certify.test.mjs test/drill.test.mjs test/relation.test.mjs test/probe.test.mjs test/recall.test.mjs test/discover.test.mjs test/breed.test.mjs test/shape.test.mjs",
     "selftest": "node bin/agent-web.mjs selftest",
     "compare": "node bin/agent-web.mjs compare cases/coffee --adapters=memory,taixianglian",
     "gh-proxy": "node scripts/gh-proxy.mjs",
@@ -44,7 +45,8 @@
     "knowledge": "node bin/agent-web.mjs knowledge",
     "recall": "node bin/agent-web.mjs recall",
     "discover": "node bin/agent-web.mjs discover",
-    "breed": "node bin/agent-web.mjs breed --adapter=memory --from-case=cases/coffee/happy-path.json --out=.tmp-bred"
+    "breed": "node bin/agent-web.mjs breed --adapter=memory --from-case=cases/coffee/happy-path.json --out=.tmp-bred",
+    "kind-necessity": "node scripts/kind-necessity.mjs"
   },
   "keywords": [
     "agent",

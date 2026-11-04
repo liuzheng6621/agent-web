@@ -5,6 +5,8 @@ export { TRUE, FALSE, UNKNOWN, isValue, fromBool, and, or, not } from './three-v
 export { NORMALIZATION_VERSION, deepEqual, stableStringify, fingerprint, getPath, setPath } from './values.mjs';
 export { PRED_OPS, validateSelector, selectEntities, describeSelector } from './select.mjs';
 export { KINDS, PHASES, PHASE_MATRIX, phaseOf, validateAssertion, evalAssertions, firstFailure } from './assert/index.mjs';
+// 形状断言：集合的结构（唯一性 / 类型 / 值域 / 顺序），不是某一行某个字段的值
+export { SHAPE_KINDS, SHAPE_TYPES, evalShape } from './assert/shape.mjs';
 export { relation, RELATION_OPS } from './assert/relation.mjs';
 export { discoverRelations } from './relations.mjs';
 export { SCHEMA_VERSION, STEP_OUTCOMES, DRAFT_STATES, BindingError, validateCase, validateSteps, resolveArguments, deriveLabels, draftBlocker, acceptCase } from './case.mjs';

@@ -1,0 +1,19 @@
+{
+  "schema_version": "agent-web/0.1",
+  "id": "shape-order/memory-only",
+  "title": "列表顺序（只在 mock 上成立，故意不进共享案例集）",
+  "draft": { "status": "confirmed", "reviewed_by": "YG" },
+  "environment": { "adapter": "memory" },
+  "task": {
+    "natural_goal": "下两单，检查订单列表是按创建时间升序的",
+    "goal_assertions": [
+      { "kind": "count_delta", "selector": { "collection": "orders" }, "delta": 2 },
+      { "kind": "sorted_by", "selector": { "collection": "orders" }, "path": "createTime", "order": "asc" }
+    ]
+  },
+  "reference_trajectory": [
+    { "id": "s1", "capability": "order.create", "as": "customer", "arguments": { "items": [{ "dishName": "拿铁", "count": 2 }] }, "expected_outcome": "applied" },
+    { "id": "s2", "capability": "order.create", "as": "customer", "arguments": { "items": [{ "dishName": "美式咖啡", "count": 3 }] }, "expected_outcome": "applied" }
+  ],
+  "invariants": []
+}

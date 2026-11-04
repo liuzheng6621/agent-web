@@ -16,6 +16,10 @@ import * as totalSingleUnit from './m-total-single-unit.mjs';
 import * as subtotalStale from './m-subtotal-stale.mjs';
 import * as cancelNoop from './m-cancel-noop.mjs';
 import * as doubleCreate from './m-double-create.mjs';
+import * as duplicateRow from './m-duplicate-row.mjs';
+import * as stringlyTotal from './m-stringly-total.mjs';
+import * as statusOffEnum from './m-status-off-enum.mjs';
+import * as unsortedOrders from './m-unsorted-orders.mjs';
 
 const ENTRIES = [
   ['m-money-off-by-cent', moneyOffByCent],
@@ -30,6 +34,10 @@ const ENTRIES = [
   ['m-subtotal-stale', subtotalStale],
   ['m-cancel-noop', cancelNoop],
   ['m-double-create', doubleCreate],
+  ['m-duplicate-row', duplicateRow],
+  ['m-stringly-total', stringlyTotal],
+  ['m-status-off-enum', statusOffEnum],
+  ['m-unsorted-orders', unsortedOrders],
 ];
 
 const LAYERS = new Set(['state', 'execute']);

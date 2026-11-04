@@ -15,6 +15,7 @@ import { TRUE, FALSE, UNKNOWN, and, assertValue } from '../three-valued.mjs';
 import { validateSelector } from '../select.mjs';
 import * as K from './kinds.mjs';
 import { relation, RELATION_OPS } from './relation.mjs';
+import { evalShape, SHAPE_KINDS, SHAPE_TYPES } from './shape.mjs';
 
 export const KINDS = Object.freeze([
   'entity_exists',
@@ -25,6 +26,7 @@ export const KINDS = Object.freeze([
   'event_absent',
   'composite',
   'relation',
+  ...SHAPE_KINDS,
 ]);
 
 export const PHASES = Object.freeze(['final', 'trace', 'initial_vs_final']);
@@ -42,9 +44,18 @@ export const PHASE_MATRIX = Object.freeze({
   // 关系式只判终态。中途的关系往往合法地不成立（新建订单还没算总额那一瞬间），
   // 按 trace 求值会把正常实现判红 —— 这是它和 status_transition 的关键差别。
   relation: { default: 'final', allowed: ['final'] },
+  // 形状断言只看终态的那一批行。中途的行集合本来就是流动的，
+  // 按 trace 求值会把正常实现判红。
+  sorted_by: { default: 'final', allowed: ['final'] },
+  unique: { default: 'final', allowed: ['final'] },
+  type_of: { default: 'final', allowed: ['final'] },
+  subset: { default: 'final', allowed: ['final'] },
 });
 
-const SELECTOR_KINDS = new Set(['entity_exists', 'field_equals', 'count_delta', 'status_transition', 'relation']);
+const SELECTOR_KINDS = new Set([
+  'entity_exists', 'field_equals', 'count_delta', 'status_transition', 'relation',
+  ...SHAPE_KINDS,
+]);
 
 export function phaseOf(a) {
   if (a.phase !== undefined) return a.phase;
@@ -128,6 +139,27 @@ export function validateAssertion(a, at = 'assertion') {
     }
   }
 
+  if (a.kind === 'sorted_by') {
+    if (typeof a.path !== 'string' || a.path === '') errors.push(`${at}.path 必填`);
+    if (a.order !== undefined && !['asc', 'desc'].includes(a.order)) {
+      errors.push(`${at}.order 必须是 asc/desc`);
+    }
+  }
+
+  if (a.kind === 'unique') {
+    if (typeof a.path !== 'string' || a.path === '') errors.push(`${at}.path 必填`);
+  }
+
+  if (a.kind === 'type_of') {
+    if (typeof a.path !== 'string' || a.path === '') errors.push(`${at}.path 必填`);
+    if (!SHAPE_TYPES.includes(a.type)) errors.push(`${at}.type 不在 ${SHAPE_TYPES.join('/')}`);
+  }
+
+  if (a.kind === 'subset') {
+    if (typeof a.path !== 'string' || a.path === '') errors.push(`${at}.path 必填`);
+    if (!Array.isArray(a.values) || a.values.length === 0) errors.push(`${at}.values 必须是非空数组`);
+  }
+
   if (a.kind === 'composite') {
     if (!['and', 'or', 'not'].includes(a.op)) errors.push(`${at}.op 必须是 and/or/not`);
     if (!Array.isArray(a.args) || a.args.length === 0) {
@@ -168,6 +200,11 @@ export function evalAssertion(a, ctx, depth = 0) {
       return K.composite(a, ctx, (sub, c) => evalAssertion(sub, c, depth + 1));
     case 'relation':
       return relation(a, ctx);
+    case 'sorted_by':
+    case 'unique':
+    case 'type_of':
+    case 'subset':
+      return evalShape(a, ctx);
     default:
       return { status: UNKNOWN, code: 'invalid_case', message: `未知断言 ${a.kind}` };
   }

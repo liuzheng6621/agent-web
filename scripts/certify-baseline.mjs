@@ -19,6 +19,10 @@ const KNOWN_SURVIVORS = [
   // 内置实现的 100+id 与真实后端的 100+id 恰好相同，写死具体值就把案例绑到某个实现上了。
   // 要抓它得写 pickupNo 与 id 的关系式，而「偏移 100」不是能跨实现断言的东西。
   'm-pickup-no-offset',
+  // 列表顺序同样的道理：mock 按创建时间升序，真实后端是新的在前，两边都没把它写进契约。
+  // 在共享案例里断言升序，换任何实现都可能红，而红的理由跟对错无关。
+  // sorted_by 保留在 examples/shape-order/（只对 mock 跑）当用法示范。
+  'm-unsorted-orders',
 ];
 
 let report;

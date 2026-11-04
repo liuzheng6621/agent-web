@@ -94,7 +94,7 @@ memory                                   内置名
 }
 ```
 
-### 4.1 八种 kind
+### 4.1 十二种 kind
 
 | kind | 必填参数 | 相位 |
 | --- | --- | --- |
@@ -105,11 +105,15 @@ memory                                   内置名
 | `status_transition` | `selector`, `path`, `transitions`(二元组数组) | trace |
 | `event_absent` | `type` 或 `selector` | trace |
 | `composite` | `op`(`and`/`or`/`not`), `args` | 由子断言决定 |
-| `relation` | `op`, 见 4.3 | final |
+| `relation` | `op`, 见 4.2 | final |
+| `unique` | `selector`, `path` | final |
+| `type_of` | `selector`, `path`, `type` | final |
+| `subset` | `selector`, `path`, `values` | final |
+| `sorted_by` | `selector`, `path`, `order?`(`asc`/`desc`) | final |
 
 **没有 `llm_judge`，也不接受自定义扩展 kind。** 未知 kind 一律 `invalid_case`。
 
-### 4.3 relation：字段之间的关系
+### 4.2 relation：字段之间的关系
 
 前七种只能写「这个字段等于这个值」「这个集合多了几条」。真实系统里最值钱的判据
 往往是**字段之间的关系**，写死具体值反而把案例绑到了某个实现上。
@@ -135,7 +139,7 @@ memory                                   内置名
 「漏乘数量」和「正确算法」在数量为 1 时算出同一个数。关系式不吃这个亏：
 它在数量为 1 时同样要求 `subTotal == unitPrice × count`，数量为 3 时直接把它抓出来。
 
-### 4.2 相位
+### 4.3 相位
 
 相位决定求值时机，是语义的一部分：
 
@@ -145,7 +149,7 @@ memory                                   内置名
 
 把 `trace` 类断言放到终态上求值会漏掉"中间走错又走回来"，因此**实现必须按相位表求值，案例不得指定相位**。
 
-### 4.3 `selector`
+### 4.4 `selector`
 
 ```json
 { "collection": "orders", "where": [{ "field": "status", "eq": "READY" }], "index": 0 }
@@ -159,13 +163,65 @@ memory                                   内置名
 
 选中 0 个实体 → 断言为 `unknown / missing_observation`，**不是** `false`。空集不构成反证。
 
-### 4.4 `path`
+### 4.5 `path`
 
 点号路径，从实体根写起：`status`、`items.length`、`items.0.count`。`length` 是特殊键，取数组长度。
 
 取值不存在 → 断言为 `unknown`（观测不足），不是 `false`。
 
 ---
+
+### 4.6 形状断言：唯一性、类型、值域、顺序
+
+前八种都在说「第几行的第几个字段等于什么」。真正难表达的是这四句：
+
+| kind | 必填 | 说的是 |
+| --- | --- | --- |
+| `unique` | `selector`, `path` | 这批行里这个字段互不重复 |
+| `type_of` | `selector`, `path`, `type` | 这批行里这个字段都是这个类型 |
+| `subset` | `selector`, `path`, `values` | 这批行里这个字段的值都在允许集合里 |
+| `sorted_by` | `selector`, `path`, `order?` | 这个序列按该字段升/降序 |
+
+它们断的是**集合的结构**，不是某一行的取值，所以行号换了也照样成立 —— 这一点让它们
+比 `field_equals` 耐移植得多。
+
+四条规则：
+
+1. 缺字段、集合不存在、行数不够（`sorted_by` 少于 2 行）一律 `unknown / missing_observation`，
+   不判假。空集合上的结构断言没有意义。
+2. `type_of` 的 `null` 一律放过：字段缺失与字段是 `null` 在跨实现时无法区分。
+3. `sorted_by` 相等不算违反 —— 稳定排序会保留相等元素。
+4. 违反时 `FALSE / shape_violated`，message 必须指出是哪一行、哪个值。
+
+**必要性是硬的。** 每加一种 kind 必须能被 `certify` 杀掉至少一个变异体，而且至少有一个
+变异体只有它能杀。`scripts/kind-necessity.mjs` 就在跑这件事：
+
+```
+PASS  unique     能杀 1 个：m-duplicate-row        只有它能杀：m-duplicate-row
+PASS  type_of    能杀 1 个：m-stringly-total       只有它能杀：m-stringly-total
+PASS  subset     能杀 1 个：m-status-off-enum      只有它能杀：m-status-off-enum
+PASS  sorted_by  能杀 2 个：…                       只有它能杀：m-unsorted-orders
+```
+
+四个新变异体是照着「只有这几种断言能抓」设计的。比如 `m-duplicate-row` 把最后一行
+覆盖成第一行的副本 —— **条数不变**。如果它只是多插一行，`count_delta` 也会抓到它，
+`unique` 就永远拿不到独占战功，那它就不该存在。
+
+`pagination` 想过，没收：规范视图不携带分页元信息，写出来杀不掉任何变异体，是装饰。
+
+### 4.7 形状断言的边界：一条实测
+
+`cases/coffee/shape.json` 里**没有** `sorted_by`，只有另外三种。原因是实测出来的：
+
+```
+memory 适配器          → pass
+真实咖啡店后端 (8180)  → fail（第 0 行比第 1 行新）
+```
+
+两边都没把「列表按什么排」写进契约。这时候断言升序不是抓到了 bug，是**自己造了一个假红**。
+所以它被挪到 `examples/shape-order/`，只对 mock 跑，当一个用法示范。
+
+这和 `m-pickup-no-offset`（取餐号偏移 100）是同一类：**能被观测到，不等于值得被断言**。
 
 ## 5. 参考轨迹
 
@@ -777,6 +833,10 @@ export function wrap(adapter) {
 
 `audit` 需要两个独立实现才知道真假；`certify` 只需要一个正确实现加一组坏法。
 在没有第二个实现的场合（别人的系统、只有一个后端的产品），`certify` 仍然可用。
+
+**建议可能是位置相关的。** 走 `orders.0.totalAmount` 这种路径的建议，抓到的是「第 0 行」，
+换一个实现行序变了就红。它不是错的 —— 现有案例里也用 index —— 但它比 `where` 过滤脆。
+看到 index 的建议，优先想想能不能换成 `unique` / `subset` 这类断结构的写法。
 
 ## 13. 出题与批改（drill）
 

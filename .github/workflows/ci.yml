@@ -57,6 +57,8 @@ jobs:
           node bin/agent-web.mjs accept /tmp/draft-check/happy-path.json --by=ci
           node bin/agent-web.mjs verify /tmp/draft-check --adapter=memory
 
+      - name: 新加的断言种类必须证明自己有用
+        run: node scripts/kind-necessity.mjs
       - name: 生成的变异体必须能被判据准入接住
         run: |
           node bin/agent-web.mjs breed --adapter=memory --from-case=cases/coffee/happy-path.json --out=.tmp-bred | tee .tmp-breed.txt
