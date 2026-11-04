@@ -46,6 +46,10 @@ const MANIFEST = {
   },
   roles: ['customer', 'customer2', 'staff'],
   events_complete: true,
+  // 只声明真实存在的事件类型：后端 t_order_status_log 只记"迁移"，
+  // 下单本身不落流水，所以没有 order.created。缺了它，对创建事件做
+  // event_absent 会得到一个假的 TRUE —— 词表让这种断言退回 unknown。
+  events_types: ['order.making', 'order.ready', 'order.picked', 'order.canceled'],
   reset_note:
     'identity：每个 run 注册一个新顾客账号；staff 用预置店员账号。不清库、不回滚，靠身份隔离保证互不影响。',
   capabilities: [

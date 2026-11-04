@@ -101,6 +101,22 @@ function checkBindings(steps) {
   return errors;
 }
 
+// 候选轨迹也要走同一套校验：Agent 交上来的动作序列和参考轨迹在结构上是一回事。
+export function validateSteps(steps, label = 'trajectory') {
+  const errors = [];
+  if (!Array.isArray(steps) || steps.length === 0) {
+    errors.push(label + ' 必须是非空数组');
+    return errors;
+  }
+  const seen = new Set();
+  steps.forEach((step, i) => {
+    errors.push(...validateStep(step || {}, i, seen));
+    if (step && step.id) seen.add(step.id);
+  });
+  errors.push(...checkBindings(steps));
+  return errors;
+}
+
 export function validateCase(c) {
   const errors = [];
   if (!c || typeof c !== 'object') return ['案例必须是对象'];

@@ -38,6 +38,9 @@ const MANIFEST = {
   scopes: ['menu', 'orders', 'status_log'],
   roles: ['customer', 'customer2', 'staff'],
   events_complete: true,
+  // 词表把 events_complete 的承诺限定在"确实记录的类型"上：
+  // 断言一个不在此列的 type，判决是 unknown/unsupported_event，不是 TRUE。
+  events_types: ['order.created', 'order.making', 'order.ready', 'order.picked', 'order.canceled'],
   events_scope: 'status_log',
   canonical_view: 'agent-web/canonical-view',
   // 视图契约：断言写在这三个集合上，形状必须与 taixianglian 适配器一致，

@@ -1,0 +1,27 @@
+{
+  "note": "同一个案例，候选轨迹比参考轨迹做得更完整：参考只到 MAKING（判 fail），它走到 READY（判 pass）。判决跟着轨迹走，不跟着案例走。",
+  "produced_by": "capable-agent (demo)",
+  "trajectory": [
+    {
+      "id": "s1",
+      "capability": "order.create",
+      "as": "customer",
+      "expected_outcome": "applied",
+      "arguments": { "items": [{ "dishName": "拿铁", "qty": 1 }] }
+    },
+    {
+      "id": "s2",
+      "capability": "kitchen.accept",
+      "as": "staff",
+      "expected_outcome": "applied",
+      "bindings": { "orderId": "$s1.orderId" }
+    },
+    {
+      "id": "s3",
+      "capability": "kitchen.ready",
+      "as": "staff",
+      "expected_outcome": "applied",
+      "bindings": { "orderId": "$s1.orderId" }
+    }
+  ]
+}

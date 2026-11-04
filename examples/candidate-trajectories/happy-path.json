@@ -1,0 +1,13 @@
+{
+  "note": "一个偷懒的候选轨迹：只下单就交差。参考轨迹能走完，它不能。",
+  "produced_by": "naive-agent (demo)",
+  "trajectory": [
+    {
+      "id": "s1",
+      "capability": "order.create",
+      "as": "customer",
+      "expected_outcome": "applied",
+      "arguments": { "items": [{ "dishName": "拿铁", "qty": 1 }] }
+    }
+  ]
+}

@@ -364,3 +364,56 @@ test('契约不满足判 invalid_environment，而不是逐条断言报没观测
   assert.match(r.detail, /视图契约/);
   assert.match(r.detail, /status_log/);
 });
+
+// ---- v0.2：事件词表 / 候选轨迹 ----
+
+test('event_absent：适配器不记录的事件类型，退回 unknown 而不是 TRUE', async () => {
+  const { event_absent } = await import('../src/assert/kinds.mjs');
+  const ctx = {
+    events: [],
+    eventsComplete: true,
+    eventsVocabulary: ['order.making', 'order.ready'],
+  };
+  const r = event_absent({ kind: 'event_absent', type: 'order.created' }, ctx);
+  assert.equal(r.status, UNKNOWN);
+  assert.equal(r.code, 'unsupported_event');
+  // 词表里有的类型照常判
+  const ok2 = event_absent({ kind: 'event_absent', type: 'order.making' }, ctx);
+  assert.equal(ok2.status, TRUE);
+  // 没声明词表的老适配器：维持原语义，只信 events_complete
+  const legacy = event_absent({ kind: 'event_absent', type: 'order.created' }, { events: [], eventsComplete: true });
+  assert.equal(legacy.status, TRUE);
+});
+
+test('judge：候选轨迹优先于参考轨迹，并记录来源', async () => {
+  const { judge } = await import('../src/runner.mjs');
+  const { createMemoryAdapter } = await import('../src/adapter/memory.mjs');
+  const c = JSON.parse(fs.readFileSync(new URL('../cases/memory-demo/happy-path.json', import.meta.url), 'utf8'));
+
+  const adapter = createMemoryAdapter();
+  const full = await judge({ case: c, adapter, adapterName: 'memory' });
+  assert.equal(full.trajectory_source, 'reference');
+  assert.equal(full.status, 'pass');
+
+  // 只下单不取餐：同一份案例，换个轨迹就该判 fail
+  const lazy = [c.reference_trajectory[0]];
+  const half = await judge({ case: c, adapter: createMemoryAdapter(), adapterName: 'memory', trajectory: lazy });
+  assert.equal(half.trajectory_source, 'candidate');
+  assert.equal(half.status, 'fail');
+  assert.equal(half.reason_code, 'assertion_false');
+});
+
+test('judge：结构不合法的候选轨迹不进执行', async () => {
+  const { judge } = await import('../src/runner.mjs');
+  const { createMemoryAdapter } = await import('../src/adapter/memory.mjs');
+  const c = JSON.parse(fs.readFileSync(new URL('../cases/memory-demo/happy-path.json', import.meta.url), 'utf8'));
+  const v = await judge({
+    case: c,
+    adapter: createMemoryAdapter(),
+    adapterName: 'memory',
+    trajectory: [{ id: 's1' }],
+  });
+  assert.equal(v.status, 'unknown');
+  assert.equal(v.reason_code, 'invalid_case');
+  assert.ok(Array.isArray(v.errors) && v.errors.length > 0);
+});

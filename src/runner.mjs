@@ -13,7 +13,7 @@
  * 把 unknown 从统计里踢掉，是这类系统最常见的自欺方式。
  */
 
-import { validateCase, resolveArguments, deriveLabels, BindingError } from './case.mjs';
+import { validateCase, validateSteps, resolveArguments, deriveLabels, BindingError } from './case.mjs';
 import { validateManifest } from './adapter/contract.mjs';
 import { checkStateAgainstView } from './view.mjs';
 import { evalAssertions, firstFailure, TRUE, FALSE, UNKNOWN } from './assert/index.mjs';
@@ -42,18 +42,35 @@ async function observeState(adapter, runId, scopes) {
 function eventContext(state, manifest) {
   const scope = manifest.events_scope;
   const events = scope ? getPath(state, scope) : undefined;
-  if (!Array.isArray(events)) return { events: [], eventsComplete: false };
-  return { events, eventsComplete: manifest.events_complete === true };
+  const vocabulary = Array.isArray(manifest.events_types) ? manifest.events_types : null;
+  if (!Array.isArray(events)) return { events: [], eventsComplete: false, eventsVocabulary: vocabulary };
+  return { events, eventsComplete: manifest.events_complete === true, eventsVocabulary: vocabulary };
 }
 
-export async function judge({ case: c, adapter, adapterName = 'unknown' }) {
+async function judgeInner({ case: c, adapter, adapterName = 'unknown', trajectory = null }) {
   const startedAt = Date.now();
   const base = {
     case_id: c?.id ?? '<invalid>',
     adapter: adapterName,
   };
 
+  // 候选轨迹优先：有它就判它，没有才判案例自带的参考轨迹。
+  // judge 因此能判任何 Agent 的实际动作序列，而不只是人写的样本。
+  const candidate = Array.isArray(trajectory) ? trajectory : null;
+  const steps = candidate ?? c?.reference_trajectory;
+  base.trajectory_source = candidate ? 'candidate' : 'reference';
+
   const caseErrors = validateCase(c);
+  if (candidate) {
+    const stepErrors = validateSteps(candidate, 'trajectory');
+    if (stepErrors.length > 0) {
+      return makeVerdict(base, 'unknown', 'invalid_case', {
+        detail: '候选轨迹未通过结构校验，不进入执行',
+        errors: stepErrors,
+        timing_ms: Date.now() - startedAt,
+      });
+    }
+  }
   if (caseErrors.length > 0) {
     return makeVerdict(base, 'unknown', 'invalid_case', {
       detail: '案例未通过格式校验，不进入执行',
@@ -166,8 +183,8 @@ export async function judge({ case: c, adapter, adapterName = 'unknown' }) {
     const trace = [];
     let aborted = null;
 
-    for (let i = 0; i < c.reference_trajectory.length; i += 1) {
-      const step = c.reference_trajectory[i];
+    for (let i = 0; i < steps.length; i += 1) {
+      const step = steps[i];
       const cap = capById.get(step.capability);
       if (!cap) {
         aborted = { status: 'unknown', code: 'coverage_gap', at: i, detail: `能力 ${step.capability} 不在 manifest` };
@@ -353,4 +370,30 @@ export async function judge({ case: c, adapter, adapterName = 'unknown' }) {
       }
     }
   }
+}
+
+/**
+ * 外层包装只负责一件事：给单条案例一个硬上限。
+ * 适配器卡住时必须有判决，宁可 unknown 也不能让整批跑挂死。
+ */
+export async function judge(opts) {
+  const timeoutMs = Number(opts.timeoutMs ?? 0);
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) return judgeInner(opts);
+
+  let timer = null;
+  const timeout = new Promise((resolve) => {
+    timer = setTimeout(() => resolve({ __timedOut: true }), timeoutMs);
+  });
+  const result = await Promise.race([judgeInner(opts), timeout]);
+  if (timer) clearTimeout(timer);
+
+  if (result && result.__timedOut) {
+    return makeVerdict(
+      { case_id: opts.case?.id ?? '<invalid>', adapter: opts.adapterName ?? 'unknown' },
+      'unknown',
+      'infrastructure_error',
+      { detail: '单条案例超时（>' + timeoutMs + 'ms），判决记为 unknown', timing_ms: timeoutMs },
+    );
+  }
+  return result;
 }

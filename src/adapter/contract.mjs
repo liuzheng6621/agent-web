@@ -47,6 +47,11 @@ export function validateManifest(m) {
   if (m.reset_strategy && !RESET_STRATEGIES.includes(m.reset_strategy)) {
     errors.push(`manifest.reset_strategy 必须是 ${RESET_STRATEGIES.join('/')}`);
   }
+  if (m.events_types !== undefined && m.events_types !== null) {
+    if (!Array.isArray(m.events_types) || m.events_types.some((t) => typeof t !== 'string')) {
+      errors.push('manifest.events_types 必须是字符串数组（不声明就表示未知，按 events_complete 判定）');
+    }
+  }
   if (!Array.isArray(m.capabilities) || m.capabilities.length === 0) {
     errors.push('manifest.capabilities 必须是非空数组');
   } else {

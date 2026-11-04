@@ -79,12 +79,15 @@ node bin/agent-web.mjs selftest
 TAIXIANGLIAN_BASE_URL=http://127.0.0.1:8080 \
   node bin/agent-web.mjs verify cases/taixianglian --adapter=taixianglian
 
-# 3. 把同一份案例同时喂给两个实现，比较判决
+# 3. 判一个 Agent 的实际动作序列（而不是案例自带的参考轨迹）
+node bin/agent-web.mjs verify cases/memory-demo --adapter=memory   --trajectory=examples/candidate-trajectories
+
+# 4. 把同一份案例同时喂给两个实现，比较判决
 TAIXIANGLIAN_BASE_URL=http://127.0.0.1:8080 \
   node bin/agent-web.mjs compare cases/memory-demo --adapters=memory,taixianglian
 ```
 
-第 3 条是整个项目的心脏。输出长这样：
+第 4 条是整个项目的心脏。输出长这样：
 
 ```
 案例                           memory        taixianglian  判决一致
@@ -182,6 +185,39 @@ const token = route.who === 'staff' ? ctx.staff.token : ctx.customer.token;
 这就是为什么"跨实现判决一致"必须是核心，而不是可选的对照实验。断言集可以写错，适配器可以撒谎，模型可以幻觉；**让两套独立实现在同一份案例上给同一个判决**，是这套东西唯一诚实的校验方式。
 
 修完之后七条全对。FINDING 全文见 [docs/FINDING-001.md](docs/FINDING-001.md)。
+
+---
+
+## 判别人的轨迹，不只是判实现
+
+案例自带的 `reference_trajectory` 只回答一件事：这条路能走通。真正评 Agent 时，判的是**它自己走的那条路**。
+
+```bash
+agent-web verify cases/memory-demo --adapter=memory --trajectory=examples/candidate-trajectories
+```
+
+`examples/candidate-trajectories/` 里放了两条演示轨迹，跑出来正好相反：
+
+| 案例 | 参考轨迹 | 候选轨迹 | 说明 |
+| --- | --- | --- | --- |
+| `happy-path` | pass | **fail** | 候选只下单就交差，目标没达成 |
+| `goal-not-reached` | fail | **pass** | 候选多走了 `kitchen.ready`，目标达成 |
+
+第二行最值得看：同一个案例，参考轨迹判 fail，候选轨迹判 pass。断言测的是**目标是否达成**，不是**动作是否照抄**。轨迹文件与案例结构完全一致，共用一套校验。
+
+候选轨迹模式下，输出里的 ✓/✗ 是相对 `expected.json`（它描述参考轨迹）的基线，落差本身就是结论。
+
+---
+
+## 检测被测系统变了没有
+
+```bash
+agent-web verify cases/x --adapter=X --out=before.jsonl
+# ……应用改了一版……
+agent-web drift before.jsonl after.jsonl
+```
+
+比较两批判决里初态的**规范视图指纹**：一致 / 漂移 / 只在旧 / 只在新，有漂移退出码 1。漂移不是判决错，而是「这份案例还描不描述当初那个应用」——菜单多一项、字段改个形状，不变指纹的案例会绿得毫无意义。
 
 ---
 
@@ -303,6 +339,10 @@ const token = route.who === 'staff' ? ctx.staff.token : ctx.customer.token;
 `and` 用 Kleene 三值逻辑聚合：任意一条为假则整体为假，否则只要有一条未知则整体未知。
 
 ---
+
+## 时间与挂死
+
+`--timeout=MS` 给单条案例一个硬上限。适配器卡住时必须有判决：宁可 `unknown / infrastructure_error`，也不让整批跑挂死。默认不设上限，跑真实后端时建议给一个。
 
 ## 约束（宪法）
 

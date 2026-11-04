@@ -178,6 +178,35 @@ memory                                   内置名
 
 ---
 
+## 5.4 候选轨迹（判别人的轨迹）
+
+`reference_trajectory` 描述「这条路能走通」；候选轨迹描述「某个 Agent 实际走了哪条路」。两者结构完全相同，同一套校验、同一个 `judge`。
+
+CLI 用法：`verify <案例目录> --adapter=X --trajectory=<轨迹目录>`，按**同名**匹配：`cases/x/happy-path.json` 对应 `trajectory/happy-path.json`。
+
+轨迹文件两种形状都接受：一个带 `produced_by` 与 `trajectory` 的对象，或直接一个数组。
+
+规则：
+- 有候选轨迹就判它，`verdict.trajectory_source = "candidate"`；没有才判参考轨迹（`"reference"`）。
+- 候选轨迹先过结构校验，不过则 `unknown / invalid_case`，不进入执行。
+- `bindings` 在候选轨迹里同样可用（Agent 若已拿到具体 id 就直接写值）。
+- 判决跟着轨迹走，不跟着案例走：同一份案例，参考轨迹 fail 而候选轨迹 pass 是**正常结果**，它恰好说明断言测的是目标达成，不是动作复刻。
+
+---
+
+## 5.5 漂移检测
+
+```bash
+agent-web verify cases/x --adapter=X --out=before.jsonl
+agent-web drift before.jsonl after.jsonl
+```
+
+`drift` 比较两批判决里 `evidence.initial` 的**规范视图指纹**（`fnv1a32:` 前缀）：一致 / 漂移 / 只在旧 / 只在新。有漂移则退出码 1。
+
+漂移不是判决错误，而是「这份案例还描不描述当初那个应用」的问题——被测系统改了菜单、改了字段形状，案例不改就会静默失真。指纹在读取时现算，不落盘，避免陈旧字段。
+
+---
+
 ## 6. 适配器契约
 
 适配器是普通对象，必须实现：
@@ -213,6 +242,7 @@ memory                                   内置名
   "description": "确定性内存业务系统",
   "scopes": ["menu", "orders", "status_log"],
   "events_complete": true,
+  "events_types": ["order.created", "order.making", "order.ready"],
   "events_scope": "status_log",
   "canonical_view": "agent-web/canonical-view",
   "roles": ["customer", "customer2", "staff"],
@@ -224,6 +254,7 @@ memory                                   内置名
 ```
 
 - `reset_strategy`：`snapshot` / `reseed` / `identity`，声明初态怎么来的。
+- `events_types`：可选，声明本适配器**确实记录**的事件类型。断言里出现不在词表内的 `type` 时，`event_absent` 判 `unknown / unsupported_event`，绝不返回 TRUE。**词表把 `events_complete` 的承诺限定在真实存在的类型上**：应用压根不记「下单」这类事件时，若不声明词表，「没查到我下单的记录」会被误读成「没有下过单」。未声明词表则退回只看 `events_complete` 的老语义。
 - `events_complete`：`true` 表示事件流水是完整记录。为 `false` 时 `event_absent` 类断言必须判 `unknown`——没记全就不能说"没发生过"。
 - `evidence_level`：`observed`（亲眼看到）/ `inferred`（从接口推出来）/ `validated`（端到端验证过）。**这是给人看的诚实标记，判决不用它。**
 - `roles`：适配器能绑定的全部角色。案例里的 `as` 必须落在这个列表里，否则适配器返回 `rejected / unknown_role`（见 6.2）。

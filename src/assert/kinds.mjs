@@ -178,6 +178,14 @@ export function unchanged(a, ctx) {
 }
 
 export function event_absent(a, ctx) {
+  // 词表优先于完整性：应用压根不记录的类型，不能因为查不到就判 TRUE。
+  if (typeof a.type === 'string' && Array.isArray(ctx.eventsVocabulary) && !ctx.eventsVocabulary.includes(a.type)) {
+    return ok(
+      UNKNOWN,
+      'unsupported_event',
+      '适配器未声明记录事件类型 ' + a.type + '（manifest.events_types 不含它），无法据此判断',
+    );
+  }
   if (!ctx.eventsComplete) {
     return ok(UNKNOWN, 'incomplete_observation', '事件记录未声明完整，无法证明中间没有发生该事件');
   }

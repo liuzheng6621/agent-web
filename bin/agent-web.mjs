@@ -17,6 +17,7 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
 import { judge } from '../src/runner.mjs';
+import { fingerprint } from '../src/values.mjs';
 import { summarize, agreement, formatText, countFailedAssertions } from '../src/report.mjs';
 import { loadAdapter, listBuiltins } from '../src/adapter/load.mjs';
 import { diffViews } from '../src/view.mjs';
@@ -63,7 +64,22 @@ async function makeAdapter(name) {
   return loadAdapter(name, {}, process.cwd());
 }
 
-async function runOne(caseFile, adapter) {
+function numFlag(v) {
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+// 候选轨迹按案例文件名同名查找：cases/x/happy-path.json ← trajectories/happy-path.json
+function loadTrajectory(dir, caseFile) {
+  if (typeof dir !== 'string' || dir === '') return null;
+  const p = path.join(path.resolve(dir), path.basename(caseFile));
+  if (!fs.existsSync(p)) return null;
+  const raw = JSON.parse(fs.readFileSync(p, 'utf8'));
+  if (Array.isArray(raw)) return raw;
+  return Array.isArray(raw?.trajectory) ? raw.trajectory : null;
+}
+
+async function runOne(caseFile, adapter, opts = {}) {
   const raw = fs.readFileSync(caseFile, 'utf8');
   let c;
   try {
@@ -78,16 +94,26 @@ async function runOne(caseFile, adapter) {
       timing_ms: 0,
     };
   }
-  return judge({ case: c, adapter });
+  return judge({
+    case: c,
+    adapter,
+    adapterName: opts.adapterName,
+    trajectory: opts.trajectory ?? null,
+    timeoutMs: opts.timeoutMs ?? 0,
+  });
 }
 
 async function cmdSelftest(flags) {
   const dir = path.join(ROOT, 'cases', 'memory-demo');
   const expected = readExpected(dir);
   const adapter = await makeAdapter('memory');
+  announceCandidateMode(flags);
   const files = collectCaseFiles(dir);
   const verdicts = [];
-  for (const f of files) verdicts.push(await runOne(f, adapter));
+  const selfOpts = { adapterName: 'memory', timeoutMs: numFlag(flags.timeout) };
+  for (const f of files) {
+    verdicts.push(await runOne(f, adapter, { ...selfOpts, trajectory: loadTrajectory(flags.trajectory, f) }));
+  }
 
   const summary = summarize(verdicts);
   const agree = agreement(verdicts, expected);
@@ -124,9 +150,13 @@ async function cmdVerify(args, flags) {
   const adapter = await makeAdapter(adapterName);
   const files = collectCaseFiles(args[0]);
   const expected = readExpected(args[0]);
+  announceCandidateMode(flags);
 
   const verdicts = [];
-  for (const f of files) verdicts.push(await runOne(f, adapter));
+  const verifyOpts = { adapterName, timeoutMs: numFlag(flags.timeout) };
+  for (const f of files) {
+    verdicts.push(await runOne(f, adapter, { ...verifyOpts, trajectory: loadTrajectory(flags.trajectory, f) }));
+  }
 
   if (flags.json) {
     console.log(JSON.stringify(verdicts, null, 2));
@@ -255,7 +285,11 @@ async function cmdCompare(args, flags) {
     const m = await adapter.manifest();
     views.set(name, m.view);
     for (const f of files) {
-      const r = await runOne(f, adapter);
+      const r = await runOne(f, adapter, {
+        adapterName: name,
+        timeoutMs: numFlag(flags.timeout),
+        trajectory: loadTrajectory(flags.trajectory, f),
+      });
       const id = r.case_id ?? path.basename(f, '.json');
       if (!matrix.has(id)) matrix.set(id, {});
       matrix.get(id)[name] = { status: r.status, reason: r.reason_code };
@@ -320,6 +354,68 @@ async function cmdCompare(args, flags) {
   return same === ids.length ? 0 : 1;
 }
 
+function loadVerdicts(p) {
+  const abs = path.resolve(p);
+  if (!fs.existsSync(abs)) throw new Error('找不到 ' + abs);
+  const out = new Map();
+  for (const line of fs.readFileSync(abs, 'utf8').split(String.fromCharCode(10))) {
+    if (!line.trim()) continue;
+    const v = JSON.parse(line);
+    out.set(v.case_id, v);
+  }
+  return out;
+}
+
+// 规范视图漂移：两次跑批的初态指纹不一样，说明被测应用的结构变了。
+// 这不是判决错误，而是"案例还能不能代表当初那个应用"的问题。
+async function cmdDrift(args) {
+  if (args.length < 2) {
+    console.error('用法：agent-web drift <旧.jsonl> <新.jsonl>');
+    return 2;
+  }
+  const A = loadVerdicts(args[0]);
+  const B = loadVerdicts(args[1]);
+  const ids = [...new Set([...A.keys(), ...B.keys()])].sort();
+
+  const fp = (v) => (v && v.evidence && v.evidence.initial ? fingerprint(v.evidence.initial) : null);
+  const pad = (t, w) => t + ' '.repeat(Math.max(0, w - [...t].length));
+  const width = Math.max(...ids.map((i) => [...String(i)].length), 10) + 2;
+
+  let same = 0;
+  let drifted = 0;
+  let onlyA = 0;
+  let onlyB = 0;
+  console.log(pad('案例', width) + pad('结果', 12) + '初态指纹');
+  for (const id of ids) {
+    const va = A.get(id);
+    const vb = B.get(id);
+    const fa = fp(va);
+    const fb = fp(vb);
+    let mark;
+    if (!va) { mark = '只在旧'; onlyA += 0; onlyB += 1; }
+    else if (!vb) { mark = '只在新'; onlyA += 1; }
+    else if (!fa || !fb) { mark = '无观测'; }
+    else if (fa === fb) { mark = '一致'; same += 1; }
+    else { mark = '漂移'; drifted += 1; }
+    const shown = fa && fb && fa !== fb ? fa.slice(0, 14) + ' → ' + fb.slice(0, 14) : (fa ?? fb ?? '-');
+    console.log(pad(String(id), width) + pad(mark, 12) + shown);
+  }
+  console.log('');
+  console.log(`一致 ${same} / 漂移 ${drifted} / 只在旧 ${onlyA} / 只在新 ${onlyB}`);
+  if (drifted > 0) {
+    console.log('初态形状变了：案例可能已不再描述同一个应用，先复核再信这份判决。');
+  }
+  return drifted > 0 ? 1 : 0;
+}
+
+function announceCandidateMode(flags) {
+  if (typeof flags.trajectory !== 'string' || flags.json) return;
+  // 候选轨迹模式下，expected.json 描述的是参考轨迹，落差是结论而不是错误。
+  console.log('候选轨迹模式：判的是 --trajectory 目录里的动作序列，不是案例自带的参考轨迹。');
+  console.log('下面的 ✓/✗ 相对 expected.json 的参考基线，落差本身就是要看的东西。');
+  console.log('');
+}
+
 const HELP = `agent-web —— 给 Agent 写机器可判的集成测试
 
   agent-web selftest [--json]                 零依赖自测：内置适配器 + 内置案例
@@ -327,6 +423,7 @@ const HELP = `agent-web —— 给 Agent 写机器可判的集成测试
   agent-web report <results.jsonl>            由判决结果出指标
   agent-web capabilities [--adapter=SPEC]     打印能力清单与证据等级
   agent-web compare <案例> --adapters=A,B     同一份案例喂多个实现，比判决
+  agent-web drift <旧.jsonl> <新.jsonl>      比较两次跑批的初态形状（漂移检测）
   agent-web init <目录>                       生成案例模板（--adapter 写进 environment）
 
 适配器 SPEC 可以是：
@@ -362,6 +459,8 @@ async function main() {
         return await cmdReport(args, flags);
       case 'compare':
         return await cmdCompare(args, flags);
+      case 'drift':
+        return await cmdDrift(args);
       case 'capabilities':
         return await cmdCapabilities(args, flags);
       case 'init':
