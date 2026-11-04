@@ -349,7 +349,7 @@ Common commands: `prepare` (create steps, a draft case, and a flow preview in on
 
 ## Version and next steps
 
-Current version: `0.6`. It can run cases, check an assistant's actions, and use one `prepare` command to turn a request log into replayable steps, a draft checklist, and a flow-chart preview.
+Current version: `0.7`. It runs cases, checks an assistant's actions, turns a request log into replayable steps and a draft case, and has started policing the verdict itself: one copy of the cases, no verdict from an unreviewed draft, and a false-green audit that turns a suspiciously all-green verdict red.
 
 Next: make it easier for different systems to share the same cases, run tests against multiple systems at once, and turn abilities that are only inferred into abilities that have been verified in practice.
 
