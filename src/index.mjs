@@ -49,6 +49,20 @@ export {
   formatCertify,
 } from './certify.mjs';
 export {
+  DISCOVER_VERSION,
+  OPENAPI_CANDIDATES,
+  toCapabilityId,
+  capabilityKind,
+  parseOpenApi,
+  probeSite,
+  pickReadEndpoints,
+  buildAdapterSource,
+  buildCaseDocs,
+  runReads,
+  discover,
+  formatDiscover,
+} from './discover.mjs';
+export {
   DRILL_VERSION,
   buildDrills,
   gradeDrills,

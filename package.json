@@ -1,6 +1,6 @@
 {
   "name": "agent-web",
-  "version": "0.18.1",
+  "version": "0.19.0",
   "description": "给 Agent 写机器可判的集成测试：一份案例，多个实现，判决必须一致。",
   "type": "module",
   "bin": {
@@ -25,10 +25,11 @@
     "./drill": "./src/drill.mjs",
     "./probe": "./src/probe.mjs",
     "./knowledge": "./knowledge/index.mjs",
-    "./recall": "./src/recall.mjs"
+    "./recall": "./src/recall.mjs",
+    "./discover": "./src/discover.mjs"
   },
   "scripts": {
-    "test": "node --test test/engine.test.mjs test/traps.test.mjs test/museum.test.mjs test/certify.test.mjs test/drill.test.mjs test/relation.test.mjs test/probe.test.mjs test/recall.test.mjs",
+    "test": "node --test test/engine.test.mjs test/traps.test.mjs test/museum.test.mjs test/certify.test.mjs test/drill.test.mjs test/relation.test.mjs test/probe.test.mjs test/recall.test.mjs test/discover.test.mjs",
     "selftest": "node bin/agent-web.mjs selftest",
     "compare": "node bin/agent-web.mjs compare cases/coffee --adapters=memory,taixianglian",
     "gh-proxy": "node scripts/gh-proxy.mjs",
@@ -40,7 +41,8 @@
     "certify:baseline": "node scripts/certify-baseline.mjs",
     "probe": "node bin/agent-web.mjs probe --adapter=memory --detail",
     "knowledge": "node bin/agent-web.mjs knowledge",
-    "recall": "node bin/agent-web.mjs recall"
+    "recall": "node bin/agent-web.mjs recall",
+    "discover": "node bin/agent-web.mjs discover"
   },
   "keywords": [
     "agent",

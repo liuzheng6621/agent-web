@@ -18,3 +18,5 @@ agent-web-output/
 /drills/
 .agent-web/
 .tmp-frames/
+agent-web-site/
+.tmp-out/

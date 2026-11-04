@@ -14,6 +14,7 @@
  *   agent-web prepare <动作日志>       一次生成轨迹、案例草稿与流程预览
  *   agent-web draft <轨迹文件>          回放一条轨迹，反推案例草稿
  *   agent-web flow <案例.json>           生成交互式流程图 HTML
+  agent-web discover <网址>                 输入一个网址：探测接口、生成适配器与案例
  *   agent-web init <目录>              生成一份案例模板
  *
  *   agent-web --version              打印版本（唯一来源：package.json）
@@ -44,6 +45,7 @@ import { MUTATIONS, describeMutations } from '../src/mutate.mjs';
 import { buildDrills, gradeDrills, writeDrills, readDrills, readSubmissions, formatGrade, gradeExit } from '../src/drill.mjs';
 import { collectUsage, summarizeCoverage, formatCoverage, coverageVerdict } from '../src/coverage.mjs';
 import { probeAdapter, formatProbe, probeExit } from '../src/probe.mjs';
+import { discover, formatDiscover } from '../src/discover.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..');
@@ -426,6 +428,27 @@ async function cmdProbe(flags) {
   else console.log(formatProbe(result, { detail: flags.detail === true }));
   return probeExit(result);
 }
+async function cmdDiscover(args, flags) {
+  if (args.length < 1) {
+    console.error("用法：agent-web discover <网址> [--out=目录] [--run] [--detail] [--accept=名字] [--timeout=8000] [--json]");
+    console.error("  输入一个网址，探测它有哪些接口，生成一个能跑的只读适配器与一批只读案例。");
+    console.error("  它不会猜写操作该保证什么 —— 那需要业务知识，猜出来的判决没有意义。");
+    return 2;
+  }
+  const report = await discover(args[0], {
+    outDir: flags.out ?? "./agent-web-site",
+    run: flags.run === true,
+    accept: typeof flags.accept === "string" ? flags.accept : null,
+    timeoutMs: flags.timeout ? Number(flags.timeout) : 8000,
+  });
+  if (flags.json) console.log(JSON.stringify(report, null, 2));
+  else console.log(formatDiscover(report, { detail: flags.detail === true }));
+  if (!report.reachable) return 2;
+  if (report.source !== "openapi") return 1;
+  const bad = report.reads.filter((r) => !r.ok);
+  return bad.length > 0 ? 1 : 0;
+}
+
 async function cmdCertify(args, flags) {
   if (args.length < 1) {
     console.error('用法：agent-web certify <案例目录> [--adapter=memory] [--mutations=id,id] [--timeout=5000] [--strict] [--detail] [--suggest] [--json]');
@@ -1439,6 +1462,8 @@ async function main() {
       return cmdKnowledge(flags);
     case 'recall':
       return cmdRecall(args, flags);
+    case 'discover':
+        return await cmdDiscover(args, flags);
     case 'probe':
         return await cmdProbe(flags);
       case 'coverage':
