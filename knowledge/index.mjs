@@ -19,10 +19,11 @@ import { e07 } from './k07-test-not-in-script.mjs';
 import { e08 } from './k08-truthy-instead-of-true.mjs';
 import { e09 } from './k09-out-dir-assumed.mjs';
 import { e10 } from './k10-case-without-expectation.mjs';
+import { e11 } from './k11-version-tri-truth.mjs';
 
 export const KNOWLEDGE_VERSION = 'agent-web/knowledge-1';
 
-export const ENTRIES = [e01, e02, e03, e04, e05, e06, e07, e08, e09, e10];
+export const ENTRIES = [e01, e02, e03, e04, e05, e06, e07, e08, e09, e10, e11];
 
 export const GUARD_KINDS = ['probe', 'certify', 'ci', 'test', 'lint', 'none'];
 

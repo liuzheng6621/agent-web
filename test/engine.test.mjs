@@ -966,3 +966,15 @@ test('每个案例都在 expected.json 里有预期，且预期表里没有不�
   assert.deepEqual(extra, [], '预期表里有已经不存在的案例');
   assert.equal(ids.length, Object.keys(expected).length);
 });
+
+test('版本号只有一处真相：package.json，CHANGELOG 与 CLI 都必须跟它一致', () => {
+  const pkg = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'package.json'), 'utf8'));
+  const log = fs.readFileSync(path.join(REPO_ROOT, 'CHANGELOG.md'), 'utf8');
+  const top = log.match(/^##\s+(\d+\.\d+\.\d+)/m);
+  assert.ok(top, 'CHANGELOG 必须有一个「## x.y.z」形式的首条版本');
+  assert.equal(top[1], pkg.version, 'CHANGELOG 首条版本必须等于 package.json');
+
+  const v = spawnSync(process.execPath, [CLI_PATH, '--version'], { cwd: REPO_ROOT, encoding: 'utf8' });
+  assert.equal(v.status, 0);
+  assert.equal(v.stdout.trim(), `${pkg.name} ${pkg.version}`, 'CLI 报的版本必须等于 package.json');
+});

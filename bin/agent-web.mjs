@@ -16,6 +16,8 @@
  *   agent-web flow <案例.json>           生成交互式流程图 HTML
  *   agent-web init <目录>              生成一份案例模板
  *
+ *   agent-web --version              打印版本（唯一来源：package.json）
+ *
  * 退出码：0 全部符合预期；1 存在不符；2 用法或环境错误。
  */
 
@@ -45,6 +47,12 @@ import { probeAdapter, formatProbe, probeExit } from '../src/probe.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..');
+
+// 版本只有一处真相：package.json。CLI、CHANGELOG、测试都对着它看齐。
+// 曾经出现过 package.json 0.16、README 0.9、Release v0.6.0 三个数各说各话。
+const PACKAGE = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
+const VERSION = PACKAGE.version;
+const CHANGELOG = path.join(ROOT, 'CHANGELOG.md');
 
 function parseArgs(argv) {
   const out = { _: [], flags: {} };
@@ -333,6 +341,15 @@ function cmdMutants(args, flags) {
     console.log('');
   }
   console.log('投稿：复制 docs/mutants/ 里任一文件，改 id 与 wrap，登记到 index.mjs 的 ENTRIES，跑 npm test。');
+  return 0;
+}
+
+function cmdVersion(flags) {
+  if (flags.json) {
+    console.log(JSON.stringify({ name: PACKAGE.name, version: VERSION, node: process.versions.node }));
+  } else {
+    console.log(`${PACKAGE.name} ${VERSION}`);
+  }
   return 0;
 }
 
@@ -1375,6 +1392,8 @@ async function main() {
   const cmd = _[0];
   const args = _.slice(1);
 
+  // --version / -v 比任何子命令都优先：版本检查不该被参数解析的边角情况影响。
+  if (flags.version || flags.v) return cmdVersion(flags);
   if (!cmd || flags.help || cmd === 'help') {
     console.log(HELP);
     return cmd ? 0 : 2;
@@ -1414,6 +1433,8 @@ async function main() {
         return await cmdAudit(args, flags);
       case 'accept':
         return cmdAccept(args, flags);
+      case 'version':
+      return cmdVersion(flags);
       case 'knowledge':
       return cmdKnowledge(flags);
     case 'recall':

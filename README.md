@@ -157,6 +157,7 @@ node bin/agent-web.mjs recall        # 扫一遍，看这次有没有重犯
 | [docs/museum/](docs/museum/) | 六件失败展品，每件都能复现 |
 | [docs/mutants/](docs/mutants/) | 十二个变异体，收稿标准在 README 里 |
 | [docs/media/promo.mp4](docs/media/promo.mp4) | 四十二秒介绍片 |
+| [CHANGELOG.md](CHANGELOG.md) | 每个版本做了什么、因为什么 |
 
 ## 许可
 
