@@ -20,7 +20,7 @@ jobs:
 
       # 零依赖：没有 npm install 这一步，跑不起来就是真跑不起来。
       - name: 单元测试
-        run: node --test test/engine.test.mjs
+        run: npm test
 
       - name: 自测（内置适配器 + 内置案例）
         run: node bin/agent-web.mjs selftest

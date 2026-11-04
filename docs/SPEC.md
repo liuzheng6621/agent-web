@@ -444,7 +444,7 @@ manifest 校验失败 → `unknown / invalid_environment`。
 | 14 | 应被拒绝却成功了 | fail | `expected_rejection` |
 | 15 | 目标断言为假 | fail | `assertion_false` |
 | 16 | 不变量为假 | fail | `invariant_violated` |
-| 17 | 任一断言为 unknown | unknown | `missing_observation` |
+| 17 | 任一断言为 unknown | unknown | `missing_observation`（若所有判不了的断言原因相同且在白名单内，用该原因，例如 `unsupported_event`） |
 | 18 | 全部成立 | pass | `ok` |
 | — | 未捕获异常 | unknown | `infrastructure_error` |
 
@@ -453,6 +453,8 @@ manifest 校验失败 → `unknown / invalid_environment`。
 注意 2：**未确认草稿不判 pass 也不判 fail，判 unknown**。它还不是一张考卷，没有资格得分。让机器生成的案例直接进判决，等于让写案例的模型给自己出题。
 
 注意 14 优先于 16：一步该成功却被挡下，就没必要再评速度与终态了，首因更清楚。
+
+注意 17 的理由码细化：断言层比判决层更清楚「为什么不知道」。当**所有**判不了的断言给出同一个原因，且该原因属于白名单（目前只有 `unsupported_event`），判决理由码就用它。白名单是封闭的——「后端不记录这类事件」和「观测是空的」是两件不同的事，前者要改适配器，后者要补观测，混成一个代码就没人能据此行动。
 
 ---
 

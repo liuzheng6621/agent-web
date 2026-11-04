@@ -1,6 +1,6 @@
 {
   "name": "agent-web",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "description": "给 Agent 写机器可判的集成测试：一份案例，多个实现，判决必须一致。",
   "type": "module",
   "bin": {
@@ -20,10 +20,11 @@
     "./coverage": "./src/coverage.mjs"
   },
   "scripts": {
-    "test": "node --test test/engine.test.mjs",
+    "test": "node --test test/engine.test.mjs test/museum.test.mjs",
     "selftest": "node bin/agent-web.mjs selftest",
     "compare": "node bin/agent-web.mjs compare cases/coffee --adapters=memory,taixianglian",
-    "gh-proxy": "node scripts/gh-proxy.mjs"
+    "gh-proxy": "node scripts/gh-proxy.mjs",
+    "museum": "node --test test/museum.test.mjs"
   },
   "keywords": [
     "agent",

@@ -12,6 +12,27 @@ agent-web works like a quality inspector with a checklist: decide what a correct
 
 ---
 
+## What this project actually governs
+
+Most evaluation tools build more tasks and more realistic environments. This project does something else: it makes **the verdict itself trustworthy**.
+
+All four pieces are needed. Drop one and an all-green verdict goes back to meaning nothing:
+
+| Mechanism | What it stops |
+| --- | --- |
+| Three outcomes, `unknown` stays in the denominator | "I don't know" being quietly counted as a pass |
+| An 18-row decision order, first match wins | The same case reporting different reasons on two implementations |
+| Cross-implementation comparison (`compare`) | The thing being measured being swapped out while every step stays legal |
+| False-green audit (`audit`) | A judge that under-reports its own misses |
+
+It also has to admit when it gets fooled. `docs/museum` collects six false passes, each of which can be run to show what happens without the mechanism that catches it — including a real incident: an adapter silently swapped "another customer" for the person who placed the order, so the case passed stably while never once testing what it claimed to test.
+
+```
+docs/museum/README.md
+```
+
+---
+
 ## Three possible results
 
 | Result | Plain meaning | Example |
@@ -399,7 +420,7 @@ Addresses are tried in order (DNS results plus a small fallback list); GitHub's 
 
 ## Version and next steps
 
-Current version: `0.8`. It runs cases, checks an assistant's actions, turns a request log into replayable steps and a draft case, polices the verdict itself (one copy of the cases, no verdict from an unreviewed draft, a false-green audit that turns a suspiciously all-green verdict red), and measures how much of the system the case set actually touches.
+Current version: `0.9`. It runs cases, checks an assistant's actions, turns a request log into replayable steps and a draft case, polices the verdict itself (one copy of the cases, no verdict from an unreviewed draft, a false-green audit that turns a suspiciously all-green verdict red), and measures how much of the system the case set actually touches.
 
 Next: make it easier for different systems to share the same cases, run tests against multiple systems at once, and turn abilities that are only inferred into abilities that have been verified in practice.
 

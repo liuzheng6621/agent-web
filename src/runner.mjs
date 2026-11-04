@@ -21,6 +21,13 @@ import { getPath } from './values.mjs';
 
 export const VERDICTS = Object.freeze(['pass', 'fail', 'unknown']);
 
+/**
+ * 断言层比判决层更清楚「为什么不知道」的几种情况。
+ * 只有落在这一张白名单里，才会被提到 verdict.reason_code 上；
+ * 其余一律退回缺省的 missing_observation，避免把细节代码变成随手可加的口子。
+ */
+const SPECIFIC_UNKNOWN_CODES = new Set(['unsupported_event']);
+
 function makeVerdict(base, status, reason_code, extra = {}) {
   return {
     ...base,
@@ -344,8 +351,16 @@ async function judgeInner({ case: c, adapter, adapterName = 'unknown', trajector
       });
     }
     if (goals.status === UNKNOWN || invariants.status === UNKNOWN) {
-      return makeVerdict(base, 'unknown', 'missing_observation', {
-        detail: '存在无法求值的断言（观测不足，既未通过也未失败）',
+      const bad = [...goals.results, ...invariants.results].filter((r) => r.status === UNKNOWN);
+      const codes = [...new Set(bad.map((r) => r && r.code).filter(Boolean))];
+      // 全都因为同一个原因判不了时，把断言层那个更精确的代码提上来：
+      // 「后端不记录这类事件」和「观测是空的」是两件不同的事，
+      // 前者要改适配器，后者要补观测，混成一个代码就没人能据此行动。
+      const reason = codes.length === 1 && SPECIFIC_UNKNOWN_CODES.has(codes[0]) ? codes[0] : 'missing_observation';
+      return makeVerdict(base, 'unknown', reason, {
+        detail: reason === 'unsupported_event'
+          ? '存在无法求值的断言：实现未记录该类型事件'
+          : '存在无法求值的断言（观测不足，既未通过也未失败）',
         stage: 'goal',
         goal_results: goals.results,
         invariant_results: invariants.results,
