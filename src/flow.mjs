@@ -53,7 +53,7 @@ export function buildFlowModel({ case: c, trajectory = null, verdict = null, tit
   const candidateSource = verdict?.trajectory_source === 'candidate' || Array.isArray(trajectory);
   const sourceSteps = Array.isArray(trajectory)
     ? trajectory
-    : candidateSource && observedSteps.length > 0
+    : candidateSource
       ? observedSteps
       : arrayOrEmpty(c?.reference_trajectory);
   const steps = sourceSteps.map((step, index) => {

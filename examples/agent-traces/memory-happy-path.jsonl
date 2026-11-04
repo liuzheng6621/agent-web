@@ -1,0 +1,4 @@
+{"capability":"order.create","as":"customer","outcome":"applied","arguments":{"items":[{"dishName":"拿铁","qty":1}]},"observed":{"orderId":1001}}
+{"capability":"kitchen.accept","as":"staff","outcome":"applied","arguments":{"orderId":1001},"observed":{"orderId":1001}}
+{"capability":"kitchen.ready","as":"staff","outcome":"applied","arguments":{"orderId":1001},"observed":{"orderId":1001}}
+{"capability":"order.pick","as":"customer","outcome":"applied","arguments":{"orderId":1001},"observed":{"orderId":1001}}

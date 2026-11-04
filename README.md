@@ -65,6 +65,47 @@ node bin/agent-web.mjs verify cases/memory-demo/happy-path.json --adapter=memory
 
 ---
 
+## 推荐流程：一份日志，三个可检查的产物
+
+助手已经跑过一次，并且你拿到了它发出的请求日志？用 `prepare` 一次生成可重放步骤、待确认案例草稿和流程预览：
+
+```bash
+node bin/agent-web.mjs prepare examples/agent-traces/memory-happy-path.jsonl \
+  --adapter=memory \
+  --id=coffee/happy-path \
+  --goal="顾客下单后由本人取走" \
+  --out-dir=agent-web-output/coffee-happy-path
+```
+
+结束后会得到：
+
+```text
+agent-web-output/coffee-happy-path/
+├── trajectory.json     从日志还原的操作步骤
+├── case.draft.json     根据实际结果生成的待确认检查清单
+└── case.flow.html      可双击打开的流程预览
+```
+
+按这个顺序接手：
+
+1. 打开 `case.flow.html`，先看每一步有没有认错人、认错操作。
+2. 检查 `case.draft.json` 里的目标、检查项和「待确认」提示；草稿描述的是这次发生了什么，**自检通过不等于规则正确**。
+3. 补上真正的业务目标和负例（例如别人不能取走订单），确认后再用 `verify` 检查。
+
+`prepare` 会在你指定的测试适配器上重放日志里的写操作，所以只连隔离的测试环境，**不要指向生产系统**。疑似密码、令牌、Cookie 等敏感字段会让流程停止，不会写入产物。若输出文件已存在，也会停止，不覆盖旧文件。
+
+演示日志用简化格式：写清操作名、角色、结果和参数，不需要网络地址。真实 HTTP 日志也能处理，但适配器必须先声明接口地址如何对应操作、请求参数如何转换。要接入自己的服务，把 `--adapter=memory` 换成自己的连接程序，并使用专用测试环境。
+
+检查草稿后，补好目标并添加必要的负例。人工确认完成时，删掉案例 JSON 最后的 `draft` 注记，再运行：
+
+```bash
+node bin/agent-web.mjs verify agent-web-output/coffee-happy-path/case.draft.json --adapter=memory
+```
+
+这一步能证明案例可执行、格式正确；业务检查项是否完整，仍以人工确认结果为准。
+
+---
+
 ## 把助手做过的步骤拿来检查
 
 案例自带的步骤是参考答案，不一定是助手实际走过的路。要检查助手自己的操作记录，先运行：
@@ -125,6 +166,24 @@ node bin/agent-web.mjs record examples/agent-traces/happy-path.jsonl \
 日志可以是 JSONL（每行一条 JSON）或 JSON 数组。每条请求至少要记录操作者、请求方法和地址；最好也保留请求内容与响应结果。登录密码和令牌不要放进日志。
 
 `record` 会把后续步骤用到的订单编号，改成「引用前一步创建的订单」。这样换一套测试数据后，步骤仍能接着跑。看不懂、无法确认结果的请求会列出来跳过，不会猜。
+
+如果想自己分开检查每一步，使用下面两个独立命令：
+
+```bash
+# 1. 请求日志 → 可重放步骤
+node bin/agent-web.mjs record examples/agent-traces/memory-happy-path.jsonl \
+  --adapter=memory --out=/tmp/coffee-trajectory.json
+
+# 2. 可重放步骤 → 待确认案例草稿
+node bin/agent-web.mjs draft /tmp/coffee-trajectory.json \
+  --adapter=memory --out=/tmp/coffee-case.draft.json
+
+# 3. 草稿 → 流程预览
+node bin/agent-web.mjs flow /tmp/coffee-case.draft.json \
+  --out=/tmp/coffee-case.flow.html
+```
+
+平常直接用 `prepare` 即可；`record`、`draft`、`flow` 留给想单独检查或替换其中一步的情况。
 
 ---
 
@@ -260,18 +319,19 @@ node bin/agent-web.mjs verify my-cases --adapter=./my-adapter.mjs
 bin/agent-web.mjs       命令行入口
 src/                   判分、案例、记录、草稿和流程图代码
 cases/                 内置测试题
-examples/              可运行的系统连接样例与操作记录
+examples/              可运行的连接样例与日志
+  agent-traces/memory-happy-path.jsonl   可直接试用 prepare 的简化日志
 docs/SPEC.md            案例文件的详细格式
- test/engine.test.mjs   自动测试（46 条）
+test/engine.test.mjs    自动测试（49 条）
 ```
 
-常用命令：`selftest`（跑内置检查）、`verify`（检查案例）、`compare`（比较不同系统）、`record`（整理请求记录）、`draft`（生成案例草稿）、`flow`（生成流程图）、`drift`（比较两次初始数据是否变化）。运行 `node bin/agent-web.mjs help` 查看完整命令。
+常用命令：`prepare`（一条命令生成步骤、案例草稿和流程预览）、`selftest`（跑内置检查）、`verify`（检查案例）、`compare`（比较不同系统）、`record`（整理请求记录）、`draft`（单独生成案例草稿）、`flow`（生成流程图）、`drift`（比较两次初始数据是否变化）。运行 `node bin/agent-web.mjs help` 查看完整命令。
 
 ---
 
 ## 版本与后续
 
-当前版本 `0.5`：可以跑案例、检查助手实际操作、整理请求记录、生成待确认案例草稿，并生成可交互流程图。
+当前版本 `0.6`：可以跑案例、检查助手实际操作，并用一条 `prepare` 命令从请求日志生成可重放步骤、待确认案例草稿和流程预览。
 
 后续方向：让不同数据结构的系统更容易共用案例、让多套系统并行测试，以及让「根据现象推测出来的能力」能通过验证升级为「实际验证过的能力」。
 

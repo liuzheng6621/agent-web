@@ -4,6 +4,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 
 import { TRUE, FALSE, UNKNOWN, and, or, not } from '../src/three-valued.mjs';
 import { getPath, fingerprint, deepEqual, stableStringify } from '../src/values.mjs';
@@ -11,6 +13,8 @@ import { selectEntities, validateSelector } from '../src/select.mjs';
 import { evalAssertions, validateAssertion, phaseOf } from '../src/assert/index.mjs';
 import { validateCase, resolveArguments } from '../src/case.mjs';
 
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const CLI_PATH = path.join(REPO_ROOT, 'bin', 'agent-web.mjs');
 const st = (orders) => ({ orders, status_log: [] });
 
 test('三值逻辑：and 遇 false 即 false，否则有 unknown 即 unknown', () => {
@@ -631,6 +635,12 @@ test('flow：候选判决使用实际执行轨迹与证据', async () => {
   assert.equal(model.events[0].from, 'MAKING');
   assert.equal(model.eventsComplete, true);
   assert.equal(model.assertions[0].result, 'false');
+
+  const noExecution = buildFlowModel({
+    case: c,
+    verdict: { trajectory_source: 'candidate', evidence: { trace: [] } },
+  });
+  assert.deepEqual(noExecution.steps, [], '候选步骤没执行时，不要伪装成参考步骤');
 });
 
 test('flow：HTML 自包含且对动态内容做 HTML / script 转义', async () => {
@@ -654,4 +664,94 @@ test('flow：HTML 自包含且对动态内容做 HTML / script 转义', async ()
   assert.doesNotMatch(html, /not-for-export/);
   assert.match(html, /REDACTED/);
   assert.doesNotMatch(html, /https?:\/\//);
+});
+
+function runCli(args) {
+  return spawnSync(process.execPath, [CLI_PATH, ...args], {
+    cwd: REPO_ROOT,
+    encoding: 'utf8',
+  });
+}
+
+test('prepare：从动作日志一次生成步骤、未确认案例和流程预览', () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-prepare-'));
+  try {
+    const outDir = path.join(tempRoot, 'prepared');
+    const source = path.join(REPO_ROOT, 'examples', 'agent-traces', 'memory-happy-path.jsonl');
+    const r = runCli([
+      'prepare', source,
+      '--adapter=memory',
+      '--out-dir=' + outDir,
+      '--id=demo/prepared',
+      '--goal=顾客下单后由本人取走',
+    ]);
+    assert.equal(r.status, 0, r.stderr + r.stdout);
+
+    const trajectory = JSON.parse(fs.readFileSync(path.join(outDir, 'trajectory.json'), 'utf8'));
+    const c = JSON.parse(fs.readFileSync(path.join(outDir, 'case.draft.json'), 'utf8'));
+    const html = fs.readFileSync(path.join(outDir, 'case.flow.html'), 'utf8');
+    const model = JSON.parse(html.match(/<script type="application\/json" id="flow-data">([\s\S]*?)<\/script>/)[1]);
+
+    assert.equal(trajectory.trajectory.length, 4);
+    assert.equal(c.id, 'demo/prepared');
+    assert.equal(c.draft.status, 'unconfirmed');
+    assert.equal(c.task.natural_goal, '顾客下单后由本人取走');
+    assert.equal(model.draftStatus, 'unconfirmed');
+    assert.equal(model.verdict, null, '预览不能把草稿伪装成通过的正式案例');
+    assert.equal(model.steps.length, 4);
+
+    const verify = runCli(['verify', path.join(outDir, 'case.draft.json'), '--adapter=memory']);
+    assert.equal(verify.status, 0, verify.stderr + verify.stdout);
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test('prepare：输出文件已存在时拒绝覆盖', () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-prepare-collision-'));
+  try {
+    const outDir = path.join(tempRoot, 'prepared');
+    fs.mkdirSync(outDir);
+    const keep = path.join(outDir, 'case.draft.json');
+    fs.writeFileSync(keep, 'keep me', 'utf8');
+
+    const source = path.join(REPO_ROOT, 'examples', 'agent-traces', 'memory-happy-path.jsonl');
+    const r = runCli(['prepare', source, '--adapter=memory', '--out-dir=' + outDir]);
+    assert.equal(r.status, 2);
+    assert.match(r.stderr, /避免覆盖/);
+    assert.equal(fs.readFileSync(keep, 'utf8'), 'keep me');
+    assert.equal(fs.existsSync(path.join(outDir, 'trajectory.json')), false);
+    assert.equal(fs.existsSync(path.join(outDir, 'case.flow.html')), false);
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test('prepare：没有可还原步骤或发现敏感字段时不写产物', () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-prepare-invalid-'));
+  try {
+    const emptyLog = path.join(tempRoot, 'empty.json');
+    const emptyOut = path.join(tempRoot, 'empty-out');
+    fs.writeFileSync(emptyLog, '[]', 'utf8');
+    const empty = runCli(['prepare', emptyLog, '--adapter=memory', '--out-dir=' + emptyOut]);
+    assert.equal(empty.status, 1);
+    assert.equal(fs.existsSync(emptyOut), false);
+
+    const secretLog = path.join(tempRoot, 'secret.jsonl');
+    const secretOut = path.join(tempRoot, 'secret-out');
+    fs.writeFileSync(secretLog, JSON.stringify({
+      capability: 'order.create',
+      as: 'customer',
+      outcome: 'applied',
+      arguments: { items: [{ dishName: '拿铁', qty: 1 }], accessToken: 'do-not-export' },
+      observed: { orderId: 1001 },
+    }) + '\n', 'utf8');
+    const secret = runCli(['prepare', secretLog, '--adapter=memory', '--out-dir=' + secretOut]);
+    assert.equal(secret.status, 2);
+    assert.match(secret.stderr, /敏感字段/);
+    assert.doesNotMatch(secret.stderr, /do-not-export/);
+    assert.equal(fs.existsSync(secretOut), false);
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
 });

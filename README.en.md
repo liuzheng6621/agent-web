@@ -65,6 +65,47 @@ node bin/agent-web.mjs verify cases/memory-demo/happy-path.json --adapter=memory
 
 ---
 
+## Recommended: one log, three useful files
+
+Already have a request log from one run of the assistant? Use `prepare` to create replayable steps, a draft checklist for review, and a flow-chart preview:
+
+```bash
+node bin/agent-web.mjs prepare examples/agent-traces/memory-happy-path.jsonl \
+  --adapter=memory \
+  --id=coffee/happy-path \
+  --goal="The customer places an order and picks it up" \
+  --out-dir=agent-web-output/coffee-happy-path
+```
+
+You will get:
+
+```text
+agent-web-output/coffee-happy-path/
+├── trajectory.json     actions rebuilt from the log
+├── case.draft.json     a checklist based on what happened
+└── case.flow.html      an offline flow-chart preview
+```
+
+Review them in this order:
+
+1. Open `case.flow.html`. Check that each person and action is shown correctly.
+2. Review the goal, checks, and “to confirm” notes in `case.draft.json`. The draft describes what happened in this run; **passing its own check does not mean its rules are correct**.
+3. Add the real business goal and negative cases (for example, another customer must not pick up the order). Then run `verify`.
+
+`prepare` replays the write actions against the adapter you specify, so point it only at an isolated test system, **never production**. If it finds fields that look like passwords, tokens, or cookies, it stops without writing output. It also refuses to overwrite existing output files.
+
+The demo log uses a simple format: operation name, role, outcome, and arguments. It needs no network address. Real HTTP logs are supported too, but the adapter must first map request URLs to operations and translate request arguments. For your own service, replace `--adapter=memory` with your connector and use a dedicated test environment.
+
+After reviewing the draft, add the real goal and any required negative cases. When a person has confirmed it, remove the trailing `draft` note from the case JSON and run:
+
+```bash
+node bin/agent-web.mjs verify agent-web-output/coffee-happy-path/case.draft.json --adapter=memory
+```
+
+This checks that the case is valid and runnable. A successful run does not prove that the business checklist is complete; a person must confirm that.
+
+---
+
 ## Check what the assistant actually did
 
 The steps stored with a case are a sample route, not necessarily the route the assistant took. To check the assistant's own actions:
@@ -127,6 +168,24 @@ node bin/agent-web.mjs record examples/agent-traces/happy-path.jsonl \
 Logs can be JSONL (one JSON object per line) or a JSON array. Each request needs the actor, request method, and URL. Include the request content and response when possible. Do not put login passwords or tokens in the log.
 
 `record` replaces order numbers returned by earlier steps with references to those steps. The route can then run with fresh test data. Requests it cannot understand or verify are listed as skipped; it does not guess.
+
+To inspect each stage yourself, run the commands separately:
+
+```bash
+# 1. Request log → replayable steps
+node bin/agent-web.mjs record examples/agent-traces/memory-happy-path.jsonl \
+  --adapter=memory --out=/tmp/coffee-trajectory.json
+
+# 2. Replayable steps → draft checklist
+node bin/agent-web.mjs draft /tmp/coffee-trajectory.json \
+  --adapter=memory --out=/tmp/coffee-case.draft.json
+
+# 3. Draft case → flow-chart preview
+node bin/agent-web.mjs flow /tmp/coffee-case.draft.json \
+  --out=/tmp/coffee-case.flow.html
+```
+
+Use `prepare` for the normal path. Keep `record`, `draft`, and `flow` for when you want to inspect or replace one stage.
 
 ---
 
@@ -263,17 +322,18 @@ bin/agent-web.mjs       Command-line entry point
 src/                   Checking, cases, logs, drafts, and flow-chart code
 cases/                 Built-in test cases
 examples/              Working connectors and sample action logs
+  agent-traces/memory-happy-path.jsonl   simple log for trying prepare
 docs/SPEC.md            Detailed case-file format
-test/engine.test.mjs    Automated tests (46 cases)
+test/engine.test.mjs    Automated tests (49 cases)
 ```
 
-Common commands: `selftest` (run the built-in checks), `verify` (check cases), `compare` (compare systems), `record` (organize request logs), `draft` (make a case draft), `flow` (make a flow chart), and `drift` (compare whether the starting data changed). Run `node bin/agent-web.mjs help` for the full list.
+Common commands: `prepare` (create steps, a draft case, and a flow preview in one run), `selftest` (run the built-in checks), `verify` (check cases), `compare` (compare systems), `record` (organize request logs), `draft` (make a case draft separately), `flow` (make a flow chart), and `drift` (compare whether the starting data changed). Run `node bin/agent-web.mjs help` for the full list.
 
 ---
 
 ## Version and next steps
 
-Current version: `0.5`. It can run cases, check an assistant's actions, organize request logs, create case drafts for review, and generate interactive flow charts.
+Current version: `0.6`. It can run cases, check an assistant's actions, and use one `prepare` command to turn a request log into replayable steps, a draft checklist, and a flow-chart preview.
 
 Next: make it easier for different systems to share the same cases, run tests against multiple systems at once, and turn abilities that are only inferred into abilities that have been verified in practice.
 

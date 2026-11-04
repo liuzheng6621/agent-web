@@ -6,6 +6,7 @@
  *   agent-web verify <目录或文件>       对指定适配器跑案例，出判决
  *   agent-web report <results.jsonl>   由判决结果出指标
  *   agent-web capabilities             打印适配器的能力清单与证据等级
+ *   agent-web prepare <动作日志>       一次生成轨迹、案例草稿与流程预览
  *   agent-web draft <轨迹文件>          回放一条轨迹，反推案例草稿
  *   agent-web flow <案例.json>           生成交互式流程图 HTML
  *   agent-web init <目录>              生成一份案例模板
@@ -460,6 +461,205 @@ async function cmdRecord(args, flags) {
   return doc.trajectory.length > 0 ? 0 : 1;
 }
 
+function findSensitiveFields(value, prefix = '', found = []) {
+  if (Array.isArray(value)) {
+    value.forEach((item, index) => findSensitiveFields(item, prefix + '[' + index + ']', found));
+  } else if (value && typeof value === 'object') {
+    for (const [key, item] of Object.entries(value)) {
+      const at = prefix ? prefix + '.' + key : key;
+      if (/password|passwd|secret|token|authorization|cookie|api[_-]?key/i.test(key)) {
+        found.push(at);
+      } else {
+        findSensitiveFields(item, at, found);
+      }
+    }
+  }
+  return found;
+}
+
+function writeNewFileSet(files, outDir) {
+  const collisions = files.filter(({ file }) => fs.existsSync(file));
+  if (collisions.length > 0) {
+    throw new Error('为避免覆盖已有文件，未写入任何内容：' + collisions.map(({ file }) => file).join('、'));
+  }
+
+  fs.mkdirSync(outDir, { recursive: true });
+  const written = [];
+  try {
+    for (const { file, content } of files) {
+      fs.writeFileSync(file, content, { encoding: 'utf8', flag: 'wx' });
+      written.push(file);
+    }
+  } catch (e) {
+    for (const file of written) {
+      try { fs.unlinkSync(file); } catch { /* 保留原始写入错误 */ }
+    }
+    throw e;
+  }
+}
+
+// prepare：从一次请求日志直接产出三个可交接文件。
+// 和手动串 record → draft → flow 不同，这里只回放一次，并且不把草稿判成绿色成绩。
+async function cmdPrepare(args, flags) {
+  if (args.length === 0) {
+    console.error('用法：agent-web prepare <动作日志> --adapter=SPEC [--out-dir=目录] [--id=案例id] [--goal="..."] [--seed=JSON]');
+    return 2;
+  }
+
+  const logPath = path.resolve(args[0]);
+  if (!fs.existsSync(logPath) || !fs.statSync(logPath).isFile()) {
+    console.error('找不到动作日志文件 ' + logPath);
+    return 2;
+  }
+
+  const base = path.basename(logPath, path.extname(logPath)) || 'case';
+  const outDir = path.resolve(typeof flags['out-dir'] === 'string'
+    ? flags['out-dir']
+    : path.join('agent-web-output', base));
+  const outputs = [
+    path.join(outDir, 'trajectory.json'),
+    path.join(outDir, 'case.draft.json'),
+    path.join(outDir, 'case.flow.html'),
+  ];
+  if (fs.existsSync(outDir) && !fs.statSync(outDir).isDirectory()) {
+    console.error('输出路径已存在但不是目录：' + outDir);
+    return 2;
+  }
+  const existing = outputs.filter((file) => fs.existsSync(file));
+  if (existing.length > 0) {
+    console.error('为避免覆盖已有文件，停止执行：');
+    for (const file of existing) console.error('  - ' + file);
+    console.error('请换一个 --out-dir。');
+    return 2;
+  }
+
+  const adapterName = flags.adapter ?? 'memory';
+  const adapter = await makeAdapter(adapterName);
+  const manifest = await adapter.manifest();
+  let seed = {};
+  if (typeof flags.seed === 'string') {
+    try {
+      seed = JSON.parse(flags.seed);
+    } catch (e) {
+      console.error('--seed 不是合法 JSON：' + e.message);
+      return 2;
+    }
+  }
+
+  const { entryCount, doc } = recordTrajectory({
+    text: fs.readFileSync(logPath, 'utf8'),
+    manifest,
+    adapter,
+    producedBy: path.basename(logPath),
+    includeReads: flags['include-reads'] === true || flags['include-reads'] === 'true',
+  });
+  if (typeof flags.id === 'string') {
+    doc.note = '由 prepare 从 ' + path.basename(logPath) + ' 还原，对应案例 ' + flags.id;
+  }
+  if (doc.trajectory.length === 0) {
+    console.error('没有还原出可执行步骤，不生成文件。');
+    for (const item of doc.skipped ?? []) console.error('  - ' + item.reason + ': ' + item.detail);
+    return 1;
+  }
+
+  const stepErrors = validateSteps(doc.trajectory, 'trajectory');
+  if (stepErrors.length > 0) {
+    console.error('还原出的步骤未通过检查，不生成文件：');
+    for (const error of stepErrors) console.error('  - ' + error);
+    return 1;
+  }
+
+  const secrets = findSensitiveFields(doc.trajectory);
+  if (secrets.length > 0) {
+    console.error('步骤参数里发现疑似敏感字段，不会写入文件：' + secrets.join('、'));
+    console.error('请先从日志或连接程序中移除密码、令牌、Cookie 等字段，再重新运行。');
+    return 2;
+  }
+
+  const replay = await replayTrajectory({
+    adapter,
+    steps: doc.trajectory,
+    scopes: manifest.scopes,
+    seed,
+  });
+  if (!replay.ok) {
+    console.error('步骤无法在当前测试系统上重放：' + replay.aborted.code +
+      (replay.aborted.at !== undefined ? ' @ step[' + replay.aborted.at + ']' : ''));
+    console.error('  ' + replay.aborted.detail);
+    console.error('未生成文件。检查连接地址、账号角色和日志内容。');
+    return 1;
+  }
+
+  const caseId = typeof flags.id === 'string' ? flags.id : 'draft/' + base;
+  const { case: c, synth } = buildDraftCase({
+    id: caseId,
+    adapterName: manifest.adapter ?? adapterName,
+    seed,
+    source: path.relative(process.cwd(), logPath).split(path.sep).join('/'),
+    steps: doc.trajectory,
+    initial: replay.initial,
+    final: replay.final,
+    trace: replay.trace,
+    manifest,
+    scopes: manifest.scopes,
+    goal: typeof flags.goal === 'string' ? flags.goal : '',
+  });
+
+  const caseErrors = validateCase(c);
+  const realErrors = synth.goal_assertions.length === 0
+    ? caseErrors.filter((error) => !error.includes('goal_assertions'))
+    : caseErrors;
+  if (realErrors.length > 0) {
+    console.error('生成的案例草稿未通过格式检查，不生成文件：');
+    for (const error of realErrors) console.error('  - ' + error);
+    return 1;
+  }
+  if (synth.goal_assertions.length === 0) {
+    console.error('这次运行没有留下可检查的目标结果，不生成文件。');
+    return 1;
+  }
+
+  const caseSecrets = findSensitiveFields(c);
+  if (caseSecrets.length > 0) {
+    console.error('案例草稿里发现疑似敏感字段，不会写入文件：' + caseSecrets.join('、'));
+    return 2;
+  }
+
+  const trajectoryJson = JSON.stringify(doc, null, 2) + '\n';
+  const caseJson = JSON.stringify(c, null, 2) + '\n';
+  const flowHtml = renderFlowHtml({ case: c, title: c.id });
+  try {
+    writeNewFileSet([
+      { file: outputs[0], content: trajectoryJson },
+      { file: outputs[1], content: caseJson },
+      { file: outputs[2], content: flowHtml },
+    ], outDir);
+  } catch (e) {
+    console.error('写入失败：' + e.message);
+    return 2;
+  }
+
+  const skipped = doc.skipped ?? [];
+  console.log('准备完成：读入 ' + entryCount + ' 条请求，还原出 ' + doc.trajectory.length + ' 步' +
+    (skipped.length ? '，另有 ' + skipped.length + ' 条请求需要查看' : ''));
+  if (skipped.length > 0) {
+    const reasons = {};
+    for (const item of skipped) reasons[item.reason] = (reasons[item.reason] ?? 0) + 1;
+    console.log('  未纳入步骤：' + Object.entries(reasons).map(([reason, count]) => reason + ' × ' + count).join('；'));
+    console.log('  每条具体原因见 trajectory.json 的 skipped 列表。');
+  }
+  console.log('输出目录：' + path.relative(process.cwd(), outDir));
+  console.log('  trajectory.json    可重放步骤');
+  console.log('  case.draft.json    未确认的检查清单');
+  console.log('  case.flow.html     离线流程预览');
+  console.log('');
+  console.log('下一步：打开流程预览并检查 case.draft.json。草稿从实际发生的事生成，自检通过不代表检查规则正确。');
+  console.log('补好目标和负例、确认规则后，再运行：');
+  console.log('  node bin/agent-web.mjs verify ' + path.relative(process.cwd(), outputs[1]) +
+    ' --adapter=' + (manifest.adapter ?? adapterName));
+  return 0;
+}
+
 // draft：把一条轨迹回放一遍，从实际终态反推案例草稿。
 // 它的产物一定是 pass —— 断言就是从这次运行的终态抄下来的。
 // 所以这一步不是"生成测试"，是"把人要想的部分从零开始压到几条待确认"。
@@ -702,7 +902,8 @@ const HELP = `agent-web —— 给 Agent 写机器可判的集成测试
   agent-web capabilities [--adapter=SPEC]     打印能力清单与证据等级
   agent-web compare <案例> --adapters=A,B     同一份案例喂多个实现，比判决
   agent-web drift <旧.jsonl> <新.jsonl>      比较两次跑批的初态形状（漂移检测）
-  agent-web record <动作日志> --adapter=SPEC  把 Agent 的实际动作还原成候选轨迹
+  agent-web record <动作日志> --adapter=SPEC   把 Agent 的实际动作还原成候选轨迹
+  agent-web prepare <动作日志> --adapter=SPEC  一次生成步骤、案例草稿和流程预览
   agent-web draft <轨迹文件> --adapter=SPEC   回放轨迹，反推案例草稿（要人确认）
   agent-web flow <案例.json> [--result=FILE]  生成交互式流程图 HTML
   agent-web init <目录>                       生成案例模板（--adapter 写进 environment）
@@ -742,6 +943,8 @@ async function main() {
         return await cmdCompare(args, flags);
       case 'record':
         return await cmdRecord(args, flags);
+      case 'prepare':
+        return await cmdPrepare(args, flags);
       case 'draft':
         return await cmdDraft(args, flags);
       case 'flow':

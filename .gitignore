@@ -2,6 +2,7 @@ node_modules/
 .design/
 *.log
 results.jsonl
+agent-web-output/
 .tmp-*
 .dbg.mjs
 .p*.mjs
