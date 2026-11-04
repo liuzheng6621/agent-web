@@ -563,7 +563,10 @@ async function cmdVerify(args, flags) {
 
   const out = flags.out;
   if (typeof out === 'string') {
-    fs.writeFileSync(out, verdicts.map((v) => JSON.stringify(v)).join('\n') + '\n', 'utf8');
+    // 目录不存在时自己建：CI 上第一次跑 .tmp-ci/xxx.jsonl 就死在这里。
+    // 本地因为目录早就在了，永远看不到——真踩过（GitHub CI 红了一整天）。
+    fs.mkdirSync(path.dirname(path.resolve(out)), { recursive: true });
+    fs.writeFileSync(path.resolve(out), verdicts.map((v) => JSON.stringify(v)).join('\n') + '\n', 'utf8');
     console.error(`已写入 ${out}`);
   }
 

@@ -60,6 +60,9 @@ jobs:
       - name: 陷阱普查必须真的指得出盲区
         run: |
           set -e
+          # 干净克隆里没有 .tmp-ci/。代码那边已经会自己建，这里再显式建一次：
+          # 代码修的是能力，CI 修的是可读性——红的时候一眼看得出死在哪。
+          mkdir -p .tmp-ci
           node bin/agent-web.mjs verify cases/coffee --adapter=memory --out=.tmp-ci/traps.jsonl > /dev/null
           node bin/agent-web.mjs traps .tmp-ci/traps.jsonl --cases=cases/coffee --json > .tmp-ci/traps.json
           node - <<'JS'
@@ -78,6 +81,24 @@ jobs:
           }
           console.log('盲区率', r.blind_rate);
           JS
+
+      - name: 每个案例都必须在 expected.json 里有预期
+        run: |
+          # two-items 加了三个月都没进 expected.json，而 selftest 只画一个点就过了。
+          # 没有预期的案例等于没被判过——这类空洞只能靠「数一遍」发现。
+          node -e '
+            const fs = require("node:fs");
+            const path = require("node:path");
+            const dir = "cases/coffee";
+            const exp = JSON.parse(fs.readFileSync(path.join(dir, "expected.json"), "utf8"));
+            const files = fs.readdirSync(dir).filter((f) => f.endsWith(".json") && f !== "expected.json");
+            const ids = files.map((f) => JSON.parse(fs.readFileSync(path.join(dir, f), "utf8")).id);
+            const missing = ids.filter((id) => !(id in exp));
+            const extra = Object.keys(exp).filter((k) => !ids.includes(k));
+            if (missing.length) { console.error("没有预期的案例：", missing); process.exit(1); }
+            if (extra.length) { console.error("预期表里有不存在的案例：", extra); process.exit(1); }
+            console.log("案例 " + files.length + " 条，预期表 " + Object.keys(exp).length + " 条，一一对应");
+          '
 
       - name: 判据准入：漏网的变异体必须正好是基线里那几个
         run: node scripts/certify-baseline.mjs

@@ -9,10 +9,10 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/liuzheng6621/agent-web/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/liuzheng6621/agent-web/actions/workflows/ci.yml/badge.svg"></a>
-  <img alt="node" src="https://img.shields.io/badge/node-%E2%89%A520-3fb950">
-  <img alt="license" src="https://img.shields.io/badge/license-MIT-58a6ff">
-  <img alt="deps" src="https://img.shields.io/badge/dependencies-0-d29922">
+  <img alt="node" src="docs/media/badge-node.svg">
+  <img alt="dependencies" src="docs/media/badge-deps.svg">
+  <img alt="license" src="docs/media/badge-license.svg">
+  <img alt="tests" src="docs/media/badge-tests.svg">
 </p>
 
 ---
@@ -79,7 +79,7 @@ node bin/agent-web.mjs certify cases/coffee --adapter=memory
 - 第二次撞上 → **拦下来**（退出码 1，`--no-gate` 可放过）
 
 ```bash
-node bin/agent-web.mjs knowledge     # 看全部八条
+node bin/agent-web.mjs knowledge     # 看全部十条
 node bin/agent-web.mjs recall        # 扫一遍，看这次有没有重犯
 ```
 

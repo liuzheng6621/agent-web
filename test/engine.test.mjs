@@ -933,3 +933,36 @@ test('加载外部适配器之前会提醒这是可执行代码，且能被环�
   });
   assert.doesNotMatch(quiet.stderr, /正在加载外部适配器/);
 });
+
+test('--out 的父目录不存在时自己建出来（干净克隆上 CI 就死在这）', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-out-'));
+  const target = path.join(root, 'deep', 'nested', 'r.jsonl');
+  assert.equal(fs.existsSync(path.dirname(target)), false, '前置：父目录不该存在');
+
+  const r = spawnSync(
+    process.execPath,
+    [CLI_PATH, 'verify', 'cases/coffee', '--adapter=memory', '--out=' + target],
+    { cwd: REPO_ROOT, encoding: 'utf8' },
+  );
+
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(fs.existsSync(target), true, '父目录不存在时 verify 必须自己建出来');
+  const lines = fs.readFileSync(target, 'utf8').trim().split('\n');
+  assert.equal(lines.length, 8);
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+test('每个案例都在 expected.json 里有预期，且预期表里没有不存在的案例', () => {
+  const dir = path.join(REPO_ROOT, 'cases', 'coffee');
+  const expected = JSON.parse(fs.readFileSync(path.join(dir, 'expected.json'), 'utf8'));
+  const ids = fs
+    .readdirSync(dir)
+    .filter((f) => f.endsWith('.json') && f !== 'expected.json')
+    .map((f) => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')).id);
+
+  const missing = ids.filter((id) => !(id in expected));
+  const extra = Object.keys(expected).filter((k) => !ids.includes(k));
+  assert.deepEqual(missing, [], '这些案例没有预期，等于没被判过');
+  assert.deepEqual(extra, [], '预期表里有已经不存在的案例');
+  assert.equal(ids.length, Object.keys(expected).length);
+});
