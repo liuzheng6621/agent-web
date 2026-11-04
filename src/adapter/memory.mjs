@@ -211,7 +211,7 @@ export function createMemoryAdapter() {
     return order;
   }
 
-  async function execute(runId, action) {
+  async function executeInner(runId, action) {
     // 未知角色必须显式拒绝：回落到默认身份会让"换个身份再来一次"静默失效。
     if (action.as && !(MANIFEST.roles ?? []).includes(action.as)) {
       return { outcome: 'rejected', error: { code: 'unknown_role', message: `角色 ${action.as} 不在 manifest.roles 里` } };
@@ -308,6 +308,24 @@ export function createMemoryAdapter() {
 
   async function close(runId) {
     runs.delete(runId);
+  }
+
+  /**
+   * 包一层只为记下「这一步到底是谁执行的」。
+   *
+   * 身份塌缩是这类系统最难抓的失败：每一步都合法、观测都真实、判决也完全正确，
+   * 只是执行的人被悄悄换成了另一个。没有这条记录，事后连查都没法查。
+   */
+  async function execute(runId, action) {
+    const r = await executeInner(runId, action);
+    let who = null;
+    try {
+      who = actor(action);
+    } catch {
+      who = null; // 未知角色没有身份可记，这一步本来就该被拒
+    }
+    if (who && r && typeof r === 'object') r.identity = who.name;
+    return r;
   }
 
   return { manifest, reset, observe, execute, close };

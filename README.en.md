@@ -261,6 +261,44 @@ node bin/agent-web.mjs accept cases/coffee/my-draft.json --by=YG
 
 Anonymous confirmation is rejected (`--by` is required): "somebody looked at it" that cannot be named is the same as nobody looking. Hand-written cases carry no `draft` field and are unaffected.
 
+## Health report: how many of these verdicts came from a blind spot
+
+`audit` needs a second implementation before it can say anything. `traps` does not: given the results plus the case files, it asks one question per verdict — was this verdict produced in a blind spot?
+
+A blind spot means the verdict looks conclusive, but the risk cannot be ruled out from the verdict itself. "The result is right but the process was not", or "someone else executed the step" — both produce a stable `pass`, and neither makes the judge complain.
+
+```bash
+agent-web verify cases/coffee --adapter=memory --out=r.jsonl
+agent-web traps r.jsonl --cases=cases/coffee --detail
+```
+
+```
+陷阱普查（7 条判决）
+
+  陷阱              涉及   有据可查   盲区   盲区率
+  身份塌缩                5          5      0   0.0%
+  事件词表缺失              0          0      0   —（分母为 0）
+  草稿闸门                0          0      0   —（分母为 0）
+  只看终态                5          0      5   100.0%
+
+  盲区风险点：5/10   盲区率 50.0%
+```
+
+The report is meant to look bad. Ours says five cases only assert the final state: **process games that land on the right end state are invisible to those five verdicts.**
+
+Four states, and they must not be conflated:
+
+| State | Meaning |
+|---|---|
+| not applicable | the case cannot hit this trap structurally |
+| guarded | it does, and the verdict carries checkable evidence |
+| blind | it does, and the verdict still looks conclusive |
+| unusable | the verdict itself is void (environment failure) |
+
+"Guarded" only means the verdict carries evidence. It does not mean safe — an adapter can lie. Same stance as the rest of this document: we only record what we can see.
+
+It reports by default and does not gate. Pass `--max-blind=0.2` to make it fail the build above a threshold. There is no default threshold because the blind rate is structural — "terminal state only" is often wrong for a whole batch — and a default would turn CI permanently red, get switched off by one flag, and never be looked at again.
+
 ## One copy of the cases
 
 `cases/coffee/` is not duplicated per implementation. The same directory hits different systems by switching `--adapter`:

@@ -7,6 +7,7 @@
  *   agent-web report <results.jsonl>   由判决结果出指标
   agent-web accept <文件> --by=NAME     确认草稿，确认后才能判决
   agent-web audit <可信.jsonl> <被审.jsonl>  用真实判决当尺子，量假绿/假红
+  agent-web traps <结果.jsonl> --cases=目录  陷阱普查：这批判决有多少条在盲区里
  *   agent-web capabilities             打印适配器的能力清单与证据等级
  *   agent-web prepare <动作日志>       一次生成轨迹、案例草稿与流程预览
  *   agent-web draft <轨迹文件>          回放一条轨迹，反推案例草稿
@@ -31,6 +32,7 @@ import { summarize, agreement, formatText, countFailedAssertions } from '../src/
 import { loadAdapter, listBuiltins } from '../src/adapter/load.mjs';
 import { diffViews } from '../src/view.mjs';
 import { auditRuns, formatAudit } from '../src/audit.mjs';
+import { summarizeTraps, formatTraps, trapVerdict } from '../src/traps.mjs';
 import { collectUsage, summarizeCoverage, formatCoverage, coverageVerdict } from '../src/coverage.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -182,6 +184,70 @@ async function cmdAudit(args, flags) {
     console.log(formatAudit(report, { detail: Boolean(flags.detail) }));
   }
   return report.sound ? 0 : 1;
+}
+
+function loadCaseDir(dir) {
+  const out = new Map();
+  let names = [];
+  try {
+    names = fs.readdirSync(dir).filter((n) => n.endsWith('.json') && n !== 'expected.json');
+  } catch (e) {
+    throw new Error(`读不了案例目录 ${dir}：${e && e.message}`);
+  }
+  for (const n of names) {
+    const c = JSON.parse(fs.readFileSync(path.join(dir, n), 'utf8'));
+    if (c && c.id) out.set(c.id, c);
+  }
+  return out;
+}
+
+async function cmdTraps(args, flags) {
+  if (args.length < 1) {
+    console.error('用法：agent-web traps <结果.jsonl> --cases=目录 [--max-blind=0] [--detail] [--json]');
+    console.error('  它对每条判决问一句：这条判决是在盲区里产生的吗？');
+    console.error('  与 audit 的分工：audit 要有两个实现对照，traps 只要一份判决加案例集。');
+    return 2;
+  }
+  const casesDir = flags.cases;
+  if (!casesDir) {
+    console.error('缺 --cases=目录：没有案例原文，就不知道每条判决当时面对的是什么任务。');
+    return 2;
+  }
+
+  const cases = loadCaseDir(casesDir);
+  const verdicts = readJsonl(args[0]);
+  const pairs = [];
+  const unmatched = [];
+  for (const v of verdicts) {
+    const c = cases.get(v.case_id);
+    if (!c) {
+      unmatched.push(v.case_id);
+      continue;
+    }
+    pairs.push({ verdict: v, case: c });
+  }
+
+  const report = summarizeTraps(pairs);
+  // 默认只报告不拦截：盲区率是结构性的（「只看终态」这类缺陷常常整批都是），
+  // 给一个默认门槛会让 CI 永远红，从而被 --max-blind 一个参数关掉、再没人看。
+  // 要设门槛就显式给。
+  const gated = flags['max-blind'] !== undefined;
+  const verdict = gated
+    ? trapVerdict(report, { maxBlind: Number(flags['max-blind']) })
+    : { ok: true, reason: '只报告，未设门槛（要拦截请给 --max-blind=0.2）' };
+
+  if (flags.json) {
+    console.log(JSON.stringify({ ...report, matched: pairs.length, unmatched, judgement: verdict }, null, 2));
+  } else {
+    console.log(formatTraps(report, { detail: Boolean(flags.detail) }));
+    if (unmatched.length > 0) {
+      console.log('');
+      console.log(`  没找到案例原文的判决：${unmatched.length} 条（${unmatched.slice(0, 5).join(', ')}）`);
+    }
+    console.log('');
+    console.log(`  ${verdict.ok ? '通过' : '不通过'}：${verdict.reason}`);
+  }
+  return verdict.ok ? 0 : 1;
 }
 
 async function cmdAccept(args, flags) {
@@ -1083,6 +1149,8 @@ async function main() {
         return await cmdDrift(args);
       case 'capabilities':
         return await cmdCapabilities(args, flags);
+      case 'traps':
+        return await cmdTraps(args, flags);
       case 'audit':
         return await cmdAudit(args, flags);
       case 'accept':

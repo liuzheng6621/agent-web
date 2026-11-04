@@ -237,7 +237,7 @@ export function createTaixianglianAdapter(options = {}) {
     }
   }
 
-  async function execute(runId, action) {
+  async function executeInner(runId, action) {
     // 未知角色必须显式拒绝：回落到默认身份会让"换个身份再来一次"静默失效。
     if (action.as && !(MANIFEST.roles ?? []).includes(action.as)) {
       return { outcome: 'rejected', error: { code: 'unknown_role', message: `角色 ${action.as} 不在 manifest.roles 里` } };
@@ -333,6 +333,22 @@ export function createTaixianglianAdapter(options = {}) {
     const id = matched?.params?.id;
     if (id !== undefined) return { orderId: Number(id) };
     return {};
+  }
+
+  /**
+   * 记下「这一步实际用谁的令牌执行」。
+   * 案例里写 as: 'customer2'，这里记的是真正发出去的那个用户名——
+   * 两者不一致就是身份塌缩，而判决本身不会有任何异常。
+   */
+  async function execute(runId, action) {
+    const r = await executeInner(runId, action);
+    const ctx = runs.get(runId);
+    if (ctx && r && typeof r === 'object') {
+      const AS = { staff: ctx.staff, customer2: ctx.customer2, customer: ctx.customer };
+      const who = AS[action.as] ?? ctx.customer;
+      if (who && who.username) r.identity = who.username;
+    }
+    return r;
   }
 
   return { manifest, reset, observe, execute, close, baseUrl, toStep };

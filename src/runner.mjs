@@ -239,6 +239,8 @@ async function judgeInner({ case: c, adapter, adapterName = 'unknown', trajector
         arguments: args,
         expected_outcome: step.expected_outcome,
         outcome: res.outcome,
+        // 适配器愿意报就记：事后唯一能查「谁真的执行了这一步」的凭据。
+        identity: res.identity ?? null,
         payload: res.payload ?? null,
         error: res.error ?? null,
         stateBefore: before.state,
@@ -306,11 +308,22 @@ async function judgeInner({ case: c, adapter, adapterName = 'unknown', trajector
         as: t.as,
         expected_outcome: t.expected_outcome,
         outcome: t.outcome,
+        identity: t.identity ?? null,
         error: t.error,
       })),
       events: ctx.events,
       events_complete: ctx.eventsComplete,
       missing_scopes: last.missingScopes,
+      // 判决要能离线复查：把「这局的身份映射」和「这台环境的观测能力」
+      // 一起留在证据里，否则事后只能靠重跑才能判断判决有没有被骗。
+      role_bindings: reset.roleBindings ?? null,
+      environment: {
+        roles: Array.isArray(manifest.roles) ? [...manifest.roles] : null,
+        scopes: Array.isArray(manifest.scopes) ? [...manifest.scopes] : null,
+        events_complete: manifest.events_complete === true,
+        events_types: Array.isArray(manifest.events_types) ? [...manifest.events_types] : null,
+        reset_strategy: manifest.reset_strategy ?? null,
+      },
     };
 
     // ---- step 5: 汇总 ----

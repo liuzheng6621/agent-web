@@ -519,17 +519,72 @@ node bin/agent-web.mjs audit <可信结果.jsonl> <被审结果.jsonl> [--detail
 
 出口判据：`missing > 0` 不通过；给定 `--min` 时 `rate` 低于门槛也不通过（`rate` 为 `null` 一律视为不达标）。
 
-## 11. 版本演进
+## 11. 陷阱普查（traps）
+
+`traps` 与 `audit` 是两件不同的事，输入也不同：
+
+| | 输入 | 问的问题 |
+|---|---|---|
+| `audit` | 两份判决（一个实现当尺子） | 判决器自己漏判了多少 |
+| `traps` | 一份判决 + 案例原文 | 这批判决里有多少条是在盲区里产生的 |
+
+### 11.1 四种状态
+
+对每条判决、每个陷阱，给出且只给出一个状态：
+
+| 状态 | 判定条件 |
+|---|---|
+| `absent` | 案例结构上碰不到这个陷阱 |
+| `guarded` | 碰到了，且判决带着可核对的凭据 |
+| `blind` | 碰到了，判决却是 `pass` / `fail` |
+| `unusable` | 判决本身无效（`reason_code: infrastructure_error`），不参与任何比率 |
+
+`guarded` 只表示「有据可查」，不表示「安全」：适配器可以谎报。规范不要求验证凭据的真伪，只要求把凭据留下来。
+
+探测器自身抛错时按 `blind` 记录并附原因，不得静默跳过——探测器坏了和风险未覆盖是同一件事。
+
+### 11.2 四个陷阱
+
+| id | 涉及条件 | `guarded` 条件 |
+|---|---|---|
+| `identity-collapse` | 轨迹中出现 ≥2 个不同 `as` | 每一步都有 `evidence.trace[i].identity`，且与 `evidence.role_bindings[as]` 一致 |
+| `event-vocabulary` | 任一断言（含 composite 展开）为 `event_absent` | 有 `evidence.environment.events_types` 且事件完整；或已判 `unknown / unsupported_event` |
+| `draft-gate` | `draft.status !== 'confirmed'` | 已判 `unknown / unconfirmed_draft` |
+| `terminal-only` | 只有终态类断言（`entity_exists` / `field_equals` / `count_delta` / `unchanged`），没有过程类断言（`status_transition` / `event_absent`） | 不适用（碰到即 `blind`） |
+
+新增陷阱属于规范变更，必须同时提供：涉及条件、`guarded` 条件、一个在 `docs/museum/` 里有出处的展品。**没有展品的陷阱不收。**
+
+### 11.3 比率与分母
+
+比率的分母是**涉及到的风险点数**，不是案例数：一局可以同时踩多个坑。
+
+```
+blind_rate = Σ blind / Σ (guarded + blind)
+```
+
+任何一侧为 0 时 `blind_rate` 为 `null`，打印「—（分母为 0）」，不得显示 `0%`。
+
+`unusable` 的判决不进入分母，另行报出数量：环境故障的判决本来就不该计分。
+
+### 11.4 门槛
+
+默认不设门槛、只报告，退出码 0。给了 `--max-blind=<0..1>` 才在超过时退出码 1；`blind_rate` 为 `null` 一律视为不超限。
+
+不设默认门槛是刻意的：盲区率是结构性指标，一个默认值会让 CI 长期红，最终被参数关掉。
+
+## 12. 版本演进
 
 `0.1` 之后允许的改动：
 
 - 新增断言 kind（向后兼容）
 - 新增 manifest 字段（必须可选）
 - 新增 `evidence_level` 取值
+- 新增陷阱探测器（见第 11 章），但必须同时给出涉及条件、`guarded` 条件，以及一个在 `docs/museum/` 里有出处的展品
 
 不允许的改动：
 
 - 改判决顺序表
 - 改相位表
 - 给 `unknown` 换语义
+- 让 `traps` 在没有展品的情况下新增陷阱
 - 引入任何形式的模型判定

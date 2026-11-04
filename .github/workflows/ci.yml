@@ -57,6 +57,28 @@ jobs:
           node bin/agent-web.mjs accept /tmp/draft-check/happy-path.json --by=ci
           node bin/agent-web.mjs verify /tmp/draft-check --adapter=memory
 
+      - name: 陷阱普查必须真的指得出盲区
+        run: |
+          set -e
+          node bin/agent-web.mjs verify cases/coffee --adapter=memory --out=.tmp-ci/traps.jsonl > /dev/null
+          node bin/agent-web.mjs traps .tmp-ci/traps.jsonl --cases=cases/coffee --json > .tmp-ci/traps.json
+          node - <<'JS'
+          const r = require('./.tmp-ci/traps.json');
+          const by = Object.fromEntries(r.traps.map((t) => [t.id, t]));
+          // 报告可以难看，但探测器本身必须说得出话：
+          // 「只看终态」这类结构性盲区必须被抓出来，否则这个命令就是装饰。
+          if (by['terminal-only'].blind === 0) {
+            console.error('终端断言盲区没被查出来，探测器失效了');
+            process.exit(1);
+          }
+          // 身份塌缩在诚实实现上必须是「有据可查」，不能全是盲区
+          if (by['identity-collapse'].guarded === 0) {
+            console.error('诚实实现的身份映射没被认作有据可查，探测器过严');
+            process.exit(1);
+          }
+          console.log('盲区率', r.blind_rate);
+          JS
+
       - name: 假绿必须被判红
         run: |
           node bin/agent-web.mjs verify cases/coffee --adapter=memory --out=/tmp/oracle.jsonl

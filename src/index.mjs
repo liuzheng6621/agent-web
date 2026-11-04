@@ -21,4 +21,12 @@ export {
   evidenceLevelOf,
 } from './adapter/contract.mjs';
 export { auditRuns, formatAudit, indexVerdicts } from './audit.mjs';
+export {
+  TRAPS,
+  TRAPS_VERSION,
+  scanVerdict,
+  summarizeTraps,
+  trapVerdict,
+  formatTraps,
+} from './traps.mjs';
 export { COVERAGE_VERSION, collectUsage, summarizeCoverage, formatCoverage, coverageVerdict } from './coverage.mjs';
