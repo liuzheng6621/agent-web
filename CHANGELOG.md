@@ -6,6 +6,12 @@
 CI 也在查。这条规则是买来的：这个仓库曾经同时存在 `package.json` 0.16、README 0.9、
 Gitee Release v0.6.0 三个数，谁看都是三个项目。
 
+## 0.26.0
+
+- 变异体从 16 个扩到 19 个，新加的三个都在执行层：`m-read-with-side-effect`（读也写）、`m-skip-intermediate`（两步压成一步）、`m-double-effect`（一次操作记两遍账）。
+- 抓获率 14/16 → 17/19；三个新变异体分别只有 `unchanged`、`status_transition`、`count_delta` 抓得住，等于替这三种断言作证。
+- 事故档案补两条：`k-login-rate-limit`（复位时每次重登撞上自己后端的登录限流）、`k-order-not-in-contract`（把实现自有的排序约定写成跨实现断言，造出一条假红）。
+
 ## 0.25.0
 
 - `flow` 支持目录输入：一页判决总览——判决分布、可判定率、带锚点的案例目录，点目录跳到案例，正文照旧可展开。

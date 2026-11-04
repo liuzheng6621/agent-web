@@ -55,12 +55,23 @@ export function wrap(adapter) {
 | `m-subtotal-stale` | state | 明细小计漏乘数量，总额却是对的 |
 | `m-cancel-noop` | execute | 取消返回成功，状态一动不动 |
 | `m-double-create` | execute | 下单被执行两次（没有幂等） |
+| `m-duplicate-row` | state | 末行被第一行覆盖，条数不变 |
+| `m-stringly-total` | state | 总额变成字符串 |
+| `m-status-off-enum` | state | 状态跳出枚举 |
+| `m-unsorted-orders` | state | 列表顺序反了 |
+| `m-read-with-side-effect` | execute | 读操作偷偷写了一条 |
+| `m-skip-intermediate` | execute | 两步迁移压成一步，终态对、序列错 |
+| `m-double-effect` | execute | 一次操作记两遍账 |
 
 看完整说明：`agent-web mutants`。
 
-**后四个观测层变异体（`m-item-count-flattened` / `m-pickup-no-offset` / `m-total-single-unit` /
-`m-subtotal-stale`）目前在整套案例上一个都抓不住。** 这不是它们写坏了，是尺子上没有那根刻度：
-案例只在「拿铁 ×1」的订单上断言过金额，数量从头到尾没被验证。留着它们就是为了让这个洞一直可见。
+**现在的战绩：19 个里抓住 17 个。** 漏网的两个都记在 `scripts/certify-baseline.mjs` 的
+`KNOWN_SURVIVORS` 里，理由分别是「取餐号的 +100 偏移是各实现自有的约定」和
+「排序本来就没写进契约」——都不是尺子不够长，是这两样东西不该跨实现断言。
+
+新加的三个执行层变异体各自钉住了一种断言：`m-read-with-side-effect` 只有 `unchanged` 抓得住，
+`m-skip-intermediate` 靠 `status_transition` 的完整序列，`m-double-effect` 靠一条针对
+具体事件类型的 `count_delta`。换句话说是这三个变异体在替那三种断言作证。
 
 ## 收稿标准
 
@@ -68,7 +79,7 @@ export function wrap(adapter) {
 
 1. **它对应哪种真实故障？** 编不出来就别收——变异体的价值是"这是真会发生的坏法"。
 2. **谁抓住它？** 跑 `agent-web certify cases/<你的案例> --mutations=<新 id>`，给出结果。
-3. **它和现有 12 个是不是同一个？** 两个变异体只有 id 不同，等于把一张票投了两遍。
+3. **它和现有 19 个是不是同一个？** 两个变异体只有 id 不同，等于把一张票投了两遍。
 4. **有没有案例抓不住它？** 有，就写进 README 的"已知盲区"，别假装没有。
 
 ## 边界

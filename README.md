@@ -204,6 +204,7 @@ node bin/agent-web.mjs certify cases/coffee --adapter=memory --suggest
 | 起点：12 个手写变异体 | 8 / 12 |
 | 关系式（`sum_equals`、`product_equals`） | 11 / 12 |
 | 形状断言（`unique`、`type_of`、`subset`、`sorted_by`） | 14 / 16 |
+| 执行层三个（读也写、跳步、双记账） | 17 / 19 |
 | `breed` 自动生成变异体 | 38 / 40 |
 
 反过来的检查也在跑：`scripts/certify-can-fail.mjs` 会把所有和总价有关的断言摘掉，
@@ -211,7 +212,7 @@ node bin/agent-web.mjs certify cases/coffee --adapter=memory --suggest
 
 ## 变异体不再只靠人想
 
-手写的十六个变异体是「我们想得到的」。想得到的总会用完。
+手写的十九个变异体是「我们想得到的」。想得到的总会用完。
 
 `breed` 换了个来源：看**观测到的形状**。字段是什么类型，就在那个位置造对应的故障——
 数值差一、翻倍、丢两位；文本加前缀、转大写、置空；集合丢尾、逆序。
@@ -443,7 +444,7 @@ node .\\bin\\agent-web.mjs compare examples/animal-tracking --adapters=examples/
 | [docs/SPEC.md](docs/SPEC.md) | 格式规范：案例、断言、适配器契约、判决顺序表 |
 | [docs/FINDING-001.md](docs/FINDING-001.md) | 一次假通过的全过程 |
 | [docs/museum/](docs/museum/) | 六件失败展品，每件都能复现 |
-| [docs/mutants/](docs/mutants/) | 十六个变异体，收稿标准在 README 里 |
+| [docs/mutants/](docs/mutants/) | 十九个变异体，收稿标准在 README 里 |
 | [docs/media/promo.mp4](docs/media/promo.mp4) | 四十二秒介绍片 |
 | [CHANGELOG.md](CHANGELOG.md) | 每个版本做了什么、因为什么 |
 

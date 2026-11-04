@@ -20,6 +20,9 @@ import * as duplicateRow from './m-duplicate-row.mjs';
 import * as stringlyTotal from './m-stringly-total.mjs';
 import * as statusOffEnum from './m-status-off-enum.mjs';
 import * as unsortedOrders from './m-unsorted-orders.mjs';
+import * as readWithSideEffect from './m-read-with-side-effect.mjs';
+import * as skipIntermediate from './m-skip-intermediate.mjs';
+import * as doubleEffect from './m-double-effect.mjs';
 
 const ENTRIES = [
   ['m-money-off-by-cent', moneyOffByCent],
@@ -38,6 +41,9 @@ const ENTRIES = [
   ['m-stringly-total', stringlyTotal],
   ['m-status-off-enum', statusOffEnum],
   ['m-unsorted-orders', unsortedOrders],
+  ['m-read-with-side-effect', readWithSideEffect],
+  ['m-skip-intermediate', skipIntermediate],
+  ['m-double-effect', doubleEffect],
 ];
 
 const LAYERS = new Set(['state', 'execute']);

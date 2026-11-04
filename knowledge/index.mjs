@@ -20,10 +20,12 @@ import { e08 } from './k08-truthy-instead-of-true.mjs';
 import { e09 } from './k09-out-dir-assumed.mjs';
 import { e10 } from './k10-case-without-expectation.mjs';
 import { e11 } from './k11-version-tri-truth.mjs';
+import { e12 } from './k12-login-rate-limit.mjs';
+import { e13 } from './k13-order-not-in-contract.mjs';
 
 export const KNOWLEDGE_VERSION = 'agent-web/knowledge-1';
 
-export const ENTRIES = [e01, e02, e03, e04, e05, e06, e07, e08, e09, e10, e11];
+export const ENTRIES = [e01, e02, e03, e04, e05, e06, e07, e08, e09, e10, e11, e12, e13];
 
 export const GUARD_KINDS = ['probe', 'certify', 'ci', 'test', 'lint', 'none'];
 
