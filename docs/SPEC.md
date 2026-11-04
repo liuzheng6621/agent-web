@@ -588,8 +588,17 @@ blind_rate = Σ blind / Σ (guarded + blind)
 | `state` | 只篡改 `observe()` 返回的规范视图 | 终态类断言够不够狠 |
 | `execute` | 篡改动作的结局（放行本该拒绝的写） | 负例步够不够狠 |
 
-内置六个（目录见 12.8）：`m-money-off-by-cent`、`m-status-frozen`、
-`m-history-empty`、`m-extra-foreign-order`、`m-foreign-write-allowed`、`m-no-reject`。
+内置十二个（目录见 12.8）。
+
+观测层：`m-money-off-by-cent`、`m-status-frozen`、`m-history-empty`、
+`m-extra-foreign-order`、`m-item-count-flattened`、`m-pickup-no-offset`、
+`m-total-single-unit`、`m-subtotal-stale`。
+
+执行层：`m-foreign-write-allowed`、`m-no-reject`、`m-cancel-noop`、`m-double-create`。
+
+其中 `m-item-count-flattened` / `m-pickup-no-offset` / `m-total-single-unit` /
+`m-subtotal-stale` 在参考案例集上**一个都抓不住**：参考案例只在数量为 1 的订单上
+断言过金额。它们留在目录里，是为了让这个盲区一直是可见的。
 
 变异体是**可审的清单**，不是不可见的天命：它只覆盖想到的坏法。
 
@@ -763,6 +772,7 @@ export function wrap(adapter) {
 - 新增 manifest 字段（必须可选）
 - 新增 `evidence_level` 取值
 - 新增陷阱探测器（见第 11 章），但必须同时给出涉及条件、`guarded` 条件，以及一个在 `docs/museum/` 里有出处的展品
+- 新增变异体（见 12.8），但必须填满 `symptom` / `mechanism` / `catch_hint`，且不得与现有变异体只差一个 id
 
 不允许的改动：
 
@@ -771,3 +781,5 @@ export function wrap(adapter) {
 - 给 `unknown` 换语义
 - 让 `traps` 在没有展品的情况下新增陷阱
 - 引入任何形式的模型判定
+- 让 `drill` 只报 `asked` 而不报 `skipped` / `not_applicable` / `invisible`（四桶必须相加等于配对数）
+- 允许 `drill grade` 用提交里的文字说明代替实跑结果

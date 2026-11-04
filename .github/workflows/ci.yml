@@ -79,8 +79,8 @@ jobs:
           console.log('盲区率', r.blind_rate);
           JS
 
-      - name: 判据准入：变异体必须全被抓到
-        run: node bin/agent-web.mjs certify cases/coffee --adapter=memory
+      - name: 判据准入：漏网的变异体必须正好是基线里那几个
+        run: node scripts/certify-baseline.mjs
 
       - name: 判据准入自己能被证伪
         run: node scripts/certify-can-fail.mjs

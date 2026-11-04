@@ -10,6 +10,12 @@ import * as historyEmpty from './m-history-empty.mjs';
 import * as extraForeignOrder from './m-extra-foreign-order.mjs';
 import * as foreignWriteAllowed from './m-foreign-write-allowed.mjs';
 import * as noReject from './m-no-reject.mjs';
+import * as itemCountFlattened from './m-item-count-flattened.mjs';
+import * as pickupNoOffset from './m-pickup-no-offset.mjs';
+import * as totalSingleUnit from './m-total-single-unit.mjs';
+import * as subtotalStale from './m-subtotal-stale.mjs';
+import * as cancelNoop from './m-cancel-noop.mjs';
+import * as doubleCreate from './m-double-create.mjs';
 
 const ENTRIES = [
   ['m-money-off-by-cent', moneyOffByCent],
@@ -18,6 +24,12 @@ const ENTRIES = [
   ['m-extra-foreign-order', extraForeignOrder],
   ['m-foreign-write-allowed', foreignWriteAllowed],
   ['m-no-reject', noReject],
+  ['m-item-count-flattened', itemCountFlattened],
+  ['m-pickup-no-offset', pickupNoOffset],
+  ['m-total-single-unit', totalSingleUnit],
+  ['m-subtotal-stale', subtotalStale],
+  ['m-cancel-noop', cancelNoop],
+  ['m-double-create', doubleCreate],
 ];
 
 const LAYERS = new Set(['state', 'execute']);

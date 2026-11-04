@@ -13,10 +13,10 @@ const all = () => readdirSync(DIR)
 
 const happy = () => all().find((c) => c.id === 'coffee/happy-path');
 
-test('变异体清单稳定：六个，id 不重复', () => {
+test('变异体清单稳定：登记数与导出数一致，id 不重复', () => {
   const ids = mutationIds();
-  assert.equal(ids.length, 6);
-  assert.equal(new Set(ids).size, 6);
+  assert.ok(ids.length >= 12, `变异体目录只剩 ${ids.length} 个，扩题后被删了？`);
+  assert.equal(new Set(ids).size, ids.length, 'id 有重复');
   for (const m of MUTATIONS) {
     assert.equal(typeof m.wrap, 'function', `${m.id} 缺 wrap`);
     assert.ok(['state', 'execute'].includes(m.layer), `${m.id} layer 不对`);
@@ -49,15 +49,20 @@ test('缺了金额与流水断言的案例，会漏掉两个变异体', async ()
   assert.equal(certifyExit(report), 1, '有漏网变异体时必须判红');
 });
 
-test('补齐断言后同一批变异体全被抓到', async () => {
+test('补齐断言后，金额与流水这两个变异体必须被抓回来', async () => {
+  // 案例集当前仍抓不住四个观测层的新变异体（见 scripts/certify-baseline.mjs），
+  // 但金额少一分、流水被吞这两个是补过断言的，不许再漏。
   const report = await certify({
     cases: all(),
     adapterFactory: () => createMemoryAdapter(),
     adapterName: 'memory',
   });
-  assert.equal(report.summary.survived, 0, `仍有漏网：${report.mutations.filter((m) => !m.caught).map((m) => m.id).join(',')}`);
-  assert.equal(report.summary.caught, report.summary.mutations);
-  assert.equal(certifyExit(report), 0);
+  const byId = new Map(report.mutations.map((m) => [m.id, m]));
+  for (const id of ['m-money-off-by-cent', 'm-history-empty']) {
+    assert.ok(byId.get(id).caught, `${id} 又漏了：对应断言被删了？`);
+  }
+  assert.equal(report.summary.caught + report.summary.survived, report.summary.mutations);
+  assert.equal(certifyExit(report), report.summary.survived > 0 ? 1 : 0);
 });
 
 test('最小充分集覆盖所有被断言抓到的变异体', async () => {
@@ -77,8 +82,12 @@ test('空转断言被点名，且 --strict 会因此判红', async () => {
   const dead = report.assertions.filter((a) => !a.unarmed && a.kills.length === 0);
   assert.ok(dead.length > 0, '当前案例集应当存在抓不住任何东西的断言');
   for (const a of dead) assert.equal(a.kills.length, 0);
-  assert.equal(certifyExit(report), 0, '默认不因空转断言判红');
-  assert.equal(certifyExit(report, { strict: true }), 1, '--strict 下空转断言必须判红');
+  // 当前有漏网变异体，所以默认退出码就是 1（漏网优先于空转）
+  assert.equal(certifyExit(report), 1);
+  // 把漏网抹掉，才能单独看「空转」这一项自己的作用：默认放行、--strict 判红
+  const clean = { ...report, summary: { ...report.summary, survived: 0 } };
+  assert.equal(certifyExit(clean), 0, '默认不该因空转断言判红');
+  assert.equal(certifyExit(clean, { strict: true }), 1, '--strict 下空转断言必须判红');
 });
 
 test('在正确实现上不为真的断言不参与准入统计', async () => {

@@ -49,8 +49,18 @@ export function wrap(adapter) {
 | `m-extra-foreign-order` | state | 列表混进别人的订单 |
 | `m-foreign-write-allowed` | execute | 越权写被放行 |
 | `m-no-reject` | execute | 该拒的不拒 |
+| `m-item-count-flattened` | state | 明细数量被拍平成 1，金额还是对的 |
+| `m-pickup-no-offset` | state | 取餐号直接等于订单号 |
+| `m-total-single-unit` | state | 总额漏乘数量 |
+| `m-subtotal-stale` | state | 明细小计漏乘数量，总额却是对的 |
+| `m-cancel-noop` | execute | 取消返回成功，状态一动不动 |
+| `m-double-create` | execute | 下单被执行两次（没有幂等） |
 
 看完整说明：`agent-web mutants`。
+
+**后四个观测层变异体（`m-item-count-flattened` / `m-pickup-no-offset` / `m-total-single-unit` /
+`m-subtotal-stale`）目前在整套案例上一个都抓不住。** 这不是它们写坏了，是尺子上没有那根刻度：
+案例只在「拿铁 ×1」的订单上断言过金额，数量从头到尾没被验证。留着它们就是为了让这个洞一直可见。
 
 ## 收稿标准
 
@@ -58,7 +68,7 @@ export function wrap(adapter) {
 
 1. **它对应哪种真实故障？** 编不出来就别收——变异体的价值是"这是真会发生的坏法"。
 2. **谁抓住它？** 跑 `agent-web certify cases/<你的案例> --mutations=<新 id>`，给出结果。
-3. **它和现有六个是不是同一个？** 两个变异体只有 id 不同，等于把一张票投了两遍。
+3. **它和现有 12 个是不是同一个？** 两个变异体只有 id 不同，等于把一张票投了两遍。
 4. **有没有案例抓不住它？** 有，就写进 README 的"已知盲区"，别假装没有。
 
 ## 边界

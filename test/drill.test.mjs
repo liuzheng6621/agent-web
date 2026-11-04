@@ -16,6 +16,11 @@ function loadCase(name) {
 }
 const factory = async () => createMemoryAdapter();
 
+// 变异体目录会持续扩容，固定口径的用例只挑这三个原始变异体，
+// 免得每加一个变异体就要来改一遍期望数字。
+const CORE = ['m-money-off-by-cent', 'm-history-empty', 'm-extra-foreign-order'];
+const coreMutants = () => MUTATIONS.filter((m) => CORE.includes(m.id));
+
 async function drillsFor(names, mutations) {
   return await buildDrills({
     entries: names.map((n) => ({ file: 'cases/coffee/' + n + '.json', case: loadCase(n) })),
@@ -27,16 +32,28 @@ async function drillsFor(names, mutations) {
 }
 
 test('出题：只对"本来该判 pass 且看得见差异"的配对出手', async () => {
-  const report = await drillsFor(['cancel-before-pickup'], MUTATIONS);
+  const report = await drillsFor(['cancel-before-pickup'], coreMutants());
   const ids = report.items.map((i) => i.mutant).sort();
   assert.deepEqual(ids, ['m-extra-foreign-order', 'm-history-empty', 'm-money-off-by-cent']);
-  // 已抓住的不出题、被删掉的变异体不出题
-  assert.ok(report.generated.skipped >= 1, '被案例本身抓住的变异体应记入 skipped');
+  // 这三个都被判据准入判成漏网，所以全都出得来；「已被抓住的不出题」由下面那条全量用例验。
+  assert.equal(report.generated.skipped, 0);
+  assert.equal(report.generated.invisible, 0);
   assert.equal(report.generated.asked, 3);
   assert.equal(
     report.generated.asked + report.generated.skipped + report.generated.not_applicable + report.generated.invisible,
     report.generated.pairs,
   );
+});
+
+test('出题：目录扩容后四桶仍相加等于配对数，且每桶都不是摆设', async () => {
+  // 两个案例：一个是见证型（能出题），一个是本来该 fail 的（必然 not_applicable），四桶才都会出现
+  const report = await drillsFor(['cancel-before-pickup', 'skip-ready-stage'], MUTATIONS);
+  const g = report.generated;
+  assert.equal(g.asked + g.skipped + g.not_applicable + g.invisible, g.pairs);
+  assert.equal(g.pairs, MUTATIONS.length * 2);
+  for (const k of ['skipped', 'not_applicable', 'invisible']) {
+    assert.ok(g[k] > 0, k + ' 一桶为 0，说明分桶逻辑可能退化成只报 asked');
+  }
 });
 
 test('出题：见证型案例（本来就该判 fail）不出题', async () => {
@@ -46,7 +63,7 @@ test('出题：见证型案例（本来就该判 fail）不出题', async () => 
 });
 
 test('题面不含答案', async () => {
-  const report = await drillsFor(['cancel-before-pickup'], MUTATIONS);
+  const report = await drillsFor(['cancel-before-pickup'], coreMutants());
   for (const item of report.items) {
     const sheet = taskSheet(item);
     assert.ok(sheet.includes(item.symptom), '症状必须给，不然题没法做');
@@ -61,7 +78,7 @@ test('文件名安全化：/ 和 @ 都要换掉', () => {
 });
 
 test('批改：抓得住就解出，抓不住就点名，乱写记 unarmed', async () => {
-  const report = await drillsFor(['cancel-before-pickup'], MUTATIONS);
+  const report = await drillsFor(['cancel-before-pickup'], coreMutants());
   const c = loadCase('cancel-before-pickup');
   const subs = new Map();
   for (const item of report.items) {
@@ -91,7 +108,7 @@ test('批改：抓得住就解出，抓不住就点名，乱写记 unarmed', asy
 });
 
 test('批改：把案例自己的断言抄一遍，一分都拿不到', async () => {
-  const report = await drillsFor(['cancel-before-pickup'], MUTATIONS);
+  const report = await drillsFor(['cancel-before-pickup'], coreMutants());
   const c = loadCase('cancel-before-pickup');
   const lazy = { assertions: [{ kind: 'field_equals', selector: { collection: 'orders', index: 0 }, path: 'status', value: 'CANCELED' }] };
   const subs = new Map(report.items.map((i) => [safeName(i.id), lazy]));
@@ -105,7 +122,7 @@ test('批改：把案例自己的断言抄一遍，一分都拿不到', async ()
 });
 
 test('批改：格式不对 / 空提交 / 没作答 分别记，不会当成没抓到', async () => {
-  const report = await drillsFor(['cancel-before-pickup'], MUTATIONS);
+  const report = await drillsFor(['cancel-before-pickup'], coreMutants());
   const c = loadCase('cancel-before-pickup');
   const [a, b, d] = report.items;
   const subs = new Map([
