@@ -291,6 +291,26 @@ node bin/agent-web.mjs flow cases/coffee/happy-path.json --result=results.jsonl 
 上面这张动图是一条真实失败案例：跳过出餐直接取餐，第 3 步被后端拒绝
 （期望 applied，实际 rejected），点开就是拒绝原因。HTML 自包含全部数据与样式，
 file:// 直接打开，不需要服务器。
+### 一页看全一个目录
+
+给 `flow` 一个目录而不是单个文件，就得到总览页：顶部是判决分布（通过 / 失败 / 未知 / 可判定率），
+下面是每条案例一行带锚点的目录，点哪行跳到哪条，案例正文照旧可展开。
+
+```bash
+node bin/agent-web.mjs verify cases/coffee --adapter=memory --out=results.jsonl
+node bin/agent-web.mjs flow cases/coffee --result=results.jsonl --out=dashboard.html
+```
+
+<p align="center">
+  <img src="docs/media/dashboard.png" alt="flow 总览页：判决分布 + 案例目录 + 每条案例正文" width="100%">
+</p>
+
+<p align="center">
+  <img src="docs/media/dashboard.gif" alt="点目录里的任意一行，跳到那条案例" width="100%">
+</p>
+
+没传 `--result` 的案例按「未运行」显示，不会装作有判决。
+
 
 ## 事故档案
 

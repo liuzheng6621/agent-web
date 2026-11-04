@@ -169,18 +169,30 @@ body{background:radial-gradient(ellipse at 14% -12%,#203149 0,transparent 48%),v
 @media(max-width:700px){.wrap{padding:24px 16px 48px}.top{display:block}.top>.badge{margin-top:16px}.goal{font-size:15px}.summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.metric{padding:10px 11px}.tools{margin:20px 0 28px}.tool{min-height:44px;padding:10px 12px}.legend{width:100%;margin:4px 0 0;justify-content:flex-start}.step-main{grid-template-columns:30px minmax(0,1fr) auto;gap:8px;padding:13px 12px;min-height:72px}.step-main .role{grid-column:2;grid-row:2}.outcome{grid-column:3;grid-row:1/3}.node{left:-40px}.timeline:before{left:12px}.event-list{grid-template-columns:1fr;gap:8px}.event{display:grid;grid-template-columns:minmax(90px,.55fr) minmax(120px,1fr);align-items:center;gap:5px 12px;padding:12px}.event-top{grid-row:1/3}.event-transition{margin:0;font-size:14px}.event-meta{grid-column:2;font-size:12px}.assertion{grid-template-columns:minmax(0,1fr) auto;padding:13px 12px}.assertion-main{gap:6px 9px}.assertion-message{grid-column:1/-1}.section-head{gap:12px}.section-head small{max-width:50%;text-align:right}.footer{line-height:1.6}}
 @media(max-width:380px){.wrap{padding-inline:12px}.step{margin-left:42px}.node{left:-37px}.step-main{grid-template-columns:25px minmax(0,1fr) auto;gap:7px}.role{max-width:100%;overflow-wrap:anywhere}.tool{padding-inline:10px}.event{grid-template-columns:minmax(76px,.5fr) minmax(0,1fr)}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
+
+/* dashboard */
+.toc{display:grid;gap:8px;margin:24px 0 28px}
+.toc-row{display:flex;gap:14px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:11px 14px;text-decoration:none;color:var(--text);background:var(--panel)}
+.toc-row:hover{border-color:var(--blue)}
+.toc-id{font:700 13px var(--mono);overflow-wrap:anywhere}
+.toc-steps{font:11px var(--mono);color:var(--muted)}
+.toc-reason{margin-left:auto;font:11px var(--mono);color:var(--muted);text-align:right}
+.case-block{margin-top:40px;padding-top:28px;border-top:1px solid var(--line)}
+.case-head{display:flex;justify-content:space-between;align-items:center;gap:18px;margin-bottom:10px;flex-wrap:wrap}
+.case-head h2{margin:0;font:700 17px var(--mono);letter-spacing:-.01em;overflow-wrap:anywhere}
+.case-block .goal{margin:4px 0 0;max-width:none}
+@media(max-width:700px){.toc-row{flex-wrap:wrap;gap:8px}.toc-reason{margin-left:0;width:100%;text-align:left}.case-head{align-items:flex-start}}
 `;
 
 const SCRIPT = `
-const DATA=JSON.parse(document.getElementById('flow-data').textContent);
+const dashRaw=document.getElementById('dashboard-data');
+const DASH=dashRaw?JSON.parse(dashRaw.textContent):null;
 let activeTheme='dark';
 try{if(document.documentElement.dataset.colorMode!=='dark')activeTheme=localStorage.getItem('agent-web-flow-theme')==='light'?'light':'dark'}catch{}
 document.documentElement.dataset.theme=activeTheme;
 const esc=(v)=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const json=(v)=>JSON.stringify(v,null,2);
 const statusName=(v)=>({pass:'PASS',fail:'FAIL',unknown:'UNKNOWN',true:'TRUE',false:'FALSE',unavailable:'待运行',applied:'applied',rejected:'rejected',unsupported:'unsupported',infra_error:'infra_error'}[v]||String(v||'待运行'));
-const root=document.getElementById('app');
-const verdictClass=DATA.verdict||'planned';
 const outcomeBadge=(step)=>{
   if(step.execution==='not_run')return '<span class="pill">未执行</span>';
   if(step.actual)return '<span class="pill '+esc(step.actual)+'">实际 '+esc(statusName(step.actual))+'</span>';
@@ -189,8 +201,27 @@ const outcomeBadge=(step)=>{
 const stepHtml=(s)=>'<article class="step '+esc(s.execution)+'" data-role="'+esc(s.role)+'" data-outcome="'+esc(s.actual||s.expected)+'" data-expected="'+esc(s.expected)+'" data-actual="'+esc(s.actual||'')+'"><span class="node" aria-hidden="true">'+String(s.index).padStart(2,'0')+'</span><button type="button" class="step-main" aria-expanded="false" aria-controls="step-details-'+s.index+'"><span class="step-id">'+esc(s.id)+'</span><span class="cap">'+esc(s.capability)+'</span><span class="role">'+esc(s.role)+'</span><span class="outcome">'+(s.actual&&s.actual!==s.expected?'<span class="pill">期望 '+esc(statusName(s.expected))+'</span> ': '')+outcomeBadge(s)+'</span></button><div class="step-detail" id="step-details-'+s.index+'"><div class="detail-label">'+(s.hasBindings?'参数绑定':'动作参数')+'</div><div class="code">'+esc(json(s.arguments))+'</div>'+(s.error?'<div class="error">'+esc(s.error.code||'error')+': '+esc(s.error.message||'')+'</div>':'')+'</div></article>';
 const eventHtml=(e)=>'<article class="event"><div class="event-top">'+esc(e.index)+' · '+esc(e.type)+'</div><div class="event-transition">'+(e.from!==null?esc(e.from)+' → ':'')+esc(e.to??e.type)+'</div><div class="event-meta">'+[e.by?'by '+e.by:null,e.orderId!==null?'order '+e.orderId:null,e.at!==null?'at '+e.at:null].filter(Boolean).map(esc).join(' · ')+'</div></article>';
 const assertionHtml=(a)=>'<article class="assertion" data-status="'+esc(a.result)+'"><div class="assertion-main"><span class="assertion-phase">'+esc(a.phase)+'</span><span class="assertion-kind">'+esc(a.kind)+'</span><span class="assertion-selector">'+esc(a.selector?.collection||'')+(a.selector?.index!==undefined?' #'+a.selector.index:'')+(a.path?'.'+esc(a.path):'')+'</span></div><span class="assertion-status '+esc(a.result)+'">'+esc(statusName(a.result))+'</span>'+(a.message?'<span class="assertion-message">'+esc(a.message)+'</span>':'')+'</article>';
-const verdictLabel=DATA.verdict?statusName(DATA.verdict):'PLAN';
-root.innerHTML='<main class="wrap"><header class="top"><div><div class="eyebrow">agent-web · workflow map</div><h1 class="title">'+esc(DATA.title)+'</h1><p class="goal">'+esc(DATA.naturalGoal||'没有自然语言目标。可在 task.natural_goal 中补充。')+'</p></div><div class="badge '+esc(verdictClass)+'"><i class="dot"></i>'+esc(verdictLabel)+(DATA.verdictReason?' · '+esc(DATA.verdictReason):'')+'</div></header><div class="summary"><span class="metric"><b>'+DATA.steps.length+'</b> 步</span><span class="metric"><b>'+esc(DATA.trajectorySource)+'</b> 轨迹来源</span><span class="metric"><b>'+DATA.assertionSummary.goal+'</b> 目标断言</span><span class="metric"><b>'+DATA.assertionSummary.invariant+'</b> 不变量</span>'+(DATA.verdict?'<span class="metric"><b>'+DATA.assertionSummary.evaluated+'</b> 已求值断言</span>':'')+'</div>'+(DATA.draftStatus?'<div class="draft-note">案例草稿：'+esc(DATA.draftStatus)+'。草稿断言描述的是这次运行实际发生的事，不等同于正确的验收标准。</div>':'')+'<div class="tools"><button class="tool active" data-filter="all">全部步骤</button><button class="tool" data-filter="mismatch">只看偏差</button><button class="tool" data-filter="not_run">未执行</button><button class="tool" id="expand">展开参数</button><button class="tool" id="theme-toggle" aria-label="切换浅色主题">切换浅色</button><div class="legend"><span><i class="dot pass"></i>通过</span><span><i class="dot fail"></i>失败</span><span><i class="dot unknown"></i>未知</span><span><i class="dot planned"></i>计划</span></div></div><section class="section"><div class="section-head"><h2>执行流程</h2><small>'+esc(DATA.trajectorySource)+' trajectory · 点击步骤查看参数</small></div><div class="timeline">'+(DATA.steps.length?DATA.steps.map(stepHtml).join(''):'<div class="empty">没有轨迹步骤</div>')+'</div></section><section class="section"><div class="section-head"><h2>状态事件</h2><small>'+DATA.events.length+' events · '+(DATA.eventsComplete?'完整':'未声明完整')+'</small></div>'+(DATA.events.length?'<div class="event-list">'+DATA.events.map(eventHtml).join('')+'</div>':'<div class="empty">没有随判决结果提供事件观测。传入 verify 输出的 --result 文件即可显示。</div>')+'</section><section class="section"><div class="section-head"><h2>判据结果</h2><small>'+DATA.assertionSummary.evaluated+' / '+DATA.assertions.length+' evaluated</small></div>'+(DATA.assertions.length?'<div class="assertions">'+DATA.assertions.map(assertionHtml).join('')+'</div>':'<div class="empty">案例没有断言。</div>')+'</section>'+(DATA.verdictDetail?'<section class="section"><div class="section-head"><h2>判决说明</h2><small>'+esc(DATA.verdictReason||'')+'</small></div><div class="empty">'+esc(DATA.verdictDetail)+'</div></section>':'')+'<div class="footer">Generated by agent-web flow · '+esc(DATA.caseId)+' · 此页面只可视化输入，不会执行或修改被测系统。</div></main>';
+const verdictLabel=(d)=>d.verdict?statusName(d.verdict):'PLAN';
+const toolsHtml='<div class="tools"><button class="tool active" data-filter="all">全部步骤</button><button class="tool" data-filter="mismatch">只看偏差</button><button class="tool" data-filter="not_run">未执行</button><button class="tool" id="expand">展开参数</button><button class="tool" id="theme-toggle" aria-label="切换浅色主题">切换浅色</button><div class="legend"><span><i class="dot pass"></i>通过</span><span><i class="dot fail"></i>失败</span><span><i class="dot unknown"></i>未知</span><span><i class="dot planned"></i>计划</span></div></div>';
+const summaryHtml=(DATA)=>'<div class="summary"><span class="metric"><b>'+DATA.steps.length+'</b> 步</span><span class="metric"><b>'+esc(DATA.trajectorySource)+'</b> 轨迹来源</span><span class="metric"><b>'+DATA.assertionSummary.goal+'</b> 目标断言</span><span class="metric"><b>'+DATA.assertionSummary.invariant+'</b> 不变量</span>'+(DATA.verdict?'<span class="metric"><b>'+DATA.assertionSummary.evaluated+'</b> 已求值断言</span>':'')+'</div>';
+const draftHtml=(DATA)=>DATA.draftStatus?'<div class="draft-note">案例草稿：'+esc(DATA.draftStatus)+'。草稿断言描述的是这次运行实际发生的事，不等同于正确的验收标准。</div>':'';
+const sectionsHtml=(DATA)=>'<section class="section"><div class="section-head"><h2>执行流程</h2><small>'+esc(DATA.trajectorySource)+' trajectory · 点击步骤查看参数</small></div><div class="timeline">'+(DATA.steps.length?DATA.steps.map(stepHtml).join(''):'<div class="empty">没有轨迹步骤</div>')+'</div></section><section class="section"><div class="section-head"><h2>状态事件</h2><small>'+DATA.events.length+' events · '+(DATA.eventsComplete?'完整':'未声明完整')+'</small></div>'+(DATA.events.length?'<div class="event-list">'+DATA.events.map(eventHtml).join('')+'</div>':'<div class="empty">没有随判决结果提供事件观测。传入 verify 输出的 --result 文件即可显示。</div>')+'</section><section class="section"><div class="section-head"><h2>判据结果</h2><small>'+DATA.assertionSummary.evaluated+' / '+DATA.assertions.length+' evaluated</small></div>'+(DATA.assertions.length?'<div class="assertions">'+DATA.assertions.map(assertionHtml).join('')+'</div>':'<div class="empty">案例没有断言。</div>')+'</section>'+(DATA.verdictDetail?'<section class="section"><div class="section-head"><h2>判决说明</h2><small>'+esc(DATA.verdictReason||'')+'</small></div><div class="empty">'+esc(DATA.verdictDetail)+'</div></section>':'');
+const singleHtml=(DATA)=>'<main class="wrap"><header class="top"><div><div class="eyebrow">agent-web · workflow map</div><h1 class="title">'+esc(DATA.title)+'</h1><p class="goal">'+esc(DATA.naturalGoal||'没有自然语言目标。可在 task.natural_goal 中补充。')+'</p></div><div class="badge '+esc(DATA.verdict||'planned')+'"><i class="dot"></i>'+esc(verdictLabel(DATA))+(DATA.verdictReason?' · '+esc(DATA.verdictReason):'')+'</div></header>'+summaryHtml(DATA)+draftHtml(DATA)+toolsHtml+sectionsHtml(DATA)+'<div class="footer">Generated by agent-web flow · '+esc(DATA.caseId)+' · 此页面只可视化输入，不会执行或修改被测系统。</div></main>';
+const multiHtml=(DATA)=>'<article class="case-block"><header class="case-head"><h2>'+esc(DATA.caseId)+'</h2><div class="badge '+esc(DATA.verdict||'planned')+'"><i class="dot"></i>'+esc(verdictLabel(DATA))+(DATA.verdictReason?' · '+esc(DATA.verdictReason):'')+'</div></header><p class="goal">'+esc(DATA.naturalGoal||'')+'</p>'+summaryHtml(DATA)+draftHtml(DATA)+sectionsHtml(DATA)+'</article>';
+const dashApp=document.getElementById('dash-app');
+const islands=[...document.querySelectorAll('script.flow-data')];
+const multi=islands.length>1;
+if(DASH&&dashApp){
+  const sm=DASH.summary;
+  const rate=sm.withResult?Math.round((sm.pass+sm.fail)/sm.withResult*100):null;
+  dashApp.innerHTML='<main class="wrap"><header class="top"><div><div class="eyebrow">agent-web · dashboard</div><h1 class="title">'+esc(DASH.title)+'</h1><p class="goal">'+sm.total+' 个案例，其中 '+sm.withResult+' 个有判决 · 一页看全</p></div><div class="badge"><i class="dot planned"></i>总览</div></header><div class="summary"><span class="metric"><b>'+sm.total+'</b> 案例</span><span class="metric"><b>'+sm.pass+'</b> 通过</span><span class="metric"><b>'+sm.fail+'</b> 失败</span><span class="metric"><b>'+sm.unknown+'</b> 未知</span>'+(rate!==null?'<span class="metric"><b>'+rate+'%</b> 可判定率</span>':'<span class="metric"><b>—</b> 可判定率</span>')+'</div><nav class="toc" aria-label="案例目录">'+DASH.entries.map((e)=>'<a class="toc-row" href="#'+esc(e.anchor)+'"><span class="pill '+(e.verdict||'planned')+'">'+esc(e.verdict?statusName(e.verdict):'PLAN')+'</span><span class="toc-id">'+esc(e.caseId)+'</span><small class="toc-steps">'+e.steps+' 步 · '+e.assertions+' 断言</small>'+(e.reason?'<small class="toc-reason">'+esc(e.reason)+'</small>':'')+'</a>').join('')+'</nav>'+toolsHtml+'</main>';
+}
+for(const isl of islands){
+  const mount=isl.nextElementSibling;
+  if(!mount||!mount.classList.contains('flow-app'))continue;
+  const DATA=JSON.parse(isl.textContent);
+  mount.innerHTML=multi?multiHtml(DATA):singleHtml(DATA);
+}
 document.querySelectorAll('.step-main').forEach(el=>{const toggle=()=>{const card=el.closest('.step');card.classList.toggle('open');el.setAttribute('aria-expanded',card.classList.contains('open')?'true':'false')};el.addEventListener('click',toggle);el.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();toggle()}})});
 document.querySelectorAll('[data-filter]').forEach(btn=>btn.addEventListener('click',()=>{document.querySelectorAll('[data-filter]').forEach(x=>x.classList.toggle('active',x===btn));const f=btn.dataset.filter;document.querySelectorAll('.step').forEach(s=>{const mismatch=(s.dataset.actual!==''&&s.dataset.actual!==s.dataset.expected)||s.classList.contains('not_run');const show=f==='all'||(f==='not_run'&&s.classList.contains('not_run'))||(f==='mismatch'&&mismatch);s.hidden=!show})}));
 let expanded=false;document.getElementById('expand').addEventListener('click',e=>{expanded=!expanded;document.querySelectorAll('.step').forEach(s=>{s.classList.toggle('open',expanded);s.querySelector('.step-main').setAttribute('aria-expanded',expanded?'true':'false')});e.currentTarget.textContent=expanded?'收起参数':'展开参数'});
@@ -214,7 +245,7 @@ export function renderFlowHtml(options) {
 <style>${STYLE}</style>
 </head>
 <body>
-<script type="application/json" id="flow-data">${data}</script>
+<script type="application/json" id="flow-data" class="flow-data">${data}</script>
 <div id="app"></div>
 <script>${SCRIPT}</script>
 </body>
@@ -222,6 +253,65 @@ export function renderFlowHtml(options) {
 `;
 }
 
+function escapeJson(value) {
+  return JSON.stringify(value).replace(/</g, '\\u003c').replace(/>/g, '\\u003e').replace(/&/g, '\\u0026');
+}
+
+export function buildDashboardModel({ cases, title = '', models = null }) {
+  const list = models ?? cases.map((entry) => buildFlowModel(entry));
+  const withResult = list.filter((m) => m.verdict);
+  const pass = withResult.filter((m) => m.verdict === 'pass').length;
+  const fail = withResult.filter((m) => m.verdict === 'fail').length;
+  const unknown = withResult.filter((m) => m.verdict === 'unknown').length;
+  return {
+    schema: 'agent-web/flow-dashboard/1',
+    title: title || `判决总览`,
+    summary: {
+      total: list.length,
+      withResult: withResult.length,
+      pass,
+      fail,
+      unknown,
+      decidableRate: withResult.length ? (pass + fail) / withResult.length : null,
+    },
+    entries: list.map((m, index) => ({
+      index,
+      anchor: `case-${index}`,
+      caseId: m.caseId,
+      verdict: m.verdict,
+      reason: m.verdictReason,
+      steps: m.steps.length,
+      assertions: m.assertions.length,
+    })),
+  };
+}
+
+export function renderDashboardHtml({ cases, title = '' }) {
+  const models = cases.map((entry) => buildFlowModel(entry));
+  const dash = buildDashboardModel({ cases, title, models });
+  const islands = models
+    .map((model, index) => `<script type="application/json" class="flow-data">${escapeJson(model)}<` + '/script>' +
+      `<div class="flow-app" id="case-${index}"></div>`)
+    .join('\n');
+  return `<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>${escapeHtml(dash.title)} · agent-web flow</title>
+<style>${STYLE}</style>
+</head>
+<body>
+` +
+    `<script type="application/json" id="dashboard-data">${escapeJson(dash)}<` + '/script>' +
+    `<div id="dash-app"></div>
+${islands}
+<script>${SCRIPT}</script>
+</body>
+</html>
+`;
+}
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (c) => ({
     '&': '&amp;',

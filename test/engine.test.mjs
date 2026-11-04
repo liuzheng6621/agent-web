@@ -663,7 +663,7 @@ test('flow：HTML 自包含且对动态内容做 HTML / script 转义', async ()
   assert.match(html, /<!doctype html>/i);
   assert.match(html, /id="flow-data"/);
   assert.match(html, /<style>/);
-  assert.match(html, /<script>\s*const DATA=/);
+  assert.match(html, /<script>\s*const dashRaw=/);
   assert.match(html, /id="theme-toggle"/);
   assert.match(html, /aria-controls="step-details-/);
   assert.match(html, /@media\(max-width:700px\)/);
@@ -674,6 +674,59 @@ test('flow：HTML 自包含且对动态内容做 HTML / script 转义', async ()
   assert.doesNotMatch(html, /https?:\/\//);
 });
 
+test('flow：目录模式生成判决总览页（dashboard）', async () => {
+  const { buildDashboardModel, renderDashboardHtml, renderFlowHtml } = await import('../src/flow.mjs');
+  const makeCase = (id) => ({
+    id,
+    task: { natural_goal: '目标', goal_assertions: [{ kind: 'field_equals', selector: { collection: 'orders', index: 0 }, path: 'status', value: 'DONE' }] },
+    reference_trajectory: [{ id: 's1', capability: 'order.create', as: 'customer', expected_outcome: 'applied' }],
+  });
+  const cases = [
+    { case: makeCase('demo/a'), verdict: { case_id: 'demo/a', status: 'pass', reason_code: 'ok' } },
+    { case: makeCase('demo/b'), verdict: { case_id: 'demo/b', status: 'fail', reason_code: 'assertion_false' } },
+    { case: makeCase('demo/c'), verdict: { case_id: 'demo/c', status: 'unknown', reason_code: 'coverage_gap' } },
+  ];
+  const dash = buildDashboardModel({ cases, title: '总览' });
+  assert.equal(dash.schema, 'agent-web/flow-dashboard/1');
+  assert.equal(dash.summary.total, 3);
+  assert.equal(dash.summary.withResult, 3);
+  assert.equal(dash.summary.pass, 1);
+  assert.equal(dash.summary.fail, 1);
+  assert.equal(dash.summary.decidableRate, 2 / 3, 'unknown 留在分母里');
+  assert.equal(dash.entries[0].anchor, 'case-0');
+  assert.equal(dash.entries[1].caseId, 'demo/b');
+
+  const html = renderDashboardHtml({ cases });
+  assert.match(html, /id="dashboard-data"/);
+  assert.equal((html.match(/class="flow-data"/g) || []).length, 3, '每个案例一个数据岛');
+  assert.match(html, /id="dash-app"/);
+  assert.match(html, /id="case-0"/);
+  assert.match(html, /id="case-2"/);
+  assert.match(html, /</);
+  assert.doesNotMatch(html, /https?:\/\//);
+
+  const single = renderFlowHtml({ case: makeCase('demo/a'), verdict: cases[0].verdict });
+  assert.equal((single.match(/class="flow-data"/g) || []).length, 1, '单案例模式只有一个数据岛');
+  assert.doesNotMatch(single, /id="dashboard-data"/, '单案例模式不渲染总览头（查元素，不查脚本里的选择器）');
+  assert.match(single, /id="flow-data"/);
+});
+
+test('flow：目录模式的命令行入口', () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-flow-dash-'));
+  try {
+    const out = path.join(tempRoot, 'dash.html');
+    const results = path.join(tempRoot, 'results.jsonl');
+    const vr = runCli(['verify', path.join(REPO_ROOT, 'cases', 'coffee'), '--adapter=memory', '--out=' + results]);
+    assert.equal(vr.status, 0, vr.stderr);
+    const r = runCli(['flow', path.join(REPO_ROOT, 'cases', 'coffee'), '--result=' + results, '--out=' + out]);
+    assert.equal(r.status, 0, r.stderr);
+    const html = fs.readFileSync(out, 'utf8');
+    assert.match(html, /id="dashboard-data"/);
+    assert.ok(html.length > 10000, '总览页包含全部案例');
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
 function runCli(args) {
   return spawnSync(process.execPath, [CLI_PATH, ...args], {
     cwd: REPO_ROOT,
@@ -698,7 +751,7 @@ test('prepare：从动作日志一次生成步骤、未确认案例和流程预�
     const trajectory = JSON.parse(fs.readFileSync(path.join(outDir, 'trajectory.json'), 'utf8'));
     const c = JSON.parse(fs.readFileSync(path.join(outDir, 'case.draft.json'), 'utf8'));
     const html = fs.readFileSync(path.join(outDir, 'case.flow.html'), 'utf8');
-    const model = JSON.parse(html.match(/<script type="application\/json" id="flow-data">([\s\S]*?)<\/script>/)[1]);
+    const model = JSON.parse(html.match(/<script type="application\/json" id="flow-data"[^>]*>([\s\S]*?)<\/script>/)[1]);
 
     assert.equal(trajectory.trajectory.length, 4);
     assert.equal(c.id, 'demo/prepared');

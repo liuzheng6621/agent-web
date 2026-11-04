@@ -8,6 +8,7 @@
 | `2-loop.py` | `loop.png`（一份案例、两个实现的对照图） |
 | `3-terminal.py` | `terminal.png`、`recall.png`、`.tmp-frames/` 的动画帧 |
 | `4-discover.py` | `discover.png`（输入一个网址之后发生了什么） |
+| playwright + ffmpeg | `dashboard.png`、`dashboard.gif`（总览页首屏与点击跳转） |
 | `5-certify-drill.py` | `certify.png`、`certify.gif`、`drill.png`（判据准入与出题批改） |
 | 真实截图（playwright + msedge，经本地 http-server） | `flow.png`（happy-pass 全页）、`flow.gif`（点开被拒步、筛偏差） |
 

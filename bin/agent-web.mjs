@@ -13,7 +13,7 @@
  *   agent-web capabilities             打印适配器的能力清单与证据等级
  *   agent-web prepare <动作日志>       一次生成轨迹、案例草稿与流程预览
  *   agent-web draft <轨迹文件>          回放一条轨迹，反推案例草稿
- *   agent-web flow <案例.json>           生成交互式流程图 HTML
+ *   agent-web flow <案例或目录>           生成单个流程图或判决总览 HTML
   agent-web discover <网址>                 输入一个网址：探测接口、生成适配器与案例
  *   agent-web init <目录>              生成一份案例模板
  *
@@ -32,7 +32,7 @@ import { fingerprint } from '../src/values.mjs';
 import { recordTrajectory } from '../src/record.mjs';
 import { replayTrajectory, buildDraftCase } from '../src/draft.mjs';
 import { validateCase, validateSteps, acceptCase, draftBlocker } from '../src/case.mjs';
-import { renderFlowHtml } from '../src/flow.mjs';
+import { renderFlowHtml, renderDashboardHtml } from '../src/flow.mjs';
 import { summarize, agreement, formatText, countFailedAssertions } from '../src/report.mjs';
 import { loadAdapter, listBuiltins } from '../src/adapter/load.mjs';
 import { ENTRIES, KNOWLEDGE_VERSION, validateAll } from '../knowledge/index.mjs';
@@ -1373,14 +1373,66 @@ function readFlowVerdict(spec, caseId) {
   return verdict;
 }
 
+function loadVerdictMap(target) {
+  if (!fs.existsSync(target)) throw new Error('找不到判决结果 ' + target);
+  const raw = parseJsonOrLines(fs.readFileSync(target, 'utf8'), '判决结果');
+  const rows = Array.isArray(raw) ? raw : [raw];
+  const map = new Map();
+  for (const row of rows) if (row?.case_id) map.set(row.case_id, row);
+  return map;
+}
+
+function cmdFlowDashboard(dir, flags) {
+  const files = fs.readdirSync(dir).filter((f) => f.endsWith('.json') && f !== 'expected.json').sort();
+  if (files.length === 0) {
+    console.error('目录里没有案例文件（expected.json 不算案例）。' + dir);
+    return 2;
+  }
+  const verdictMap = typeof flags.result === 'string' ? loadVerdictMap(path.resolve(flags.result)) : null;
+  const cases = [];
+  for (const file of files) {
+    const rawCase = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf8'));
+    const caseErrors = validateCase(rawCase);
+    if (caseErrors.length > 0) {
+      console.error('案例 ' + file + ' 未通过校验：');
+      for (const error of caseErrors) console.error('  - ' + error);
+      return 1;
+    }
+    cases.push({ case: rawCase, verdict: verdictMap ? (verdictMap.get(rawCase.id) ?? null) : null });
+  }
+  const title = typeof flags.title === 'string' ? flags.title : path.basename(dir) + ' · 判决总览';
+  const html = renderDashboardHtml({ cases, title });
+  const out = typeof flags.out === 'string'
+    ? path.resolve(flags.out)
+    : path.resolve(path.basename(dir) + '.flow.html');
+  fs.mkdirSync(path.dirname(out), { recursive: true });
+  fs.writeFileSync(out, html, 'utf8');
+  const withResult = cases.filter((entry) => entry.verdict).length;
+  console.log('总览页已生成：' + path.relative(process.cwd(), out));
+  console.log('案例：' + cases.length + ' · 有判决：' + withResult);
+  if (verdictMap) {
+    for (const entry of cases) {
+      if (!verdictMap.has(entry.case.id)) console.log('提示：判决结果里没有 ' + entry.case.id + '，该案例按未运行显示。');
+    }
+  }
+  console.log('HTML 自包含，可直接用浏览器打开。');
+  return 0;
+}
 function cmdFlow(args, flags) {
   if (args.length === 0) {
-    console.error('用法：agent-web flow <案例.json> [--trajectory=轨迹.json或目录] [--result=判决.json或.jsonl] [--out=流程.html]');
+    console.error('用法：agent-web flow <案例.json或目录> [--trajectory=轨迹.json或目录] [--result=判决.json或.jsonl] [--out=流程.html]');
     return 2;
   }
   const caseFile = path.resolve(args[0]);
-  if (!fs.existsSync(caseFile) || !fs.statSync(caseFile).isFile()) {
-    console.error('找不到案例文件 ' + caseFile);
+  if (!fs.existsSync(caseFile)) {
+    console.error('找不到案例文件或目录 ' + caseFile);
+    return 2;
+  }
+  if (fs.statSync(caseFile).isDirectory()) {
+    return cmdFlowDashboard(caseFile, flags);
+  }
+  if (!fs.statSync(caseFile).isFile()) {
+    console.error('不是案例文件 ' + caseFile);
     return 2;
   }
   const rawCase = JSON.parse(fs.readFileSync(caseFile, 'utf8'));
@@ -1444,7 +1496,7 @@ const HELP = `agent-web —— 给 Agent 写机器可判的集成测试
   agent-web record <动作日志> --adapter=SPEC   把 Agent 的实际动作还原成候选轨迹
   agent-web prepare <动作日志> --adapter=SPEC  一次生成步骤、案例草稿和流程预览
   agent-web draft <轨迹文件> --adapter=SPEC   回放轨迹，反推案例草稿（要人确认）
-  agent-web flow <案例.json> [--result=FILE]  生成交互式流程图 HTML
+  agent-web flow <案例或目录> [--result=FILE]  单案例流程图；给目录则生成判决总览
   agent-web knowledge                         事故档案：这个仓库踩过的八个坑
   agent-web recall [案例目录]                 比对档案：这次有没有重犯旧错（第二次拦下）
   agent-web init <目录>                       生成案例模板（--adapter 写进 environment）
