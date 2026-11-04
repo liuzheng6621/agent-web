@@ -602,3 +602,53 @@ test('draft：轨迹跑不通就不生成草稿', async () => {
   assert.equal(r.aborted.code, 'unexpected_rejection');
   assert.equal(r.aborted.at, 0);
 });
+
+test('flow：候选判决使用实际执行轨迹与证据', async () => {
+  const { buildFlowModel } = await import('../src/flow.mjs');
+  const c = {
+    id: 'demo/flow',
+    task: { natural_goal: '完成订单', goal_assertions: [{ kind: 'field_equals', selector: { collection: 'orders', index: 0 }, path: 'status', value: 'READY' }] },
+    reference_trajectory: [{ id: 'r1', capability: 'order.create', as: 'customer', expected_outcome: 'applied' }],
+  };
+  const verdict = {
+    case_id: c.id,
+    status: 'fail',
+    reason_code: 'assertion_false',
+    trajectory_source: 'candidate',
+    evidence: {
+      trace: [{ index: 0, id: 'c1', capability: 'order.pick', as: 'customer2', outcome: 'rejected', expected_outcome: 'applied', error: { code: 'not_owner', message: 'not owner' } }],
+      events: [{ type: 'order.ready', from: 'MAKING', to: 'READY', by: 'staff', orderId: 2 }],
+      events_complete: true,
+    },
+    goal_results: [{ index: 0, kind: 'field_equals', status: 'false', code: 'field_mismatch', message: 'status mismatch' }],
+    invariant_results: [],
+  };
+  const model = buildFlowModel({ case: c, verdict });
+  assert.equal(model.trajectorySource, 'candidate');
+  assert.equal(model.steps[0].id, 'c1');
+  assert.equal(model.steps[0].actual, 'rejected');
+  assert.equal(model.steps[0].role, 'customer2');
+  assert.equal(model.events[0].from, 'MAKING');
+  assert.equal(model.eventsComplete, true);
+  assert.equal(model.assertions[0].result, 'false');
+});
+
+test('flow：HTML 自包含且对动态内容做 HTML / script 转义', async () => {
+  const { renderFlowHtml } = await import('../src/flow.mjs');
+  const html = renderFlowHtml({
+    case: {
+      id: 'demo/<flow>',
+      task: { natural_goal: '</script><img src=x onerror=alert(1)>', goal_assertions: [] },
+      reference_trajectory: [{ id: 's1', capability: 'order.create', as: 'customer', arguments: { note: '<script>alert(1)</script>', accessToken: 'not-for-export' } }],
+    },
+  });
+  assert.match(html, /<!doctype html>/i);
+  assert.match(html, /id="flow-data"/);
+  assert.match(html, /<style>/);
+  assert.match(html, /<script>\s*const DATA=/);
+  assert.doesNotMatch(html, /<script type="application\/json" id="flow-data">[^<]*<\/script><img/);
+  assert.match(html, /\\u003c\/script\\u003e/);
+  assert.doesNotMatch(html, /not-for-export/);
+  assert.match(html, /REDACTED/);
+  assert.doesNotMatch(html, /https?:\/\//);
+});

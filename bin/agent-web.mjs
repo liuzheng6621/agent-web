@@ -7,6 +7,7 @@
  *   agent-web report <results.jsonl>   由判决结果出指标
  *   agent-web capabilities             打印适配器的能力清单与证据等级
  *   agent-web draft <轨迹文件>          回放一条轨迹，反推案例草稿
+ *   agent-web flow <案例.json>           生成交互式流程图 HTML
  *   agent-web init <目录>              生成一份案例模板
  *
  * 退出码：0 全部符合预期；1 存在不符；2 用法或环境错误。
@@ -22,6 +23,7 @@ import { fingerprint } from '../src/values.mjs';
 import { recordTrajectory } from '../src/record.mjs';
 import { replayTrajectory, buildDraftCase } from '../src/draft.mjs';
 import { validateCase, validateSteps } from '../src/case.mjs';
+import { renderFlowHtml } from '../src/flow.mjs';
 import { summarize, agreement, formatText, countFailedAssertions } from '../src/report.mjs';
 import { loadAdapter, listBuiltins } from '../src/adapter/load.mjs';
 import { diffViews } from '../src/view.mjs';
@@ -590,7 +592,102 @@ async function cmdDraft(args, flags) {
   return self.status === 'pass' ? 0 : 1;
 }
 
-function announceCandidateMode(flags) {  if (typeof flags.trajectory !== 'string' || flags.json) return;
+// flow：把案例/候选轨迹与可选判决结果渲染为独立 HTML。
+// 纯展示、不执行适配器。HTML 内嵌所有数据与样式，file:// 直接打开。
+function parseJsonOrLines(text, label) {
+  try {
+    return JSON.parse(text);
+  } catch (jsonError) {
+    const lines = String(text).split(/\r?\n/).filter((line) => line.trim() !== '');
+    if (lines.length === 0) throw new Error(label + ' 为空');
+    try {
+      return lines.map((line, i) => {
+        try {
+          return JSON.parse(line);
+        } catch (e) {
+          throw new Error(label + ' 第 ' + (i + 1) + ' 行 JSON 错误：' + e.message);
+        }
+      });
+    } catch (lineError) {
+      if (lineError.message.startsWith(label + ' 第 ')) throw lineError;
+      throw new Error(label + ' 不是合法 JSON / JSONL：' + jsonError.message);
+    }
+  }
+}
+
+function readFlowTrajectory(spec, caseFile) {
+  if (typeof spec !== 'string') return null;
+  let target = path.resolve(spec);
+  if (fs.existsSync(target) && fs.statSync(target).isDirectory()) {
+    target = path.join(target, path.basename(caseFile));
+  }
+  if (!fs.existsSync(target)) throw new Error('找不到候选轨迹 ' + target);
+  const raw = parseJsonOrLines(fs.readFileSync(target, 'utf8'), '候选轨迹');
+  const steps = Array.isArray(raw) ? raw : Array.isArray(raw?.trajectory) ? raw.trajectory : null;
+  if (!steps || steps.length === 0) throw new Error('候选轨迹文件必须是非空数组或含 trajectory 数组的对象');
+  const errors = validateSteps(steps, 'trajectory');
+  if (errors.length > 0) throw new Error('候选轨迹未通过校验：' + errors.join('；'));
+  return steps;
+}
+
+function readFlowVerdict(spec, caseId) {
+  if (typeof spec !== 'string') return null;
+  const target = path.resolve(spec);
+  if (!fs.existsSync(target)) throw new Error('找不到判决结果 ' + target);
+  const raw = parseJsonOrLines(fs.readFileSync(target, 'utf8'), '判决结果');
+  const rows = Array.isArray(raw) ? raw : [raw];
+  const verdict = rows.find((row) => row?.case_id === caseId);
+  if (!verdict) throw new Error('判决结果里没有 case_id=' + caseId);
+  return verdict;
+}
+
+function cmdFlow(args, flags) {
+  if (args.length === 0) {
+    console.error('用法：agent-web flow <案例.json> [--trajectory=轨迹.json或目录] [--result=判决.json或.jsonl] [--out=流程.html]');
+    return 2;
+  }
+  const caseFile = path.resolve(args[0]);
+  if (!fs.existsSync(caseFile) || !fs.statSync(caseFile).isFile()) {
+    console.error('找不到案例文件 ' + caseFile);
+    return 2;
+  }
+  const rawCase = JSON.parse(fs.readFileSync(caseFile, 'utf8'));
+  const caseErrors = validateCase(rawCase);
+  if (caseErrors.length > 0) {
+    console.error('案例未通过校验：');
+    for (const error of caseErrors) console.error('  - ' + error);
+    return 1;
+  }
+
+  const trajectory = readFlowTrajectory(flags.trajectory, caseFile);
+  const verdict = readFlowVerdict(flags.result, rawCase.id);
+  if (trajectory && verdict && verdict.trajectory_source !== 'candidate') {
+    throw new Error('传入了候选轨迹，但 --result 不是 candidate 判决，不能把不同轨迹的步骤对齐；请用 verify --trajectory 重新生成结果');
+  }
+  const title = typeof flags.title === 'string' ? flags.title : rawCase.id;
+  const html = renderFlowHtml({ case: rawCase, trajectory, verdict, title });
+  const out = typeof flags.out === 'string'
+    ? path.resolve(flags.out)
+    : path.resolve(path.basename(caseFile, path.extname(caseFile)) + '.flow.html');
+  fs.mkdirSync(path.dirname(out), { recursive: true });
+  fs.writeFileSync(out, html, 'utf8');
+
+  console.log('流程图已生成：' + path.relative(process.cwd(), out));
+  console.log('案例：' + rawCase.id + ' · ' + (trajectory ? 'candidate' : 'reference') + ' trajectory');
+  const displayedSteps = trajectory
+    ?? (verdict?.trajectory_source === 'candidate' && Array.isArray(verdict.evidence?.trace)
+      ? verdict.evidence.trace
+      : rawCase.reference_trajectory);
+  console.log('步骤：' + displayedSteps.length + ' · 判决：' + (verdict?.status ?? '未提供'));
+  if (verdict?.trajectory_source === 'candidate' && !trajectory) {
+    console.log('提示：当前显示已执行步骤；要显示尚未执行的候选步骤与动作参数，另传 --trajectory=轨迹文件或目录。');
+  }
+  console.log('HTML 自包含，可直接用浏览器打开。');
+  return 0;
+}
+
+function announceCandidateMode(flags) {
+  if (typeof flags.trajectory !== 'string' || flags.json) return;
   // 候选轨迹模式下，expected.json 描述的是参考轨迹，落差是结论而不是错误。
   console.log('候选轨迹模式：判的是 --trajectory 目录里的动作序列，不是案例自带的参考轨迹。');
   console.log('下面的 ✓/✗ 相对 expected.json 的参考基线，落差本身就是要看的东西。');
@@ -607,6 +704,7 @@ const HELP = `agent-web —— 给 Agent 写机器可判的集成测试
   agent-web drift <旧.jsonl> <新.jsonl>      比较两次跑批的初态形状（漂移检测）
   agent-web record <动作日志> --adapter=SPEC  把 Agent 的实际动作还原成候选轨迹
   agent-web draft <轨迹文件> --adapter=SPEC   回放轨迹，反推案例草稿（要人确认）
+  agent-web flow <案例.json> [--result=FILE]  生成交互式流程图 HTML
   agent-web init <目录>                       生成案例模板（--adapter 写进 environment）
 
 适配器 SPEC 可以是：
@@ -646,6 +744,8 @@ async function main() {
         return await cmdRecord(args, flags);
       case 'draft':
         return await cmdDraft(args, flags);
+      case 'flow':
+        return cmdFlow(args, flags);
       case 'drift':
         return await cmdDrift(args);
       case 'capabilities':

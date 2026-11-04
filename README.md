@@ -301,6 +301,32 @@ node bin/agent-web.mjs draft examples/agent-traces/recorded/happy-path.json \
 
 ---
 
+## 一眼看懂一条案例：flow
+
+```bash
+# 先跑一条案例，拿到判决证据
+node bin/agent-web.mjs verify cases/memory-demo/happy-path.json \
+  --adapter=memory --out=happy-path.jsonl
+
+# 再生成自包含流程图
+node bin/agent-web.mjs flow cases/memory-demo/happy-path.json \
+  --result=happy-path.jsonl --out=happy-path.flow.html
+```
+
+也可以叠加候选轨迹（传轨迹文件，或一个按案例文件名匹配的目录）：
+
+```bash
+node bin/agent-web.mjs flow cases/memory-demo/happy-path.json \
+  --trajectory=examples/candidate-trajectories \
+  --result=happy-path.jsonl --out=happy-path.flow.html
+```
+
+生成的 HTML 是**单文件、零依赖**，双击即可打开。它把步骤、执行角色、预期/实际结果、动作参数、状态事件和断言结果放在同一张图里；可以筛出偏差或未执行步骤，点击步骤展开参数。动态内容会 HTML 转义，token / password / cookie / API key 等字段默认脱敏。
+
+不带 `--result` 时画计划轨迹，不伪造实际执行结果；判决里若是 candidate trajectory，会优先画实际执行轨迹。流程图只读、不重跑适配器。
+
+---
+
 ## 检测被测系统变了没有
 
 ```bash
@@ -462,7 +488,7 @@ agent-web drift before.jsonl after.jsonl
 
 ```
 agent-web/
-├── bin/agent-web.mjs          命令行：selftest / verify / report / compare / record / draft / drift / capabilities / init
+├── bin/agent-web.mjs          命令行：selftest / verify / report / compare / record / draft / flow / drift / capabilities / init
 ├── src/
 │   ├── three-valued.mjs       Kleene 三值逻辑（true / false / unknown 及其 and/or/not）
 │   ├── values.mjs             归一化、深比较、稳定序列化、结构指纹
@@ -475,6 +501,7 @@ agent-web/
 │   ├── view.mjs               视图契约：声明校验、状态核对、跨实现差异
 │   ├── record.mjs             流量 → 候选轨迹（http 模板反查、绑定推断）
 │   ├── draft.mjs              轨迹 → 案例草稿（回放、断言合成、待确认清单）
+│   ├── flow.mjs               案例/判决 → 自包含交互流程图 HTML
 │   └── adapter/
 │       ├── contract.mjs       适配器契约（manifest 校验、四种执行结果、证据等级）
 │       ├── load.mjs           适配器加载（内置名 / 文件路径 / 包名）
@@ -486,12 +513,12 @@ agent-web/
 ├── examples/
 │   ├── README.md              参考被测系统（咖啡店）说明
 │   ├── adapter-template/      能直接跑的适配器骨架 + 四条示例案例
-│   └── agent-traces/          真实流量日志 → record 产物 → draft 草稿
+│   └── agent-traces/          真实流量日志 → record 产物 → draft 草稿 → flow 流程图
 ├── docs/
 │   ├── SPEC.md                案例格式规范
 │   ├── FINDING-001.md         身份塌缩导致的假通过
 │   └── FINDING-001.en.md      同上，英文版
-└── test/engine.test.mjs       44 个单元测试（node --test，零依赖）
+└── test/engine.test.mjs       46 个单元测试（node --test，零依赖）
 ```
 
 ---
@@ -510,7 +537,8 @@ agent-web/
 - `0.1`：内存适配器 + 真实 HTTP 适配器 + 七种断言 + 跨适配器判决对照 + 视图契约，跑通。
 - `0.2`：判别人的轨迹；事件词表；初态漂移检测。
 - `0.3`：`record`——真实流量还原成候选轨迹。
-- `0.4`（当前）：`draft`——轨迹回放成案例草稿，把「写案例」压成「确认几条待办」。
+- `0.4`：`draft`——轨迹回放成案例草稿，把「写案例」压成「确认几条待办」。
+- `0.5`（当前）：`flow`——案例、候选轨迹、判决证据汇成一张离线交互流程图。
 - 之后：跨视图映射（不同集合名的案例能换算过去）；多后端并发；`inferred` 提级路径。
 
 ---

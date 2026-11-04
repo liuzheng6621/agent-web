@@ -10,6 +10,7 @@ export { VERDICTS, judge } from './runner.mjs';
 export { wilson, summarize, agreement, formatText } from './report.mjs';
 export { parseLog, matchHttp, outcomeOf, inferSteps, toTrajectoryDoc, recordTrajectory } from './record.mjs';
 export { identityOf, synthesize, replayTrajectory, buildDraftCase } from './draft.mjs';
+export { buildFlowModel, renderFlowHtml } from './flow.mjs';
 export {
   OUTCOMES,
   CAPABILITY_KINDS,

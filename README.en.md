@@ -304,6 +304,32 @@ Four things worth stating plainly.
 
 ---
 
+## See a case at a glance: flow
+
+```bash
+# Run one case and keep its verdict evidence
+node bin/agent-web.mjs verify cases/memory-demo/happy-path.json \
+  --adapter=memory --out=happy-path.jsonl
+
+# Render a self-contained workflow map
+node bin/agent-web.mjs flow cases/memory-demo/happy-path.json \
+  --result=happy-path.jsonl --out=happy-path.flow.html
+```
+
+A candidate trajectory can be overlaid too (pass a file or a directory matched by case filename):
+
+```bash
+node bin/agent-web.mjs flow cases/memory-demo/happy-path.json \
+  --trajectory=examples/candidate-trajectories \
+  --result=happy-path.jsonl --out=happy-path.flow.html
+```
+
+The generated HTML is a **single file with no dependencies**. Open it directly. Steps, roles, expected/actual outcomes, action arguments, status events, and assertion results share one view. Filter mismatches or unexecuted steps; click a card to expand arguments. Dynamic content is HTML-escaped; fields named like token / password / cookie / API key are redacted by default.
+
+Without `--result`, it draws the planned trajectory and does not invent execution outcomes. If the verdict says `candidate`, it draws the actual executed trajectory first. `flow` is read-only; it never reruns the adapter.
+
+---
+
 ## Three concepts
 
 | Concept | What it is |
@@ -449,7 +475,7 @@ Written down so people know where the edges are, not out of modesty.
 
 ```
 agent-web/
-├── bin/agent-web.mjs          CLI: selftest / verify / report / compare / record / draft / drift / capabilities / init
+├── bin/agent-web.mjs          CLI: selftest / verify / report / compare / record / draft / flow / drift / capabilities / init
 ├── src/
 │   ├── three-valued.mjs       Kleene three-valued logic (true / false / unknown, and/or/not)
 │   ├── values.mjs             normalization, deep equality, stable stringify, structural fingerprint
@@ -462,6 +488,7 @@ agent-web/
 │   ├── view.mjs               view contract: declaration checks, state checks, cross-impl diff
 │   ├── record.mjs             traffic → candidate trajectory (http template lookup, binding inference)
 │   ├── draft.mjs              trajectory → case draft (replay, assertion synthesis, to-confirm list)
+│   ├── flow.mjs               case/verdict → self-contained interactive workflow HTML
 │   └── adapter/
 │       ├── contract.mjs       adapter contract (manifest checks, four outcomes, evidence levels)
 │       ├── load.mjs           adapter loading (built-in name / file path / package name)
@@ -473,12 +500,12 @@ agent-web/
 ├── examples/
 │   ├── README.md              the reference system under test (coffee shop)
 │   ├── adapter-template/      a runnable adapter skeleton + four example cases
-│   └── agent-traces/          real traffic log → record output → draft case
+│   └── agent-traces/          real traffic log → record output → draft case → flow map
 ├── docs/
 │   ├── SPEC.md                case format specification
 │   ├── FINDING-001.md         the false pass caused by collapsed identities
 │   └── FINDING-001.en.md      same, in English
-└── test/engine.test.mjs       44 unit tests (node --test, zero dependencies)
+└── test/engine.test.mjs       46 unit tests (node --test, zero dependencies)
 ```
 
 ---
@@ -497,7 +524,8 @@ agent-web/
 - `0.1`: in-memory adapter + real HTTP adapter + seven assertion kinds + cross-adapter verdict comparison + view contracts, working.
 - `0.2`: judging someone else's trajectory; event vocabulary; initial-state drift detection.
 - `0.3`: `record` — real traffic reconstructed into a candidate trajectory.
-- `0.4` (current): `draft` — a trajectory replayed into a case draft, turning "write a case" into "confirm a short list".
+- `0.4`: `draft` — replay a trajectory into a case draft, turning "write a case" into "confirm a short list".
+- `0.5` (current): `flow` — case, candidate trajectory, and verdict evidence rendered as an offline interactive workflow map.
 - After that: cross-view mapping so cases travel between differently-named collections; multi-backend concurrency; a promotion path for `inferred`.
 
 ---
