@@ -1,4 +1,4 @@
-# agent-web v0.29.3
+# agent-web v0.29.4
 
 <p align="center">
   <img src="docs/media/hero.png" alt="agent-web：给 Agent 写机器可判的集成测试" width="100%">
@@ -14,11 +14,10 @@
   <img alt="node" src="docs/media/badge-node.svg">
   <img alt="dependencies" src="docs/media/badge-deps.svg">
   <img alt="license" src="docs/media/badge-license.svg">
-  <img alt="tests" src="docs/media/badge-tests.svg">
 </p>
 
 <p align="center">
-  <b>当前版本 0.29.3</b> · 12 种断言 · 26 条命令 · 22 个变异体
+  <b>当前版本 0.29.4</b> · 12 种断言 · 26 条命令 · 22 个变异体
 </p>
 
 <p align="center">

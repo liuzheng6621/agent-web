@@ -34,6 +34,4 @@ cd .tmp-promo && ffmpeg -y -f concat -safe 0 -i list.txt -t 52 \
   -movflags +faststart ../docs/media/promo.mp4
 ```
 
-徽章 `badge-tests.svg` 里的数字要手动跟上（`npm test` 之后看一眼总数），其余三枚是恒定的。
-
 依赖只有 Pillow 和 ffmpeg。字体用系统自带的微软雅黑与 Consolas，中文与代码分别渲染后按字宽拼接——单一等宽字体没有中文字形，混排会出现豆腐块。
