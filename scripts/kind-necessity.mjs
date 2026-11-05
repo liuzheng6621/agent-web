@@ -20,6 +20,7 @@ import { certify } from '../src/certify.mjs';
 import { MUTATIONS } from '../src/mutate.mjs';
 import { loadAdapter } from '../src/adapter/load.mjs';
 import { KINDS } from '../src/assert/index.mjs';
+import { readFileSync } from 'node:fs';
 
 const CANCELLED = ['PENDING', 'MAKING', 'READY', 'PICKED', 'CANCELED'];
 
@@ -32,12 +33,35 @@ function shapeCase(assertions) {
     environment: { adapter: 'memory' },
     task: { natural_goal: '下两单，看这两单的集合形状', goal_assertions: assertions, preconditions: [] },
     reference_trajectory: [
-      { id: 's1', capability: 'order.create', as: 'customer', arguments: { items: [{ dishName: '拿铁', count: 2 }] }, expected_outcome: 'applied' },
+      { id: 's1', capability: 'order.create', as: 'customer', arguments: { items: [{ dishName: '拿铁', qty: 2 }] }, expected_outcome: 'applied' },
       { id: 's2', capability: 'order.create', as: 'customer', arguments: { items: [{ dishName: '美式咖啡', count: 3 }] }, expected_outcome: 'applied' },
     ],
     invariants: [],
   };
 }
+
+/**
+ * 时间窗 / 每步求值这两个 kind 不在上面那条「两单」案例里求值 ——
+ * 它们看的是「某一段」和「每一步」，需要一条多步案例才测得出来。
+ * 所以各配一条专用案例，再各配一个只有它能杀的变异体。
+ */
+/**
+ * 时间窗 / 每步求值这两个 kind 需要多步案例才测得出来，所以直接用仓库里那两条真案例，
+ * 只替换 invariants —— 用手编的迷你案例测，量到的是「我编的案例」而不是「我们的案例」。
+ */
+function fromReal(id, invariants) {
+  const raw = readFileSync(new URL(`../cases/coffee/${id}.json`, import.meta.url), 'utf8');
+  const c = JSON.parse(raw);
+  const task = { ...c.task, invariants };
+  return { ...c, task };
+}
+
+const TEMPORAL = [
+  // skip-ready-stage 的第 3 步会被拒；那一步之后不该多出流水
+  { kind: 'window', caseId: 'skip-ready-stage', invariant: { kind: 'window', from_step: 2, to_step: 3, of: { kind: 'unchanged', scopes: ['status_log'] } } },
+  // happy-path 五步走完；菜单是只读数据，任何一步之后都不该变
+  { kind: 'every_step', caseId: 'happy-path', invariant: { kind: 'every_step', of: { kind: 'unchanged', scopes: ['menu'] } } },
+];
 
 const SHAPE = [
   { kind: 'entity_exists', selector: { collection: 'orders', index: 0 } },
@@ -70,10 +94,27 @@ async function run() {
   };
 
   const shapeKinds = ['unique', 'type_of', 'subset', 'sorted_by'];
+
   console.log('形状断言的必要性（案例：两单 + 六条断言）\n');
   console.log('全套变异体：' + pool.length + ' 个，抓到 ' + full.mutations.filter((m) => m.status === 'caught').length + ' 个\n');
 
   let failed = 0;
+  let failedTemporal = 0;
+  // 时间窗 / 每步求值：各自一条专用案例，去掉这条断言就该有变异体漏网。
+  for (const spec of TEMPORAL) {
+    const withIt = await certify({ cases: [fromReal(spec.caseId, [spec.invariant])], adapterFactory: factory, adapterName: 'memory', mutations: pool });
+    const without = await certify({ cases: [fromReal(spec.caseId, [])], adapterFactory: factory, adapterName: 'memory', mutations: pool });
+    const kills = withIt.mutations.filter((m) => (m.killedBy ?? []).some((k) => (typeof k === 'string' ? k : k.kind) === spec.kind));
+    const caughtWith = new Set(withIt.mutations.filter((m) => m.status === 'caught').map((m) => m.id));
+    const caughtWithout = new Set(without.mutations.filter((m) => m.status === 'caught').map((m) => m.id));
+    const necessary = [...caughtWith].filter((id) => !caughtWithout.has(id));
+    const ok = kills.length > 0 && necessary.length > 0;
+    if (!ok) failedTemporal += 1;
+    console.log(`${ok ? 'PASS' : 'FAIL'}  ${spec.kind}（案例 ${spec.caseId}）`);
+    console.log(`      能杀 ${kills.length} 个：${kills.map((m) => m.id).join(' ') || '—'}`);
+    console.log(`      只有它能杀：${necessary.join(' ') || '—'}`);
+  }
+  if (failedTemporal > 0) failed += failedTemporal;
   for (const kind of shapeKinds) {
     const kills = full.mutations.filter((m) =>
       (m.killedBy ?? []).some((k) => (typeof k === 'string' ? k : k.kind) === kind),
@@ -87,7 +128,7 @@ async function run() {
   }
 
   console.log('\n' + (failed === 0
-    ? '四种都换得回东西：去掉任何一条，都有变异体会漏网。'
+    ? '形状四种 + 时序两种都换得回东西：去掉任何一条，都有变异体会漏网。'
     : failed + ' 种没有独占战功 —— 按宪法不该进。'));
   return failed === 0 ? 0 : 1;
 }

@@ -94,7 +94,7 @@ memory                                   内置名
 }
 ```
 
-### 4.1 十二种 kind
+### 4.1 十四种 kind
 
 | kind | 必填参数 | 相位 |
 | --- | --- | --- |
@@ -139,7 +139,36 @@ memory                                   内置名
 「漏乘数量」和「正确算法」在数量为 1 时算出同一个数。关系式不吃这个亏：
 它在数量为 1 时同样要求 `subTotal == unitPrice × count`，数量为 3 时直接把它抓出来。
 
-### 4.3 相位
+### 4.3 `window` 与 `every_step`：换个观察口
+
+`unchanged` / `count_delta` 只看首尾，`status_transition` 只看状态序列。有一类故障刚好躲在这两者之间：
+**中途坏掉、结尾修好**，或者**被拒绝那一步之后留了半条记录、收尾时又抹掉**。
+净变化为零、终态干净，现有断言全判 `TRUE`。这两种 kind 不是「更严格」，是把观察范围缩小。
+
+```json
+{ "kind": "window", "from_step": 2, "to_step": 3,
+  "of": { "kind": "unchanged", "scopes": ["status_log"] } }
+
+{ "kind": "every_step", "of": { "kind": "unchanged", "scopes": ["menu"] } }
+```
+
+| kind | 求值范围 | 内层允许 | 相位 |
+| --- | --- | --- | --- |
+| `window` | `[from_step, to_step)` 这一段：`initial` 取该段起点状态，`final` 取终点状态 | `unchanged` / `count_delta` / `field_equals` / `entity_exists` | 只能 `trace` |
+| `every_step` | 每一步：「起点 → 这一步之后」 | 同上（含 `composite` 之外的全部终态类断言） | 只能 `trace` |
+
+四条规则：
+
+1. `from_step` / `to_step` 越界、方向反了、或该步的状态没记录 —— 判 `unknown / invalid_case` 或 `missing_observation`，**不许猜**。
+2. `every_step` 的参照是**起点**不是上一步 —— 否则「每步都在变」的东西永远判不了。
+3. 两种都只允许 `trace` 相位。写成 `final` 等于把窗口丢掉，校验期直接拒收。
+4. 新增这两个 kind 的前提是各自有**独占杀手**：`m-transient-menu-price`（只有 `every_step` 抓得住）与
+   `m-mid-write-leak`（只有 `window` 抓得住），由 `scripts/kind-necessity.mjs` 每次跑一遍验证。
+
+实现细节：状态层变异体拿到的 `tamper(state, index, count)` 现在带下标，
+这样它才能只坏「中间那一步」而不碰首尾 —— 没有这个下标，上面两个故障根本造不出来。
+
+### 4.4 相位
 
 相位决定求值时机，是语义的一部分：
 
@@ -149,7 +178,7 @@ memory                                   内置名
 
 把 `trace` 类断言放到终态上求值会漏掉"中间走错又走回来"，因此**实现必须按相位表求值，案例不得指定相位**。
 
-### 4.4 `selector`
+### 4.5 `selector`
 
 ```json
 { "collection": "orders", "where": [{ "field": "status", "eq": "READY" }], "index": 0 }
@@ -163,7 +192,7 @@ memory                                   内置名
 
 选中 0 个实体 → 断言为 `unknown / missing_observation`，**不是** `false`。空集不构成反证。
 
-### 4.5 `path`
+### 4.6 `path`
 
 点号路径，从实体根写起：`status`、`items.length`、`items.0.count`。`length` 是特殊键，取数组长度。
 
@@ -171,7 +200,7 @@ memory                                   内置名
 
 ---
 
-### 4.6 形状断言：唯一性、类型、值域、顺序
+### 4.7 形状断言：唯一性、类型、值域、顺序
 
 前八种都在说「第几行的第几个字段等于什么」。真正难表达的是这四句：
 
@@ -209,7 +238,7 @@ PASS  sorted_by  能杀 2 个：…                       只有它能杀：m-un
 
 `pagination` 想过，没收：规范视图不携带分页元信息，写出来杀不掉任何变异体，是装饰。
 
-### 4.7 形状断言的边界：一条实测
+### 4.8 形状断言的边界：一条实测
 
 `cases/coffee/shape.json` 里**没有** `sorted_by`，只有另外三种。原因是实测出来的：
 

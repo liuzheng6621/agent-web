@@ -16,6 +16,7 @@ import { validateSelector } from '../select.mjs';
 import * as K from './kinds.mjs';
 import { relation, RELATION_OPS } from './relation.mjs';
 import { evalShape, SHAPE_KINDS, SHAPE_TYPES } from './shape.mjs';
+import { window as evalWindow, everyStep as evalEveryStep, WINDOW_INNER } from './window.mjs';
 
 export const KINDS = Object.freeze([
   'entity_exists',
@@ -27,7 +28,11 @@ export const KINDS = Object.freeze([
   'composite',
   'relation',
   ...SHAPE_KINDS,
+  'window',
+  'every_step',
 ]);
+
+export { WINDOW_INNER };
 
 export const PHASES = Object.freeze(['final', 'trace', 'initial_vs_final']);
 
@@ -50,6 +55,10 @@ export const PHASE_MATRIX = Object.freeze({
   unique: { default: 'final', allowed: ['final'] },
   type_of: { default: 'final', allowed: ['final'] },
   subset: { default: 'final', allowed: ['final'] },
+  // 时间窗与每步求值都在 trace 上工作，但它们看的是「某一段」和「每一步」，
+  // 所以相位固定 trace，不允许被显式改成 final（那等于把窗口丢掉）。
+  window: { default: 'trace', allowed: ['trace'] },
+  every_step: { default: 'trace', allowed: ['trace'] },
 });
 
 const SELECTOR_KINDS = new Set([
@@ -67,6 +76,23 @@ export function validateAssertion(a, at = 'assertion') {
   const errors = [];
   if (!a || typeof a !== 'object') return [`${at} 必须是对象`];
 
+  if ((a.kind === 'window' || a.kind === 'every_step') && (!a.of || typeof a.of !== 'object')) {
+    return [`${at} 的 ${a.kind} 需要一个内层断言 of`];
+  }
+  if (a.kind === 'window') {
+    if (a.from_step !== undefined && !(Number.isInteger(a.from_step) && a.from_step >= 0)) {
+      errors.push(`${at}.from_step 必须是非负整数`);
+    }
+    if (a.to_step !== undefined && !(Number.isInteger(a.to_step) && a.to_step >= 0)) {
+      errors.push(`${at}.to_step 必须是非负整数`);
+    }
+    if (Number.isInteger(a.from_step) && Number.isInteger(a.to_step) && a.to_step <= a.from_step) {
+      errors.push(`${at}.to_step 必须大于 from_step`);
+    }
+    if (a.of && typeof a.of === 'object' && !WINDOW_INNER.includes(a.of.kind)) {
+      errors.push(`${at}.of 只能是 ${WINDOW_INNER.join(' / ')}（其它断言在时间窗里没有意义）`);
+    }
+  }
   if (!KINDS.includes(a.kind)) {
     errors.push(`${at}.kind=${JSON.stringify(a.kind)} 不在 ${KINDS.join('/')}`);
     return errors;
@@ -205,6 +231,10 @@ export function evalAssertion(a, ctx, depth = 0) {
     case 'type_of':
     case 'subset':
       return evalShape(a, ctx);
+    case 'window':
+      return evalWindow(a, ctx, (sub, c) => evalAssertion(sub, c, depth + 1));
+    case 'every_step':
+      return evalEveryStep(a, ctx, (sub, c) => evalAssertion(sub, c, depth + 1));
     default:
       return { status: UNKNOWN, code: 'invalid_case', message: `未知断言 ${a.kind}` };
   }

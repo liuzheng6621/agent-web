@@ -17,6 +17,20 @@
         "path": "status",
         "value": "PICKED"
       }
+    ],
+    "invariants": [
+      {
+        "kind": "window",
+        "from_step": 2,
+        "to_step": 3,
+        "of": {
+          "kind": "unchanged",
+          "scopes": [
+            "status_log"
+          ]
+        },
+        "why": "第 3 步被拒绝，那一步之后不该多出任何流水。收尾时清掉的话，净变化为零，看不出来。"
+      }
     ]
   },
   "reference_trajectory": [

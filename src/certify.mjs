@@ -96,9 +96,12 @@ function transformCtx(baseCtx, tamper) {
     final: dupValue(baseCtx.final),
     trace: (baseCtx.trace ?? []).map((t) => ({ stateAfter: dupValue(t.stateAfter) })),
   };
-  tamper(ctx.initial);
-  tamper(ctx.final);
-  for (const t of ctx.trace) tamper(t.stateAfter);
+  // 传下标与总长：这样变异体才能只坏「中间某一步」——
+  // 「中途坏掉、结尾修好」是现有断言全靠看不出来的那一类。
+  const count = ctx.trace.length + 2;
+  tamper(ctx.initial, 0, count);
+  tamper(ctx.final, count - 1, count);
+  for (let i = 0; i < ctx.trace.length; i += 1) tamper(ctx.trace[i].stateAfter, i + 1, count);
   return ctx;
 }
 

@@ -6,6 +6,27 @@
 CI 也在查。这条规则是买来的：这个仓库曾经同时存在 `package.json` 0.16、README 0.9、
 Gitee Release v0.6.0 三个数，谁看都是三个项目。
 
+## 0.33.0
+
+断言从 12 种到 14 种：补上「时间窗」和「每步求值」——这两种不是更严格，是换个观察口。
+
+- **`window`**：把观察缩到 `[from_step, to_step)` 这一段，内层只能是 `unchanged` / `count_delta` / `field_equals` / `entity_exists`。
+  对付「被拒绝之后留了半条流水，收尾时又抹掉」：净变化为零，`unchanged` 判真。
+- **`every_step`**：每走完一步就用「起点 → 这一步之后」重跑内层断言，任何一步假就假，并指出第几步。
+  对付「中途抖一下又改回来」：终态干净，`unchanged` 判真。
+
+两种都只允许停在 `trace` 相位——写成 `final` 等于把窗口丢掉，校验期直接拒。
+
+配套两件必须一起做：
+
+- `transformCtx` 现在把 `(state, index, count)` 交给变异体，才能只坏「中间那一步」而不碰首尾。
+- 新增 `m-transient-menu-price`、`m-mid-write-leak` 两个变异体，各自**只被一个新 kind 抓住**：
+  `scripts/kind-necessity.mjs` 扩到六种，且时序两条改用仓库里的真案例（`skip-ready-stage` / `happy-path`）来测，
+  不拿手编的迷你案例冒充。
+
+还没做：`pagination`（跨页重复 / 边界丢行 / 翻页乱序 / total 说谎）需要 `observe` 带分页元信息，
+`docs/LIMITS.md` 的 L7 仍是 `open`，没有假装解决。
+
 ## 0.32.0
 
 跨命名体系的字段映射：`agent-web align`（L2）。
