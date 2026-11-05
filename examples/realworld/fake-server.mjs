@@ -194,8 +194,13 @@ const server = http.createServer(async (req, res) => {
   // GET /articles/feed
   if (method === 'GET' && path === '/articles/feed') {
     if (!viewer) return errs(res, 401, { token: ['is missing'] });
-    const mine = [...db.articles.values()].filter((a) => db.follows.has(`${viewer.username}|${a.author}`));
-    return send(res, 200, { articles: mine.map((a) => articleOf(a, viewer)), articlesCount: mine.length });
+    const mine = [...db.articles.values()]
+      .filter((a) => db.follows.has(`${viewer.username}|${a.author}`))
+      .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+    const limit = Math.min(Number(q.get('limit') || 20), 100);
+    const offset = Number(q.get('offset') || 0);
+    const page = mine.slice(offset, offset + limit);
+    return send(res, 200, { articles: page.map((a) => articleOf(a, viewer)), articlesCount: mine.length });
   }
   // GET /articles
   if (method === 'GET' && path === '/articles') {
