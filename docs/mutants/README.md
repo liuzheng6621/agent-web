@@ -81,6 +81,15 @@ export function wrap(adapter) {
 `m-skip-intermediate` 靠 `status_transition` 的完整序列，`m-double-effect` 靠一条针对
 具体事件类型的 `count_delta`。换句话说是这三个变异体在替那三种断言作证。
 
+## 需要步号的那一类（`requires_trace`）
+
+有两个变异体不是「改观测」，是「只改中间那一步」—— 中途坏、结尾修好，或者被拒绝之后留半条记录再抹掉。
+它们靠 `tamper(state, index, count)` 里的**下标**下药，而 `observe` 包装拿不到步号，
+所以只在 certify 的快路径（从 P⁺ 的 ctx 变换）里复现，重放路径复现不出来。
+
+meta 里写 `requires_trace: true` 就是声明这件事，`scripts/state-equivalence.mjs` 会跳过它们并把跳过数量打出来。
+不写这个标记，等价性门会看到「重放没坏、变换坏了」而报不一致 —— 那不是快路径错了，是这类变异体跨不过两条路径。
+
 ## 收稿标准
 
 收一个变异体，要先回答这四个问题：

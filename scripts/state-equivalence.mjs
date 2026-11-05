@@ -18,6 +18,7 @@ const bad = [];
 const noTamper = [];
 let compared = 0;
 let reused = 0;
+const skippedTrace = [];
 
 for (const file of files) {
   const caseObj = JSON.parse(readFileSync(path.join(dir, file), 'utf8'));
@@ -26,6 +27,7 @@ for (const file of files) {
 
   for (const m of mutants) {
     if (m.layer !== 'state') continue;
+    if (m.requires_trace) { skippedTrace.push(m.id); continue; }
     const wrapped = m.wrap(createMemoryAdapter());
     const tamper = wrapped._agentWebStateFn;
     if (typeof tamper !== 'function') {
@@ -54,6 +56,10 @@ for (const file of files) {
       bad.push(file + ' ' + m.id + ' 初态规范视图不同');
     }
   }
+}
+
+if (skippedTrace.length) {
+  console.log('跳过 ' + skippedTrace.length + ' 个需要轨迹下标的变异体（只在快路径里复现）：' + [...new Set(skippedTrace)].join(', '));
 }
 
 if (noTamper.length) {

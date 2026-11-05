@@ -167,6 +167,8 @@ memory                                   内置名
 
 实现细节：状态层变异体拿到的 `tamper(state, index, count)` 现在带下标，
 这样它才能只坏「中间那一步」而不碰首尾 —— 没有这个下标，上面两个故障根本造不出来。
+代价是这类变异体只能在快路径里复现（`observe` 包装拿不到步号），所以它们在 meta 里标 `requires_trace: true`，
+`scripts/state-equivalence.mjs` 会跳过并列出来。
 
 ### 4.4 相位
 

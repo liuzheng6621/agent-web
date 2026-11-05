@@ -7,6 +7,8 @@ export const meta = {
   layer: 'state',
   symptom: '净变化为零、终态干净，但中间确实多写过一行',
   mechanism: '只在第 2 步之后的快照里往 status_log 塞一条假记录，其余快照不动',
+  // 它靠「第几步」下药：observe 包装给不出步号，所以只能在快路径（变换）里复现。
+  requires_trace: true,
   catch_hint: '把窗口缩到「那一步之后」（window），盯住中间那段',
 };
 

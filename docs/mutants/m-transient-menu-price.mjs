@@ -7,6 +7,8 @@ export const meta = {
   layer: 'state',
   symptom: '终态完全正确，只是中间某一步的状态不对',
   mechanism: '只在第 2 步之后的那份快照里把 menu[0].price 加一，其它快照保持原样',
+  // 它靠「第几步」下药：observe 包装给不出步号，所以只能在快路径（变换）里复现。
+  requires_trace: true,
   catch_hint: '需要在每一步之后都看一眼（every_step），只看首尾的断言看不见',
 };
 
