@@ -1,0 +1,226 @@
+{
+  "orders": [
+    {
+      "id": 1001,
+      "username": "alice",
+      "status": "PENDING",
+      "totalAmount": 88,
+      "pickupNo": 1101,
+      "createTime": 1767225600000,
+      "items": [
+        {
+          "dishName": "拿铁",
+          "count": 1,
+          "unitPrice": 28,
+          "subTotal": 28
+        },
+        {
+          "dishName": "卡布奇诺",
+          "count": 2,
+          "unitPrice": 30,
+          "subTotal": 60
+        }
+      ]
+    },
+    {
+      "id": 1002,
+      "username": "bob",
+      "status": "MAKING",
+      "totalAmount": 44,
+      "pickupNo": 1102,
+      "createTime": 1767225660000,
+      "items": [
+        {
+          "dishName": "美式",
+          "count": 2,
+          "unitPrice": 22,
+          "subTotal": 44
+        }
+      ]
+    },
+    {
+      "id": 1003,
+      "username": "carol",
+      "status": "READY",
+      "totalAmount": 84,
+      "pickupNo": 1103,
+      "createTime": 1767225720000,
+      "items": [
+        {
+          "dishName": "拿铁",
+          "count": 3,
+          "unitPrice": 28,
+          "subTotal": 84
+        }
+      ]
+    },
+    {
+      "id": 1004,
+      "username": "alice",
+      "status": "PICKED",
+      "totalAmount": 82,
+      "pickupNo": 1104,
+      "createTime": 1767225780000,
+      "items": [
+        {
+          "dishName": "美式",
+          "count": 1,
+          "unitPrice": 22,
+          "subTotal": 22
+        },
+        {
+          "dishName": "卡布奇诺",
+          "count": 2,
+          "unitPrice": 30,
+          "subTotal": 60
+        }
+      ]
+    },
+    {
+      "id": 1005,
+      "username": "bob",
+      "status": "PENDING",
+      "totalAmount": 56,
+      "pickupNo": 1105,
+      "createTime": 1767225840000,
+      "items": [
+        {
+          "dishName": "拿铁",
+          "count": 2,
+          "unitPrice": 28,
+          "subTotal": 56
+        }
+      ]
+    },
+    {
+      "id": 1006,
+      "username": "carol",
+      "status": "MAKING",
+      "totalAmount": 66,
+      "pickupNo": 1106,
+      "createTime": 1767225900000,
+      "items": [
+        {
+          "dishName": "美式",
+          "count": 3,
+          "unitPrice": 22,
+          "subTotal": 66
+        }
+      ]
+    }
+  ],
+  "menu": [
+    {
+      "id": 11,
+      "name": "拿铁",
+      "price": 28
+    },
+    {
+      "id": 12,
+      "name": "美式",
+      "price": 22
+    },
+    {
+      "id": 13,
+      "name": "卡布奇诺",
+      "price": 30
+    },
+    {
+      "id": 14,
+      "name": "抹茶拿铁",
+      "price": 32
+    }
+  ],
+  "status_log": [
+    {
+      "id": 1,
+      "type": "order.created",
+      "orderId": 1001,
+      "from": null,
+      "to": "PENDING",
+      "by": "alice",
+      "at": 1767225600000
+    },
+    {
+      "id": 2,
+      "type": "order.created",
+      "orderId": 1002,
+      "from": null,
+      "to": "PENDING",
+      "by": "bob",
+      "at": 1767225660000
+    },
+    {
+      "id": 3,
+      "type": "order.making",
+      "orderId": 1002,
+      "from": "PENDING",
+      "to": "MAKING",
+      "by": "barista",
+      "at": 1767225690000
+    },
+    {
+      "id": 4,
+      "type": "order.created",
+      "orderId": 1003,
+      "from": null,
+      "to": "PENDING",
+      "by": "carol",
+      "at": 1767225720000
+    },
+    {
+      "id": 5,
+      "type": "order.ready",
+      "orderId": 1003,
+      "from": "PENDING",
+      "to": "READY",
+      "by": "barista",
+      "at": 1767225750000
+    },
+    {
+      "id": 6,
+      "type": "order.created",
+      "orderId": 1004,
+      "from": null,
+      "to": "PENDING",
+      "by": "alice",
+      "at": 1767225780000
+    },
+    {
+      "id": 7,
+      "type": "order.picked",
+      "orderId": 1004,
+      "from": "PENDING",
+      "to": "PICKED",
+      "by": "barista",
+      "at": 1767225810000
+    },
+    {
+      "id": 8,
+      "type": "order.created",
+      "orderId": 1005,
+      "from": null,
+      "to": "PENDING",
+      "by": "bob",
+      "at": 1767225840000
+    },
+    {
+      "id": 9,
+      "type": "order.created",
+      "orderId": 1006,
+      "from": null,
+      "to": "PENDING",
+      "by": "carol",
+      "at": 1767225900000
+    },
+    {
+      "id": 10,
+      "type": "order.making",
+      "orderId": 1006,
+      "from": "PENDING",
+      "to": "MAKING",
+      "by": "barista",
+      "at": 1767225930000
+    }
+  ]
+}

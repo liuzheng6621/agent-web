@@ -1,4 +1,4 @@
-# agent-web v0.31.0
+# agent-web v0.32.0
 
 <p align="center">
   <img src="docs/media/hero.png" alt="agent-web：给 Agent 写机器可判的集成测试" width="100%">
@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <b>当前版本 0.31.0</b> · 12 种断言 · 26 条命令 · 22 个变异体
+  <b>当前版本 0.32.0</b> · 12 种断言 · 27 条命令 · 22 个变异体
 </p>
 
 <p align="center">
@@ -248,6 +248,31 @@ FAIL todo/recorded   assertion_false
 <img src="docs/media/dashboard.png" alt="多案例判决总览" width="100%">
 
 <img src="docs/media/dashboard.gif" alt="总览页交互动画" width="100%">
+
+## 换个命名体系，字段还是那些字段
+
+`learn` 学得出来的前提是「字段名认得」。别人的系统里 `totalAmount` 可能叫 `sum`、
+`pickupNo` 叫 `no`、`orders` 叫 `tickets`。`align` 干的就是这件事——**给建议，不替你决定**。
+
+```
+$ agent-web align our-view.json their-view.json --out=align.yml
+字段映射 · 3 个集合 · 17 / 17 条字段 → 100.0%
+
+  orders → tickets   置信 95.0%
+    createTime      → at              94.0%
+    id              → key             94.0%
+    items           → lines           94.0%
+    pickupNo        → no              88.0%
+    totalAmount     → sum             94.0%
+```
+
+五路信号，权重写死不调参：名字（复数归一到同义词组）、逐行取值一致、取值多重集一致
+（行序不同也认）、枚举重合、基数一致。类型不同直接出局。
+
+**低置信度一律不猜**：低于 0.75 进 `unresolved` 并给 top-3 候选。改名的夹具恢复 17/17、
+零错配；把行打乱、`totalAmount` 改成 `x9`、`pickupNo` 删掉之后恢复 15/17，**仍然零错配**，
+剩下两条如实写着「需要人签」。宁可说不清，也不许错配——一个错配的字段会让案例在
+「看起来对、其实错」的地方判 pass。
 
 ## 事故档案：这个仓库踩过的坑，不许踩第二次
 

@@ -1,0 +1,46 @@
+{
+  "collections": {
+    "orders": "tickets",
+    "menu": "catalog",
+    "status_log": "history"
+  },
+  "fields": {
+    "id": "key",
+    "username": "owner",
+    "status": "state",
+    "totalAmount": "sum",
+    "pickupNo": "no",
+    "createTime": "at",
+    "items": "lines",
+    "name": "title",
+    "price": "rate",
+    "type": "event",
+    "orderId": "ticketKey",
+    "from": "prev",
+    "to": "next",
+    "by": "actor",
+    "dishName": "label",
+    "count": "qty",
+    "unitPrice": "unitRate",
+    "subTotal": "lineSum"
+  },
+  "hard_fields": {
+    "id": "key",
+    "username": "owner",
+    "status": "state",
+    "totalAmount": null,
+    "createTime": "at",
+    "items": "lines",
+    "name": "title",
+    "price": "rate",
+    "type": "category",
+    "orderId": "ticketKey",
+    "from": "prev",
+    "to": "next",
+    "by": "actor",
+    "dishName": "label",
+    "count": "qty",
+    "unitPrice": "unitRate",
+    "subTotal": "lineSum"
+  }
+}

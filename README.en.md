@@ -1,4 +1,4 @@
-# agent-web v0.31.0
+# agent-web v0.32.0
 
 <p align="center">
   <img src="docs/media/hero.png" alt="agent-web: integration tests an agent can be judged on" width="100%">
@@ -18,7 +18,7 @@
 </p>
 
 <p align="center">
-  <b>v0.31.0</b> · 12 assertion kinds · 26 commands · 22 mutants
+  <b>v0.32.0</b> · 12 assertion kinds · 27 commands · 22 mutants
 </p>
 
 <p align="center">
@@ -241,6 +241,23 @@ Give it a directory, get a dashboard: verdict distribution, decidability rate, a
 
 `recall` compares fingerprints after a run: first hit prints a notice, **second hit of the same entry exits 1 and blocks**. Deepening memory is not about discipline — it is about exit codes.
 
+## Different names, same fields
+
+`learn` only works if the field names make sense. In someone else's system `totalAmount` may be `sum`,
+`pickupNo` may be `no`, and `orders` may be `tickets`. `align` suggests the mapping and **does not decide for you**.
+
+```
+$ agent-web align our-view.json their-view.json --out=align.yml
+field mapping · 3 collections · 17 / 17 fields → 100.0%
+```
+
+Five signals with fixed weights: name (plural-folded into synonym groups), row-wise value agreement,
+value multiset agreement (survives shuffled rows), enum overlap, cardinality. Different types are out immediately.
+
+**Low confidence is never guessed**: below 0.75 goes to `unresolved` with top-3 candidates.
+The renamed fixture recovers 17/17 with zero mismatches; after shuffling rows, renaming `totalAmount`
+to `x9` and deleting `pickupNo` it recovers 15/17 and **still zero mismatches** — the other two are
+reported as needing a human signature. A wrong mapping makes a case pass on a field that only looks right.
 ## Validated across three domains
 
 | Domain | Implementation | What it proved |

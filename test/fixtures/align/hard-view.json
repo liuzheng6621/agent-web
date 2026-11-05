@@ -1,0 +1,226 @@
+{
+  "tickets": [
+    {
+      "key": 1002,
+      "owner": "bob",
+      "state": "MAKING",
+      "at": 1767225660000,
+      "lines": [
+        {
+          "label": "美式",
+          "qty": 2,
+          "unitRate": 22,
+          "lineSum": 44
+        }
+      ],
+      "x9": 44,
+      "maker": "bob"
+    },
+    {
+      "key": 1003,
+      "owner": "carol",
+      "state": "READY",
+      "at": 1767225720000,
+      "lines": [
+        {
+          "label": "拿铁",
+          "qty": 3,
+          "unitRate": 28,
+          "lineSum": 84
+        }
+      ],
+      "x9": 84,
+      "maker": "carol"
+    },
+    {
+      "key": 1004,
+      "owner": "alice",
+      "state": "PICKED",
+      "at": 1767225780000,
+      "lines": [
+        {
+          "label": "美式",
+          "qty": 1,
+          "unitRate": 22,
+          "lineSum": 22
+        },
+        {
+          "label": "卡布奇诺",
+          "qty": 2,
+          "unitRate": 30,
+          "lineSum": 60
+        }
+      ],
+      "x9": 82,
+      "maker": "alice"
+    },
+    {
+      "key": 1005,
+      "owner": "bob",
+      "state": "PENDING",
+      "at": 1767225840000,
+      "lines": [
+        {
+          "label": "拿铁",
+          "qty": 2,
+          "unitRate": 28,
+          "lineSum": 56
+        }
+      ],
+      "x9": 56,
+      "maker": "bob"
+    },
+    {
+      "key": 1006,
+      "owner": "carol",
+      "state": "MAKING",
+      "at": 1767225900000,
+      "lines": [
+        {
+          "label": "美式",
+          "qty": 3,
+          "unitRate": 22,
+          "lineSum": 66
+        }
+      ],
+      "x9": 66,
+      "maker": "carol"
+    },
+    {
+      "key": 1001,
+      "owner": "alice",
+      "state": "PENDING",
+      "at": 1767225600000,
+      "lines": [
+        {
+          "label": "拿铁",
+          "qty": 1,
+          "unitRate": 28,
+          "lineSum": 28
+        },
+        {
+          "label": "卡布奇诺",
+          "qty": 2,
+          "unitRate": 30,
+          "lineSum": 60
+        }
+      ],
+      "x9": 88,
+      "maker": "alice"
+    }
+  ],
+  "catalog": [
+    {
+      "key": 12,
+      "title": "美式",
+      "rate": 22
+    },
+    {
+      "key": 13,
+      "title": "卡布奇诺",
+      "rate": 30
+    },
+    {
+      "key": 14,
+      "title": "抹茶拿铁",
+      "rate": 32
+    },
+    {
+      "key": 11,
+      "title": "拿铁",
+      "rate": 28
+    }
+  ],
+  "history": [
+    {
+      "key": 5,
+      "ticketKey": 1003,
+      "prev": "PENDING",
+      "next": "READY",
+      "actor": "barista",
+      "at": 1767225750000,
+      "category": "order.ready"
+    },
+    {
+      "key": 10,
+      "ticketKey": 1006,
+      "prev": "PENDING",
+      "next": "MAKING",
+      "actor": "barista",
+      "at": 1767225930000,
+      "category": "order.making"
+    },
+    {
+      "key": 6,
+      "ticketKey": 1004,
+      "prev": null,
+      "next": "PENDING",
+      "actor": "alice",
+      "at": 1767225780000,
+      "category": "order.created"
+    },
+    {
+      "key": 8,
+      "ticketKey": 1005,
+      "prev": null,
+      "next": "PENDING",
+      "actor": "bob",
+      "at": 1767225840000,
+      "category": "order.created"
+    },
+    {
+      "key": 2,
+      "ticketKey": 1002,
+      "prev": null,
+      "next": "PENDING",
+      "actor": "bob",
+      "at": 1767225660000,
+      "category": "order.created"
+    },
+    {
+      "key": 3,
+      "ticketKey": 1002,
+      "prev": "PENDING",
+      "next": "MAKING",
+      "actor": "barista",
+      "at": 1767225690000,
+      "category": "order.making"
+    },
+    {
+      "key": 4,
+      "ticketKey": 1003,
+      "prev": null,
+      "next": "PENDING",
+      "actor": "carol",
+      "at": 1767225720000,
+      "category": "order.created"
+    },
+    {
+      "key": 9,
+      "ticketKey": 1006,
+      "prev": null,
+      "next": "PENDING",
+      "actor": "carol",
+      "at": 1767225900000,
+      "category": "order.created"
+    },
+    {
+      "key": 1,
+      "ticketKey": 1001,
+      "prev": null,
+      "next": "PENDING",
+      "actor": "alice",
+      "at": 1767225600000,
+      "category": "order.created"
+    },
+    {
+      "key": 7,
+      "ticketKey": 1004,
+      "prev": "PENDING",
+      "next": "PICKED",
+      "actor": "barista",
+      "at": 1767225810000,
+      "category": "order.picked"
+    }
+  ]
+}

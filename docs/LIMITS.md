@@ -46,7 +46,18 @@ README 的「现在做不到什么」是这份清单的摘要。**两边条目�
 
 ## L2 字段映射靠人
 
-`status: open`
+`status: mitigated`
+
+`agent-web align` 现在能把「跨命名体系的字段映射」变成提议 + 人签：纯改名夹具 17/17 字段、
+3/3 集合、零错配；行被打乱且字段被改成毫无关系的名字时，恢复 15/17 且**零错配**，
+剩下两条如实进 `unresolved`。
+
+仍不解决的是：**嵌套数组只映射容器**（`items → lines` 配得上，`count → qty` 要等下钻）；
+以及**同一字段在不同集合里语义不同**（订单的 `amount` 是总额，账本的 `amount` 是单笔）——
+这需要按语义而不是按取值分布来判，当前不猜。
+
+验收：`node bin/agent-web.mjs align test/fixtures/align/ref-view.json test/fixtures/align/renamed-view.json`。
+
 
 规范视图的映射写在适配器里，跨命名体系（`order_sn` ↔ `orderId` ↔ `order-id`）要人一条条对。
 可用的信号是齐全的：名称归一（camel/snake/kebab + 同义词）、类型、唯一性与基数、枚举重叠、

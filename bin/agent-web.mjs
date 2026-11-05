@@ -46,6 +46,7 @@ import { MUTATIONS, describeMutations } from '../src/mutate.mjs';
 import { KINDS } from '../src/assert/index.mjs';
 import { buildDrills, gradeDrills, writeDrills, readDrills, readSubmissions, formatGrade, gradeExit } from '../src/drill.mjs';
 import { appendLedger, computeStats, formatStats, rankItems, readLedger, statsExit, toRecord } from '../src/drill-ledger.mjs';
+import { alignExit, alignViews, formatAlign, renderAlignYaml } from '../src/align.mjs';
 import { collectUsage, summarizeCoverage, formatCoverage, coverageVerdict } from '../src/coverage.mjs';
 import { probeAdapter, formatProbe, probeExit } from '../src/probe.mjs';
 import { discover, formatDiscover } from '../src/discover.mjs';
@@ -393,6 +394,36 @@ async function cmdDrillStats(args, flags) {
   }
   return statsExit(stats, {
     minAttempts: flags['min-attempts'] !== undefined ? Number(flags['min-attempts']) : null,
+  });
+}
+
+
+async function cmdAlign(args, flags) {
+  if (args.length < 2) {
+    console.error('用法：agent-web align <参照视图.json> <目标视图.json> [--out=align.yml] [--detail] [--json]');
+    console.error('      --require-all：所有字段都必须配上，留下未定就算失败');
+    console.error('      --max-unresolved=N：未定条目超过 N 就算失败');
+    console.error('  输入是两份规范视图（{集合名: 行数组}）。输出是建议映射，低置信度一律进 unresolved，不猜。');
+    return 2;
+  }
+  const read = (p) => JSON.parse(fs.readFileSync(path.resolve(p), 'utf8'));
+  const ref = read(args[0]);
+  const target = read(args[1]);
+  const report = alignViews(ref, target, { source: args[0], target: args[1] });
+  if (flags.out) {
+    fs.writeFileSync(path.resolve(flags.out), renderAlignYaml(report), 'utf8');
+  }
+  if (flags.json) console.log(JSON.stringify(report, null, 2));
+  else {
+    console.log(formatAlign(report, { detail: flags.detail === true }));
+    if (flags.out) {
+      console.log('');
+      console.log('写进 ' + path.relative(process.cwd(), path.resolve(flags.out)) + '（accepted 段是空的，人签之后才算生效）');
+    }
+  }
+  return alignExit(report, {
+    requireAll: flags['require-all'] === true,
+    maxUnresolved: flags['max-unresolved'] !== undefined ? Number(flags['max-unresolved']) : null,
   });
 }
 
@@ -1634,6 +1665,7 @@ const HELP = `agent-web —— 给 Agent 写机器可判的集成测试
   agent-web tap --target=URL                  录五分钟：流量长出适配器、孪生与案例
   agent-web learn <traffic.jsonl> --out=DIR  把录制学成四件东西（yaml/孪生/案例/认不出的）
   agent-web mutants                           变异体目录：谁的坏法、怎么抓、怎么投稿
+  agent-web align <参照视图> <目标视图> [--out=align.yml]  跨命名体系的字段映射提议
   agent-web audit <真实.jsonl> <候选.jsonl>    假绿审计：拿真实后端当尺子量候选实现
   agent-web traps <结果.jsonl> --cases=DIR    陷阱普查：这批判决有多少是盲的
   agent-web knowledge                         事故档案：这个仓库踩过的 ${ENTRIES.length} 个坑
@@ -1694,6 +1726,8 @@ async function main() {
         return await cmdCertify(args, flags);
       case 'breed':
         return await cmdBreed(args, flags);
+      case 'align':
+        return await cmdAlign(args, flags);
       case 'mutants':
         return cmdMutants(args, flags);
       case 'drill':
