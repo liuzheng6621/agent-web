@@ -248,6 +248,7 @@ const server = http.createServer(async (req, res) => {
       }
       if (method === 'DELETE' && seg[3]) {
         if (!viewer) return errs(res, 401, { token: ['is missing'] });
+        if (!art) return errs(res, 404, { article: ['not found'] });
         const rec = db.comments.get(Number(seg[3]));
         if (!rec) return errs(res, 404, { comment: ['not found'] });
         if (rec.author !== viewer.username) return errs(res, 403, { comment: ['forbidden'] });
