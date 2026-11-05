@@ -1,5 +1,13 @@
 {
   "assertions": [
-    { "kind": "count_delta", "selector": { "collection": "orders" }, "delta": 1 }
+    {
+      "kind": "field_equals",
+      "selector": {
+        "collection": "status_log",
+        "index": 1
+      },
+      "path": "type",
+      "value": "order.canceled"
+    }
   ]
 }

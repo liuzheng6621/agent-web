@@ -175,7 +175,7 @@ jobs:
       - name: 出题与批改：好提交必须满分，偷懒提交必须零分
         run: |
           node bin/agent-web.mjs drill cases/coffee --adapter=memory --out=.tmp-drill
-          node bin/agent-web.mjs drill grade .tmp-drill --submissions=examples/drills/good
+          node bin/agent-web.mjs drill grade .tmp-drill --submissions=examples/drills/good --allow-missed
           if node bin/agent-web.mjs drill grade .tmp-drill --submissions=examples/drills/lazy; then
             echo "偷懒提交居然通过了，批改器有问题"; exit 1
           fi

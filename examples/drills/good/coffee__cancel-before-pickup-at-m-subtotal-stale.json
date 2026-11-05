@@ -1,5 +1,13 @@
 {
   "assertions": [
-    { "kind": "field_equals", "selector": { "collection": "orders", "index": 0 }, "path": "items.0.subTotal", "value": 56 }
+    {
+      "kind": "field_equals",
+      "selector": {
+        "collection": "orders",
+        "index": 0
+      },
+      "path": "items.0.subTotal",
+      "value": 56
+    }
   ]
 }

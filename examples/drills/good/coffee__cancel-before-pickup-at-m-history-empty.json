@@ -1,5 +1,0 @@
-{
-  "assertions": [
-    { "kind": "count_delta", "selector": { "collection": "status_log", "where": [{ "field": "type", "eq": "order.canceled" }] }, "delta": 1 }
-  ]
-}

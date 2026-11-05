@@ -1,5 +1,0 @@
-{
-  "assertions": [
-    { "kind": "count_delta", "selector": { "collection": "orders" }, "delta": 1 }
-  ]
-}

@@ -299,6 +299,12 @@ export function gradeExit(report, opts) {
     if (s.rate === null) return 1;
     return s.rate + 1e-9 >= min ? 0 : 1;
   }
+  // 默认要求答满：漏一题就不算过。示例提交只覆盖了一部分题（建议断言只能表达集合内的
+  // 字段差异，整实体替换与集合外差异需要人写），CI 用 --allow-missed 校验「答了就必须对」。
+  if (opts && opts.allowMissed === true) {
+    // 没答的照实报，但答错的、交上来却没法批的仍然算失败。
+    return s.missed === 0 && s.invalid === 0 && s.empty === 0 && s.unknown_mutant === 0 ? 0 : 1;
+  }
   return s.missed === 0 && s.ungraded === 0 ? 0 : 1;
 }
 

@@ -254,6 +254,7 @@ async function cmdDrill(args, flags) {
   if (args.length < 1) {
     console.error('用法：agent-web drill <案例目录> [--adapter=memory] [--mutations=id,id] [--out=DIR] [--json]');
     console.error('      agent-web drill grade <题目目录> --submissions=DIR [--min=0.8] [--detail] [--json]');
+    console.error('      --allow-missed：答了就必须对，没答的照实报（默认要求答满）');
     console.error('  出题：对"整套断言都没抓住"的案例出题，题面不含答案。');
     console.error('  批改：不看提交说了什么，只看它跑出来什么——在正确实现上为真、在坏实现上为假才算抓到。');
     return 2;
@@ -304,6 +305,7 @@ async function cmdDrillGrade(args, flags) {
   const subsDir = flags.submissions;
   if (!tasksDir || !subsDir) {
     console.error('用法：agent-web drill grade <题目目录> --submissions=DIR [--adapter=memory] [--min=0.8] [--detail] [--json]');
+    console.error('      --allow-missed：答了就必须对，没答的照实报（默认要求答满）');
     return 2;
   }
 
@@ -327,7 +329,10 @@ async function cmdDrillGrade(args, flags) {
   if (flags.json) console.log(JSON.stringify(report, null, 2));
   else console.log(formatGrade(report, { detail: flags.detail === true }));
 
-  return gradeExit(report, { min: flags.min !== undefined ? Number(flags.min) : null });
+  return gradeExit(report, {
+    min: flags.min !== undefined ? Number(flags.min) : null,
+    allowMissed: flags['allow-missed'] === true,
+  });
 }
 
 function cmdMutants(args, flags) {
@@ -1556,6 +1561,7 @@ const HELP = `agent-web —— 给 Agent 写机器可判的集成测试
   agent-web breed --adapter=SPEC --out=目录   照着视图形状自动生成变异体
   agent-web drill <案例> --adapter=SPEC       出题：对真盲区出题（题面不含答案）
   agent-web drill grade <题目> --submissions=DIR  批改：只认跑出来的结果
+  console.error('      --allow-missed：答了就必须对，没答的照实报（默认要求答满）');
   agent-web compare <案例> --adapters=A,B     同一份案例喂多个实现，比判决
   agent-web drift <旧.jsonl> <新.jsonl>      比较两次跑批的初态形状（漂移检测）
   agent-web record <动作日志> --adapter=SPEC   把 Agent 的实际动作还原成候选轨迹
