@@ -235,6 +235,9 @@ const server = http.createServer(async (req, res) => {
   if (seg[0] === 'articles' && seg[1]) {
     const slug = decodeURIComponent(seg[1]);
     const art = db.articles.get(slug);
+    if (seg.length === 2 && ['PUT', 'DELETE'].includes(method) && !viewer) {
+      return errs(res, 401, { token: ['is missing'] });
+    }
     if (seg[2] === 'comments') {
       if (method === 'GET') {
         if (!art) return errs(res, 404, { article: ['not found'] });
