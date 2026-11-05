@@ -55,8 +55,10 @@ test('hurl：转出来的案例能过校验，且默认是未确认草稿', () =
   assert.equal(c.id, 'realworld/sample');
   assert.equal(c.draft.status, 'unconfirmed');
   assert.equal(c.reference_trajectory.length, 3);
-  assert.equal(c.reference_trajectory[0].as, 'anonymous');
-  assert.equal(c.reference_trajectory[1].as, 'anonymous');
+  // 注册与登录不是匿名动作：它们就是在确立这个角色的身份，
+  // 后面 as=user 的步骤才能用上新 token（否则会一直用复位时那个人的 token）。
+  assert.equal(c.reference_trajectory[0].as, 'user');      // 注册 = 确立身份
+  assert.equal(c.reference_trajectory[1].as, 'anonymous'); // 没带 Authorization 就是匿名
   assert.equal(c.task.goal_assertions.length, 5);
   assert.equal(todo.length, 0);
   const errs = validateAssertions(c.task.goal_assertions, 'task.goal_assertions');

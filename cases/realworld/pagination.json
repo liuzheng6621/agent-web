@@ -1,0 +1,154 @@
+{
+  "schema_version": "agent-web/0.1",
+  "id": "realworld/pagination",
+  "title": "从 hurl 转来：pagination",
+  "environment": {
+    "adapter": "realworld",
+    "seed": {}
+  },
+  "task": {
+    "natural_goal": "按 hurl 套件 pagination 的顺序重放一遍，并检查每一步的返回体。",
+    "goal_assertions": [
+      {
+        "kind": "payload",
+        "step": 3,
+        "path": "$.article.title",
+        "op": "equals",
+        "value": "Pagination 2 000000"
+      },
+      {
+        "kind": "payload",
+        "step": 3,
+        "path": "$.article.slug",
+        "op": "is_string"
+      },
+      {
+        "kind": "payload",
+        "step": 4,
+        "path": "$.articles",
+        "op": "count_equals",
+        "value": 1
+      },
+      {
+        "kind": "payload",
+        "step": 4,
+        "path": "$.articlesCount",
+        "op": "equals",
+        "value": 2
+      },
+      {
+        "kind": "payload",
+        "step": 4,
+        "path": "$.articles[0].slug",
+        "op": "equals",
+        "value_from": "$s3.article.slug"
+      },
+      {
+        "kind": "payload",
+        "step": 5,
+        "path": "$.articles",
+        "op": "count_equals",
+        "value": 1
+      },
+      {
+        "kind": "payload",
+        "step": 5,
+        "path": "$.articlesCount",
+        "op": "equals",
+        "value": 2
+      },
+      {
+        "kind": "payload",
+        "step": 5,
+        "path": "$.articles[0].slug",
+        "op": "equals",
+        "value_from": "$s2.article.slug"
+      }
+    ],
+    "invariants": []
+  },
+  "reference_trajectory": [
+    {
+      "id": "s1",
+      "capability": "users.create",
+      "as": "user",
+      "expected_outcome": "applied",
+      "arguments": {
+        "username": "page_000000",
+        "email": "page_000000@test.com",
+        "password": "password123"
+      }
+    },
+    {
+      "id": "s2",
+      "capability": "articles.create",
+      "as": "user",
+      "expected_outcome": "applied",
+      "arguments": {
+        "title": "Pagination 1 000000",
+        "description": "Page test 1",
+        "body": "Page body 1"
+      }
+    },
+    {
+      "id": "s3",
+      "capability": "articles.create",
+      "as": "user",
+      "expected_outcome": "applied",
+      "arguments": {
+        "title": "Pagination 2 000000",
+        "description": "Page test 2",
+        "body": "Page body 2"
+      }
+    },
+    {
+      "id": "s4",
+      "capability": "articles.list",
+      "as": "anonymous",
+      "expected_outcome": "applied",
+      "arguments": {
+        "author": "page_000000",
+        "limit": 1
+      }
+    },
+    {
+      "id": "s5",
+      "capability": "articles.list",
+      "as": "anonymous",
+      "expected_outcome": "applied",
+      "arguments": {
+        "author": "page_000000",
+        "limit": 1,
+        "offset": 1
+      }
+    },
+    {
+      "id": "s6",
+      "capability": "articles.delete",
+      "as": "user",
+      "expected_outcome": "applied",
+      "arguments": {
+        "slug": "$s2.article.slug"
+      }
+    },
+    {
+      "id": "s7",
+      "capability": "articles.delete",
+      "as": "user",
+      "expected_outcome": "applied",
+      "arguments": {
+        "slug": "$s3.article.slug"
+      }
+    }
+  ],
+  "observability": {
+    "declared_scopes": []
+  },
+  "draft": {
+    "status": "confirmed",
+    "generated_by": "agent-web import hurl",
+    "note": "全部请求与断言都转成了案例结构",
+    "reviewed_by": "阿蓝",
+    "reviewed_at": "2026-11-05T13:28:09.833Z"
+  }
+}

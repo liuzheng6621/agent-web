@@ -1,0 +1,107 @@
+{
+  "schema_version": "agent-web/0.1",
+  "id": "realworld/tags",
+  "title": "从 hurl 转来：tags",
+  "environment": {
+    "adapter": "realworld",
+    "seed": {}
+  },
+  "task": {
+    "natural_goal": "按 hurl 套件 tags 的顺序重放一遍，并检查每一步的返回体。",
+    "goal_assertions": [
+      {
+        "kind": "payload",
+        "step": 3,
+        "path": "$.tags",
+        "op": "is_list"
+      },
+      {
+        "kind": "payload",
+        "step": 3,
+        "path": "$.tags",
+        "op": "count_gte",
+        "value": 1
+      },
+      {
+        "kind": "payload",
+        "step": 3,
+        "path": "$.tags",
+        "op": "contains",
+        "value": "h_000000"
+      },
+      {
+        "kind": "payload",
+        "step": 3,
+        "path": "$.tags",
+        "op": "contains",
+        "value": "t_000000"
+      },
+      {
+        "kind": "payload",
+        "step": 3,
+        "path": "$.tags[0]",
+        "op": "is_string"
+      },
+      {
+        "kind": "payload",
+        "step": 3,
+        "path": "$.tags[1]",
+        "op": "is_string"
+      }
+    ],
+    "invariants": []
+  },
+  "reference_trajectory": [
+    {
+      "id": "s1",
+      "capability": "users.create",
+      "as": "user",
+      "expected_outcome": "applied",
+      "arguments": {
+        "username": "tag_000000",
+        "email": "tag_000000@test.com",
+        "password": "password123"
+      }
+    },
+    {
+      "id": "s2",
+      "capability": "articles.create",
+      "as": "user",
+      "expected_outcome": "applied",
+      "arguments": {
+        "title": "Tag Article 000000",
+        "description": "For tags",
+        "body": "Article body",
+        "tagList": [
+          "h_000000",
+          "t_000000"
+        ]
+      }
+    },
+    {
+      "id": "s3",
+      "capability": "tags.list",
+      "as": "anonymous",
+      "expected_outcome": "applied"
+    },
+    {
+      "id": "s4",
+      "capability": "articles.delete",
+      "as": "user",
+      "expected_outcome": "applied",
+      "arguments": {
+        "slug": "$s2.article.slug"
+      }
+    }
+  ],
+  "observability": {
+    "declared_scopes": []
+  },
+  "draft": {
+    "status": "confirmed",
+    "generated_by": "agent-web import hurl",
+    "note": "全部请求与断言都转成了案例结构",
+    "reviewed_by": "阿蓝",
+    "reviewed_at": "2026-11-05T13:28:10.171Z"
+  }
+}

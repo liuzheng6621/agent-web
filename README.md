@@ -1,4 +1,4 @@
-# agent-web v0.36.0
+# agent-web v0.37.0
 
 <p align="center">
   <img src="docs/media/hero.png" alt="agent-web：给 Agent 写机器可判的集成测试" width="100%">
@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <b>当前版本 0.36.0</b> · 16 种断言 · 28 条命令 · 28 个变异体
+  <b>当前版本 0.37.0</b> · 16 种断言 · 28 条命令 · 28 个变异体
 </p>
 
 <p align="center">
@@ -388,6 +388,11 @@ agent-web import hurl examples/realworld/hurl --out=cases/realworld
 | 读不懂的断言 | 写进同名 `.todo.md`，**一条不丢，一句不猜** |
 
 **还差什么**：`adapter: 'realworld'` 没有内置适配器。要真跑，先 `discover <某个实现的地址>` 生成声明式适配器，或者照 `specs/api/openapi.yml` 写一份 `adapter.yml`。这一步是这套语料唯一要人做的地方。
+
+实测（本仓库自带的内存夹具，`node examples/realworld/fake-server.mjs 8299 --allow-reset`）：
+`probe` 6/6 通过，`verify cases/realworld --adapter=realworld` **3/3 与预期一致**。
+夹具只证明「转换器 + 适配器 + 判决链路是通的」，不证明「某个 RealWorld 实现是对的」——
+要证明后者，把 `REALWORLD_BASE_URL` 指向一个真实现（详见 `examples/realworld/README.md`）。
 
 ## 现在做不到什么
 

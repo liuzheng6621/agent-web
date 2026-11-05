@@ -158,7 +158,7 @@ export function validateAssertion(a, at = 'assertion') {
     if (typeof a.path !== 'string' || !a.path.startsWith('$')) errors.push(`${at}.path 必填，形如 $.user.token`);
     if (!PAYLOAD_OPS.includes(a.op)) {
       errors.push(`${at}.op=${JSON.stringify(a.op)} 不在 ${PAYLOAD_OPS.join('/')}`);
-    } else if (['equals', 'count_gte', 'count_equals', 'contains'].includes(a.op) && !('value' in a)) {
+    } else if (['equals', 'count_gte', 'count_equals', 'contains'].includes(a.op) && !('value' in a) && !(a.op === 'equals' && typeof a.value_from === 'string')) {
       errors.push(`${at}.value 必填（op=${a.op}）`);
     }
   }

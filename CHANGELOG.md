@@ -6,6 +6,20 @@
 CI 也在查。这条规则是买来的：这个仓库曾经同时存在 `package.json` 0.16、README 0.9、
 Gitee Release v0.6.0 三个数，谁看都是三个项目。
 
+## 0.37.0
+
+把 RealWorld 的现成断言套件真的跑起来：`src/adapter/realworld.mjs` + `examples/realworld/fake-server.mjs`。
+
+- **新适配器 `realworld`**（19 个能力，注册在 `src/adapter/load.mjs`）：覆盖 users/user/profiles/tags/articles/comments/favorite。
+- **新夹具 `examples/realworld/fake-server.mjs`**（零依赖内存实现，`--allow-reset` 开夹具复位口）。
+- **`payload` 断言支持 `value_from`**：期望值可以是「前面某一步返回体里的位置」，例如先建一条再翻页找它。
+  现成套件里这种写法很常见，不支持就只能把它当字面量、白白丢掉一半断言。
+- **转换器修了七处会让案例假红的地方**：路径参数按资源定名（`slug`/`id`/`username`）；注册与登录步归属
+  `user` 角色（否则新 token 记在 anonymous 名下）；`[Captures]` 引用写成返回体路径（`$s2.article.slug`）；
+  查询串进实参（`limit`/`offset`/`author`）；变量占位符改成 JSON 安全的 `@@x@@` 并递归替换数组；
+  `null` 实参不再被丢掉（`{"bio": null}` 就是清空）；`GET /a/{x}/b` 这类末段是复数的按 `list` 而不是 `get`。
+- 实测：`probe` 6/6；`verify cases/realworld` **3/3 与预期一致**（夹具在 8299）；测试 **257/257**。
+
 ## 0.36.0
 
 「案例从哪来」这个问题，现在有一个不靠猜的答案。

@@ -109,10 +109,28 @@ export function payload(a, ctx) {
       return value === undefined
         ? { status: FALSE, code: 'payload_mismatch', message: `${label} 不存在` }
         : { status: TRUE, code: 'ok', message: `${label} 存在` };
-    case 'equals':
-      return deepEqual(value, a.value)
-        ? { status: TRUE, code: 'ok', message: `${label} == ${JSON.stringify(a.value)}` }
-        : { status: FALSE, code: 'payload_mismatch', message: `${label} 实际 ${JSON.stringify(value)}，期望 ${JSON.stringify(a.value)}` };
+    case 'equals': {
+      // value_from：期望值不在案例里写死，而是「前面某一步返回体里的某个位置」。
+      // 现成套件里这种写法很常见（先建一条、再翻页找它），不猜就等于丢掉一半断言。
+      let expected = a.value;
+      if (a.value_from !== undefined) {
+        const ref = String(a.value_from);
+        const m = ref.match(/^\$(s\d+)\.(.+)$/);
+        if (!m) return { status: UNKNOWN, code: 'invalid_case', message: `${label} 的 value_from 读不懂：${ref}` };
+        const idx = Number(m[1].slice(1)) - 1;
+        const host = trace[idx];
+        if (!host || host.payload === undefined) {
+          return { status: UNKNOWN, code: 'missing_observation', message: `${label} 依赖第 ${idx + 1} 步的返回体，但没记下来` };
+        }
+        expected = jsonPath('$.' + m[2], host.payload);
+        if (expected === undefined) {
+          return { status: UNKNOWN, code: 'missing_observation', message: `${label} 依赖的位置 ${m[2]} 在第 ${idx + 1} 步返回体里不存在` };
+        }
+      }
+      return deepEqual(value, expected)
+        ? { status: TRUE, code: 'ok', message: `${label} == ${JSON.stringify(expected)}` }
+        : { status: FALSE, code: 'payload_mismatch', message: `${label} 实际 ${JSON.stringify(value)}，期望 ${JSON.stringify(expected)}` };
+    }
     case 'is_string':
       return typeof value === 'string'
         ? { status: TRUE, code: 'ok', message: `${label} 是字符串` }

@@ -11,11 +11,30 @@ import path from 'node:path';
 
 export const HURL_VERSION = 'agent-web/hurl-1';
 
+// 变量占位符。不能写成 `__name__`：hurl 里 `auth_{{uid}}` 会先变成 `auth___uid__`，
+// 而 `/__([A-Za-z0-9_]+)__/` 会从第二个下划线开始匹配、把名字读成 `_uid`，结果 `auth000000`。
+// 占位符必须是**JSON 安全**的：`` 控制字符放在 JSON 字符串里会让 JSON.parse 直接抛错，
+// 结果整块 body 变成 null，案例跑起来就是「body is missing」。
+const MARK = '@@';
+const MARK_RE = /@@([A-Za-z0-9_]+)@@/g;
+
+/** 递归替换占位符：数组与对象里的字符串也要换，tagList 这种就靠它。 */
+function deepFill(value, uid) {
+  if (typeof value === 'string') return value.replace(MARK_RE, uid);
+  if (Array.isArray(value)) return value.map((v) => deepFill(v, uid));
+  if (value && typeof value === 'object') {
+    const out = {};
+    for (const [k, v] of Object.entries(value)) out[k] = deepFill(v, uid);
+    return out;
+  }
+  return value;
+}
+
 const METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']);
 const VAR_RE = /\{\{\s*([A-Za-z0-9_]+)\s*\}\}/g;
 
 function expandVars(text, vars) {
-  return String(text).replace(VAR_RE, (_, name) => (name in vars ? String(vars[name]) : `__${name}__`));
+  return String(text).replace(VAR_RE, (_, name) => (name in vars ? String(vars[name]) : `${MARK}${name}${MARK}`));
 }
 
 /** 从 URL 里剥出静态资源名与路径参数。`/api/articles/{{slug}}` → { resource:'articles', params:['slug'] } */
@@ -27,7 +46,7 @@ export function splitUrl(url) {
   for (const p of parts) {
     const varName = p.replace(/[{}]/g, '').trim();
     if (['host', 'base', 'baseUrl', 'BASE_URL'].includes(varName)) continue;
-    if (/^\{\{/.test(p) || /^:/.test(p) || /^\d+$/.test(p) || /^__/.test(p)) {
+    if (/^\{\{/.test(p) || /^:/.test(p) || /^\d+$/.test(p) || p.startsWith(MARK)) {
       params.push(varName.replace(/^:/, ''));
     } else if (!['api', 'v1', 'v2', 'v3'].includes(p)) {
       statics.push(p);
@@ -38,10 +57,31 @@ export function splitUrl(url) {
 
 const ACTION_BY_METHOD = { GET: 'list', POST: 'create', PUT: 'update', PATCH: 'update', DELETE: 'delete', HEAD: 'head' };
 
+// 路径末段本身就是一个动作时（RealWorld 这类契约里很常见），它才是动作名，
+// 资源名取前一段：`/api/users/login` → users.login、`/api/articles/{slug}/favorite` → articles.favorite。
+// 路径参数在各资源里叫什么（RealWorld 契约的约定，不是通用规律）。
+const ARG_NAMES = { articles: 'slug', comments: 'id', profiles: 'username', users: 'username', user: 'username' };
+
+const PATH_ACTIONS = new Set(['login', 'logout', 'register', 'follow', 'feed', 'favorite']);
+
 export function capabilityOf(method, url) {
+  const raw = String(url).replace(/^https?:\/\/[^/]+/, '').split('?')[0].split('/').filter(Boolean);
+  const lastRaw = raw[raw.length - 1] || '';
+  const last = lastRaw.replace(/[{}]/g, '');
   const { resource, params } = splitUrl(url);
-  const action = method === 'GET' && params.length > 0 ? 'get' : ACTION_BY_METHOD[method] || 'call';
-  return { capability: `${resource}.${action}`, resource, params };
+  if (PATH_ACTIONS.has(last)) {
+    const statics = raw.filter((p) => p !== last && !/^\{\{/.test(p) && !/^:/.test(p) && !['api', 'v1', 'v2', 'v3'].includes(p));
+    const owner = statics[statics.length - 1] || resource;
+    return { capability: `${owner}.${last}`, resource: owner, params };
+  }
+  if (method === 'GET') {
+    // 末段是路径参数 → 取那一个；末段是复数资源名 → 列那一片。
+    // 判断是不是路径参数要看**原样**的那一段：去掉花括号后 `{{slug}}` 会变成 `slug`，就认不出来了
+    const lastIsParam = lastRaw.startsWith('{{') || /^:/.test(lastRaw) || /^\d+$/.test(lastRaw);
+    const action = lastIsParam ? 'get' : (resource && resource.endsWith('s') ? 'list' : 'get');
+    return { capability: `${resource}.${action}`, resource, params };
+  }
+  return { capability: `${resource}.${ACTION_BY_METHOD[method] || 'call'}`, resource, params };
 }
 
 function parseAssertText(rest) {
@@ -88,7 +128,7 @@ export function parseHurl(text) {
     bodyLines.length = 0;
     cur.body_text = raw;
     try {
-      cur.body = JSON.parse(raw.replace(VAR_RE, (_, n) => `__${n}__`));
+      cur.body = JSON.parse(raw.replace(VAR_RE, (_, n) => `${MARK}${n}${MARK}`));
     } catch {
       cur.body = null;
     }
@@ -163,33 +203,59 @@ export function toCases(blocks, opts = {}) {
           : b.body;
     if (body && typeof body === 'object' && !Array.isArray(body)) {
       for (const [k, v] of Object.entries(body)) {
-        if (v !== undefined && v !== null) args[k] = typeof v === 'string' ? v.replace(/__([A-Za-z0-9_]+)__/g, uid) : v;
+        // null 是**有意义的实参**（`{"bio": null}` 就是清空），只有 undefined 才丢
+        if (v !== undefined) args[k] = deepFill(v, uid);
       }
-    } else if (Array.isArray(params) && params.length > 0) {
+    }
+    // 查询串是接口参数（`?author=page_1&limit=1`），丢了分页断言就会对着全量列表比大小。
+    const qs = String(b.url).split('?')[1] || '';
+    for (const pair of qs ? qs.split('&') : []) {
+      const [k, v = ''] = pair.split('=');
+      if (!k) continue;
+      const name = decodeURIComponent(k);
+      const raw = decodeURIComponent(v);
+      const filled = raw.replace(VAR_RE, (_, n) => (n === 'uid' ? uid : `${MARK}${n}${MARK}`));
+      const plain = filled.replace(MARK_RE, uid);
+      args[name] = /^-?\d+$/.test(plain) ? Number(plain) : plain;
+    }
+    if (Array.isArray(params) && params.length > 0) {
       for (const p of params) {
         const src = capturedAt.get(p);
-        if (src) args[`${p}`] = src;
+        // hurl 的捕获名（slug1/slug2）是套件自己的命名，不是接口参数名。
+        // 路径参数按资源定名：articles→slug、comments→id、profiles→username。
+        const argName = ARG_NAMES[capability.split('.')[0]] || p;
+        if (src) args[argName] = src;
         else todo.push(`第 ${i + 1} 个请求要路径参数 {{${p}}}，但没有更早的捕获，参数留空`);
       }
     }
-    const role = (b.headers.authorization || b.headers.Authorization) ? as : 'anonymous';
+    // 注册与登录不是匿名动作：它就是在确立这个角色的身份，后续步骤才以这个身份执行。
+    // 写成 anonymous 会让适配器把新 token 记在 anonymous 名下，后面 as=user 的步骤还在用复位的旧 token。
+    const establishesIdentity = capability === 'users.create' || capability === 'users.login';
+    const role = establishesIdentity || b.headers.authorization || b.headers.Authorization ? as : 'anonymous';
     const expected = b.status >= 400 ? 'rejected' : 'applied';
     const step = { id: stepId, capability, as: role, expected_outcome: expected };
     if (Object.keys(args).length > 0) step.arguments = args;
-    const binds = {};
+    // 捕获不是这一步的输入，而是**后面某一步的实参**。所以这里只记账，
+    // 等后面遇到 {{name}} 时再写成 `$sN.field` 引用（bindings 的语义是「本步引用前面某步的输出」）。
     for (const c of b.captures) {
-      const field = String(c.path).split('.').pop().replace(/\[.*$/, '');
-      capturedAt.set(c.name, `$${stepId}.${field}`);
-      binds[c.name] = `$${stepId}.${field}`;
+      // 引用写的是**返回体里的路径**：运行器的 outputs 存的是 res.payload（src/runner.mjs:273），
+      // 不是适配器另算的 outputs 映射。所以 `$.article.slug` 要写成 `$s2.article.slug`，
+      // 少写中间那段就会解析成 undefined。
+      const rel = String(c.path).replace(/^\$\.?/, '');
+      capturedAt.set(c.name, `$${stepId}.${rel}`);
     }
-    if (Object.keys(binds).length > 0) step.captures = binds;
     steps.push(step);
 
     for (const a of b.asserts) {
       if (!a.op || !a.path) { todo.push(`第 ${i + 1} 步的断言读不懂，留给人看：${a.raw || ''}`); continue; }
-      const raw = a.raw === undefined ? undefined : String(a.raw).replace(VAR_RE, (_, n) => (n === 'uid' ? uid : `__${n}__`));
+      const raw = a.raw === undefined ? undefined : String(a.raw).replace(VAR_RE, (_, n) => (n === 'uid' ? uid : `${MARK}${n}${MARK}`));
       const assertion = { kind: 'payload', step: steps.length, path: a.path, op: a.op };
-      if (a.op === 'equals' || a.op === 'contains') assertion.value = literalOf(raw);
+      // 期望值本身是捕获来的（`== "{{slug2}}"`），写成跨步引用，而不是把占位符当字面量。
+      const rawText = a.raw === undefined ? '' : String(a.raw).trim().replace(/^"|"$/g, '');
+      const varOnly = rawText.match(/^\{\{\s*(\w+)\s*\}\}$/);
+      if (varOnly && capturedAt.has(varOnly[1])) {
+        assertion.value_from = capturedAt.get(varOnly[1]);
+      } else if (a.op === 'equals' || a.op === 'contains') assertion.value = literalOf(raw);
       if (a.op === 'count_gte' || a.op === 'count_equals') assertion.value = Number(raw);
       if (JSON.stringify(assertion).includes('}}')) { todo.push(`第 ${i + 1} 步断言里还有变量没替换：${a.path}`); continue; }
       assertions.push(assertion);

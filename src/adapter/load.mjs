@@ -46,6 +46,13 @@ const BUILTINS = {
     const m = await import('./animal.mjs');
     return m.createAnimalAdapter();
   },
+  // RealWorld 契约：19 个端点、一份案例可以在 990+ 个实现上重跑。
+  // 地址取 REALWORLD_BASE_URL（默认 http://127.0.0.1:8299）。
+  // 配套的零依赖仿真服务在 examples/realworld/fake-server.mjs。
+  realworld: async () => {
+    const m = await import('./realworld.mjs');
+    return m.createRealWorldAdapter();
+  },
 };
 
 export function listBuiltins() {
