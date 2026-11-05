@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { parseHurl, toCases, capabilityOf, writeImport, HURL_VERSION } from '../src/import-hurl.mjs';
+import { parseHurl, toCases, capabilityOf, splitUrl, writeImport, HURL_VERSION } from '../src/import-hurl.mjs';
 import { payload, jsonPath } from '../src/assert/payload.mjs';
 import { KINDS, validateAssertions, evalAssertions } from '../src/assert/index.mjs';
 
@@ -48,6 +48,47 @@ test('hurl：能力名与路径参数', () => {
   assert.equal(capabilityOf('GET', '{{host}}/api/tags').capability, 'tags.list');
   assert.equal(capabilityOf('GET', '{{host}}/api/articles/{{slug}}').capability, 'articles.get');
   assert.equal(capabilityOf('DELETE', '{{host}}/api/articles/{{slug}}').capability, 'articles.delete');
+});
+
+test('hurl：RealWorld 静态 slug 与动作 HTTP 方法', () => {
+  assert.deepEqual(splitUrl('{{host}}/api/articles/some-slug'), { resource: 'articles', params: ['some-slug'] });
+  assert.equal(capabilityOf('PUT', '{{host}}/api/articles/some-slug').capability, 'articles.update');
+  assert.deepEqual(capabilityOf('PUT', '{{host}}/api/articles/some-slug').params, ['some-slug']);
+  assert.equal(capabilityOf('DELETE', '{{host}}/api/articles/{{slug}}/favorite').capability, 'articles.unfavorite');
+  assert.equal(capabilityOf('DELETE', '{{host}}/api/profiles/{{username}}/follow').capability, 'profiles.unfollow');
+  assert.deepEqual(capabilityOf('DELETE', '{{host}}/api/articles/unknown-slug-{{uid}}/comments/99999').params, ['unknown-slug-{{uid}}', '99999']);
+  const converted = toCases(parseHurl(['PUT {{host}}/api/articles/some-slug', '{', '  "article": { "body": "test" }', '}', 'HTTP 404'].join('\n')), { id: 'literal-slug' });
+  assert.equal(converted.case.reference_trajectory[0].arguments.slug, 'some-slug');
+  assert.equal(converted.todo.length, 0);
+});
+
+test('hurl：登录复用注册身份，更新后捕获的新 token 继承身份', () => {
+  const text = [
+    'POST {{host}}/api/users',
+    '{ "user": { "username": "alice", "email": "alice@example.com", "password": "pw" } }',
+    'HTTP 201',
+    '[Captures]',
+    'reg_token: jsonpath "$.user.token"',
+    '',
+    'POST {{host}}/api/users/login',
+    '{ "user": { "email": "alice@example.com", "password": "pw" } }',
+    'HTTP 200',
+    '[Captures]',
+    'token: jsonpath "$.user.token"',
+    '',
+    'PUT {{host}}/api/user',
+    'Authorization: Token {{token}}',
+    '{ "user": { "email": "alice-updated@example.com" } }',
+    'HTTP 200',
+    '[Captures]',
+    'updated_token: jsonpath "$.user.token"',
+    '',
+    'GET {{host}}/api/user',
+    'Authorization: Token {{updated_token}}',
+    'HTTP 200',
+  ].join('\n');
+  const { case: c } = toCases(parseHurl(text), { id: 'token-rotation', as: 'user' });
+  assert.deepEqual(c.reference_trajectory.map((step) => step.as), ['user', 'user', 'user', 'user']);
 });
 
 test('hurl：转出来的案例能过校验，且默认是未确认草稿', () => {

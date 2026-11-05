@@ -37,8 +37,40 @@ function expandVars(text, vars) {
   return String(text).replace(VAR_RE, (_, name) => (name in vars ? String(vars[name]) : `${MARK}${name}${MARK}`));
 }
 
-/** 从 URL 里剥出静态资源名与路径参数。`/api/articles/{{slug}}` → { resource:'articles', params:['slug'] } */
+/** URL 路径段；RealWorld 的资源根路径能确定静态 slug 所在位置。 */
+function routeParts(url) {
+  const clean = String(url).replace(/^https?:\/\/[^/]+/, '').split('?')[0];
+  const parts = clean.split('/').filter(Boolean);
+  const apiIndex = parts.indexOf('api');
+  if (apiIndex >= 0) return parts.slice(apiIndex + 1);
+  const versionIndex = parts.findIndex((part) => /^v[1-9]\d*$/.test(part));
+  return versionIndex >= 0 ? parts.slice(versionIndex + 1) : parts;
+}
+
+function routeParam(segment) {
+  const value = String(segment);
+  const variable = value.match(/^\{\{\s*([A-Za-z0-9_]+)\s*\}\}$/);
+  if (variable) return variable[1];
+  return value;
+}
+
+/** 从 URL 里剥出资源名与参数。RealWorld 的静态 slug 也按路由位置识别为参数。 */
 export function splitUrl(url) {
+  const route = routeParts(url);
+  if (route[0] === 'articles') {
+    if (route[1] === 'feed' || route.length === 1) return { resource: 'articles', params: [] };
+    const slug = routeParam(route[1]);
+    if (route[2] === 'comments') {
+      const params = [slug];
+      if (route[3] !== undefined) params.push(routeParam(route[3]));
+      return { resource: 'comments', params };
+    }
+    return { resource: 'articles', params: [slug] };
+  }
+  if (route[0] === 'profiles' && route[1] !== undefined) {
+    return { resource: 'profiles', params: [routeParam(route[1])] };
+  }
+
   const clean = String(url).replace(/^https?:\/\/[^/]+/, '');
   const parts = clean.split('?')[0].split('/').filter(Boolean);
   const params = [];
@@ -47,9 +79,9 @@ export function splitUrl(url) {
     const varName = p.replace(/[{}]/g, '').trim();
     if (['host', 'base', 'baseUrl', 'BASE_URL'].includes(varName)) continue;
     if (/^\{\{/.test(p)) {
-      params.push(varName.replace(/^:/, ''));            // `{{slug}}` → 捕获名 slug
+      params.push(varName.replace(/^:/, ''));
     } else if (p.includes('{{')) {
-      params.push(p);                                    // `unknown-slug-{{uid}}` → 原样，它是一个值
+      params.push(p);
     } else if (/^:/.test(p) || /^\d+$/.test(p) || p.startsWith(MARK)) {
       params.push(p.replace(/^:/, ''));
     } else if (!['api', 'v1', 'v2', 'v3'].includes(p)) {
@@ -60,12 +92,6 @@ export function splitUrl(url) {
 }
 
 const ACTION_BY_METHOD = { GET: 'list', POST: 'create', PUT: 'update', PATCH: 'update', DELETE: 'delete', HEAD: 'head' };
-
-// 路径末段本身就是一个动作时（RealWorld 这类契约里很常见），它才是动作名，
-// 资源名取前一段：`/api/users/login` → users.login、`/api/articles/{slug}/favorite` → articles.favorite。
-// 路径参数在各资源里叫什么（RealWorld 契约的约定，不是通用规律）。
-// 路径参数**按位置**定名：`/articles/{{slug}}/comments/{{id}}` 的第一个是父资源的 slug，
-// 第二个才是这条评论自己的 id。只按资源取一个名字，会把 slug 传成 id。
 const PARAM_NAMES = {
   articles: ['slug'],
   comments: ['slug', 'id'],
@@ -74,22 +100,48 @@ const PARAM_NAMES = {
   user: ['username'],
 };
 const ARG_NAMES = { articles: 'slug', comments: 'slug', profiles: 'username', users: 'username', user: 'username' };
-
 const PATH_ACTIONS = new Set(['login', 'logout', 'register', 'follow', 'feed', 'favorite']);
 
 export function capabilityOf(method, url) {
+  const route = routeParts(url);
+  const { resource, params } = splitUrl(url);
+  if (route[0] === 'articles') {
+    if (route[1] === 'feed') return { capability: 'articles.feed', resource: 'articles', params: [] };
+    if (route[2] === 'favorite') {
+      return { capability: method === 'DELETE' ? 'articles.unfavorite' : 'articles.favorite', resource: 'articles', params };
+    }
+    if (route[2] === 'comments') {
+      const action = route.length > 3 && method === 'DELETE'
+        ? 'delete'
+        : ({ GET: 'list', POST: 'create' }[method] || ACTION_BY_METHOD[method] || 'call');
+      return { capability: `comments.${action}`, resource: 'comments', params };
+    }
+    if (route.length === 1) return { capability: `articles.${ACTION_BY_METHOD[method] || 'call'}`, resource: 'articles', params };
+    if (route.length === 2) {
+      const action = method === 'GET' ? 'get' : (ACTION_BY_METHOD[method] || 'call');
+      return { capability: `articles.${action}`, resource: 'articles', params };
+    }
+  }
+  if (route[0] === 'profiles' && route.length === 2) {
+    return { capability: 'profiles.get', resource: 'profiles', params };
+  }
+  if (route[0] === 'profiles' && route[2] === 'follow') {
+    const action = method === 'DELETE' ? 'unfollow' : (method === 'POST' ? 'follow' : ACTION_BY_METHOD[method] || 'call');
+    return { capability: `profiles.${action}`, resource: 'profiles', params };
+  }
+
   const raw = String(url).replace(/^https?:\/\/[^/]+/, '').split('?')[0].split('/').filter(Boolean);
   const lastRaw = raw[raw.length - 1] || '';
   const last = lastRaw.replace(/[{}]/g, '');
-  const { resource, params } = splitUrl(url);
   if (PATH_ACTIONS.has(last)) {
     const statics = raw.filter((p) => p !== last && !p.includes('{{') && !/^:/.test(p) && !/^\d+$/.test(p) && !['api', 'v1', 'v2', 'v3'].includes(p));
     const owner = statics[statics.length - 1] || resource;
-    return { capability: `${owner}.${last}`, resource: owner, params };
+    const action = (last === 'favorite' && method === 'DELETE') ? 'unfavorite'
+      : (last === 'follow' && method === 'DELETE') ? 'unfollow'
+        : last;
+    return { capability: `${owner}.${action}`, resource: owner, params };
   }
   if (method === 'GET') {
-    // 末段是路径参数 → 取那一个；末段是复数资源名 → 列那一片。
-    // 判断是不是路径参数要看**原样**的那一段：去掉花括号后 `{{slug}}` 会变成 `slug`，就认不出来了
     const lastIsParam = lastRaw.includes('{{') || /^:/.test(lastRaw) || /^\d+$/.test(lastRaw);
     const action = lastIsParam ? 'get' : (resource && resource.endsWith('s') ? 'list' : 'get');
     return { capability: `${resource}.${action}`, resource, params };
@@ -202,28 +254,37 @@ export function toCases(blocks, opts = {}) {
   const capturedAt = new Map();
 
 
-  // 身份由「注册/登录时提交的那个用户名」决定，**token 变量名不算身份**：
-  // 同一套件里可能注册一次再登录一次，捕获到的变量叫 reg_token / token，
-  // 把变量名当身份会让后半段步骤以陌生人的身份执行，断言必然对不上。
+  // 身份由注册/登录提交的 username 或 email 决定，token 变量名不算身份。
   const roleByUsername = new Map();
+  const roleByEmail = new Map();
   const roleOfStep = new Map();
   let identityCount = 0;
   blocks.forEach((b, i) => {
     const { capability: cap } = capabilityOf(b.method, b.url);
     if (cap !== 'users.create' && cap !== 'users.login') return;
-    const uname = (b.body && b.body.user && b.body.user.username) || (b.body && b.body.username);
-    const key = uname ? String(uname) : '#' + i;
-    if (!roleByUsername.has(key)) {
-      roleByUsername.set(key, identityCount === 0 ? as : 'user2');
-      identityCount += 1;
-    }
-    roleOfStep.set(i, roleByUsername.get(key));
+    const user = (b.body && b.body.user) || b.body || {};
+    const username = user.username ? String(user.username) : '';
+    const email = user.email ? String(user.email) : '';
+    const knownRole = (username && roleByUsername.get(username)) || (email && roleByEmail.get(email));
+    const role = knownRole || (identityCount === 0 ? as : 'user2');
+    if (!knownRole) identityCount += 1;
+    if (username) roleByUsername.set(username, role);
+    if (email) roleByEmail.set(email, role);
+    roleOfStep.set(i, role);
   });
+  // 令牌轮换不会创建新身份。每个 token 捕获继承该请求实际使用的角色，
+  // 包括 PUT /user 返回的 updated_token 一类普通更新响应。
   const varRole = new Map();
   blocks.forEach((b, i) => {
-    const r = roleOfStep.get(i);
-    if (!r) return;
-    for (const c of b.captures) if (/token/i.test(c.name)) varRole.set(c.name, r);
+    const cap = capabilityOf(b.method, b.url).capability;
+    const establishesIdentity = cap === 'users.create' || cap === 'users.login';
+    const authVar = String(b.headers.authorization || b.headers.Authorization || '').match(/\{\{\s*(\w+)\s*\}\}/);
+    const requestRole = establishesIdentity
+      ? (roleOfStep.get(i) || as)
+      : (authVar ? (varRole.get(authVar[1]) || as) : 'anonymous');
+    for (const capture of b.captures) {
+      if (/token/i.test(capture.name)) varRole.set(capture.name, requestRole);
+    }
   });
   const roleOfTokenVar = (name) => varRole.get(name) || as;
   blocks.forEach((b, i) => {
@@ -257,22 +318,30 @@ export function toCases(blocks, opts = {}) {
       args[name] = /^-?\d+$/.test(plain) ? Number(plain) : plain;
     }
     if (Array.isArray(params) && params.length > 0) {
-      for (const p of params) {
-        if (p.includes(MARK) || String(p).includes('{{')) {
-          // 末段不是捕获名，而是一个值本身（`unknown-slug-{{uid}}` = 一个不存在的 slug）
-          const name = ARG_NAMES[capability.split('.')[0]] || 'id';
-          const plain = String(p).replace(VAR_RE, (_, n) => (n === 'uid' ? uid : `${MARK}${n}${MARK}`));
-          args[name] = deepFill(plain, uid);
+      for (const [pos, p] of params.entries()) {
+        const res = capability.split('.')[0];
+        const argName = (PARAM_NAMES[res] || [])[pos] || p;
+        const text = String(p);
+        if (text.includes(MARK) || text.includes('{{')) {
+          // 含变量的路径段是具体值（如 unknown-slug-{{uid}}），不是捕获名。
+          const plain = text.replace(VAR_RE, (_, n) => (n === 'uid' ? uid : `${MARK}${n}${MARK}`));
+          args[argName] = deepFill(plain, uid);
           continue;
         }
         const src = capturedAt.get(p);
-        // hurl 的捕获名（slug1/slug2）是套件自己的命名，不是接口参数名。
-        // 路径参数按资源定名：articles→slug、comments→id、profiles→username。
-        const res = capability.split('.')[0];
-        const pos = params.indexOf(p);
-        const argName = (PARAM_NAMES[res] || [])[pos] || p;
-        if (src) args[argName] = src;
-        else todo.push(`第 ${i + 1} 个请求要路径参数 {{${p}}}，但没有更早的捕获，参数留空`);
+        if (src) {
+          args[argName] = src;
+        } else if (/^\d+$/.test(text)) {
+          // 数字路径段（如评论 ID）是字面参数，不需要在前文捕获。
+          args[argName] = Number(text);
+        } else if (text.startsWith(':')) {
+          todo.push(`第 ${i + 1} 个请求要路径参数 {{${text.slice(1)}}}，但没有更早的捕获，参数留空`);
+        } else if (['slug', 'username', 'id'].includes(text)) {
+          todo.push(`第 ${i + 1} 个请求要路径参数 {{${text}}}，但没有更早的捕获，参数留空`);
+        } else {
+          // RealWorld 的静态 slug（如 /articles/some-slug）也是契约路径参数。
+          args[argName] = text;
+        }
       }
     }
     // 注册与登录不是匿名动作：它就是在确立这个角色的身份，后续步骤才以这个身份执行。
