@@ -250,7 +250,7 @@ const server = http.createServer(async (req, res) => {
         if (!viewer) return errs(res, 401, { token: ['is missing'] });
         const rec = db.comments.get(Number(seg[3]));
         if (!rec) return errs(res, 404, { comment: ['not found'] });
-        if (rec.author !== viewer.username) return errs(res, 403, { comment: ['is not yours'] });
+        if (rec.author !== viewer.username) return errs(res, 403, { comment: ['forbidden'] });
         db.comments.delete(rec.id);
         res.writeHead(200); return res.end();
       }
