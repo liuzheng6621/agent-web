@@ -1,0 +1,118 @@
+{
+  "schema_version": "agent-web/0.1",
+  "id": "realworld/errors_profiles",
+  "title": "从 hurl 转来：errors_profiles",
+  "environment": {
+    "adapter": "realworld",
+    "seed": {}
+  },
+  "task": {
+    "natural_goal": "按 hurl 套件 errors_profiles 的顺序重放一遍，并检查每一步的返回体。",
+    "goal_assertions": [
+      {
+        "kind": "payload",
+        "step": 1,
+        "path": "$.errors.profile[0]",
+        "op": "equals",
+        "value": "not found"
+      },
+      {
+        "kind": "payload",
+        "step": 2,
+        "path": "$.errors.token[0]",
+        "op": "equals",
+        "value": "is missing"
+      },
+      {
+        "kind": "payload",
+        "step": 3,
+        "path": "$.errors.token[0]",
+        "op": "equals",
+        "value": "is missing"
+      },
+      {
+        "kind": "payload",
+        "step": 5,
+        "path": "$.errors.profile[0]",
+        "op": "equals",
+        "value": "not found"
+      },
+      {
+        "kind": "payload",
+        "step": 6,
+        "path": "$.errors.profile[0]",
+        "op": "equals",
+        "value": "not found"
+      }
+    ],
+    "invariants": []
+  },
+  "reference_trajectory": [
+    {
+      "id": "s1",
+      "capability": "profiles.get",
+      "as": "anonymous",
+      "expected_outcome": "rejected",
+      "arguments": {
+        "username": "unknown-user-000000"
+      }
+    },
+    {
+      "id": "s2",
+      "capability": "profiles.follow",
+      "as": "anonymous",
+      "expected_outcome": "rejected",
+      "arguments": {
+        "username": "unknown-user-000000"
+      }
+    },
+    {
+      "id": "s3",
+      "capability": "profiles.follow",
+      "as": "anonymous",
+      "expected_outcome": "rejected",
+      "arguments": {
+        "username": "unknown-user-000000"
+      }
+    },
+    {
+      "id": "s4",
+      "capability": "users.create",
+      "as": "user",
+      "expected_outcome": "applied",
+      "arguments": {
+        "username": "ep_000000",
+        "email": "ep_000000@test.com",
+        "password": "password123"
+      }
+    },
+    {
+      "id": "s5",
+      "capability": "profiles.follow",
+      "as": "user",
+      "expected_outcome": "rejected",
+      "arguments": {
+        "username": "unknown-user-000000"
+      }
+    },
+    {
+      "id": "s6",
+      "capability": "profiles.follow",
+      "as": "user",
+      "expected_outcome": "rejected",
+      "arguments": {
+        "username": "unknown-user-000000"
+      }
+    }
+  ],
+  "observability": {
+    "declared_scopes": []
+  },
+  "draft": {
+    "status": "confirmed",
+    "generated_by": "agent-web import hurl",
+    "note": "全部请求与断言都转成了案例结构",
+    "reviewed_by": "阿蓝",
+    "reviewed_at": "2026-11-05T13:54:03.479Z"
+  }
+}

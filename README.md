@@ -1,4 +1,4 @@
-# agent-web v0.37.0
+# agent-web v0.37.1
 
 <p align="center">
   <img src="docs/media/hero.png" alt="agent-web：给 Agent 写机器可判的集成测试" width="100%">
@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <b>当前版本 0.37.0</b> · 16 种断言 · 28 条命令 · 28 个变异体
+  <b>当前版本 0.37.1</b> · 16 种断言 · 28 条命令 · 28 个变异体
 </p>
 
 <p align="center">

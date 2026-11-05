@@ -1,0 +1,15 @@
+{
+  "realworld/articles": "pass",
+  "realworld/auth": "pass",
+  "realworld/comments": "pass",
+  "realworld/errors_articles": "pass",
+  "realworld/errors_auth": "pass",
+  "realworld/errors_authorization": "pass",
+  "realworld/errors_comments": "pass",
+  "realworld/errors_profiles": "pass",
+  "realworld/favorites": "pass",
+  "realworld/feed": "pass",
+  "realworld/pagination": "pass",
+  "realworld/profiles": "pass",
+  "realworld/tags": "pass"
+}

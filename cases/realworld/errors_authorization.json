@@ -1,0 +1,152 @@
+{
+  "schema_version": "agent-web/0.1",
+  "id": "realworld/errors_authorization",
+  "title": "从 hurl 转来：errors_authorization",
+  "environment": {
+    "adapter": "realworld",
+    "seed": {}
+  },
+  "task": {
+    "natural_goal": "按 hurl 套件 errors_authorization 的顺序重放一遍，并检查每一步的返回体。",
+    "goal_assertions": [
+      {
+        "kind": "payload",
+        "step": 4,
+        "path": "$.errors.article[0]",
+        "op": "equals",
+        "value": "forbidden"
+      },
+      {
+        "kind": "payload",
+        "step": 5,
+        "path": "$.errors.article[0]",
+        "op": "equals",
+        "value": "forbidden"
+      },
+      {
+        "kind": "payload",
+        "step": 7,
+        "path": "$.errors.comment[0]",
+        "op": "equals",
+        "value": "forbidden"
+      },
+      {
+        "kind": "payload",
+        "step": 8,
+        "path": "$.comments",
+        "op": "count_gte",
+        "value": 1
+      },
+      {
+        "kind": "payload",
+        "step": 8,
+        "path": "$.comments[0].body",
+        "op": "equals",
+        "value": "A's comment"
+      }
+    ],
+    "invariants": []
+  },
+  "reference_trajectory": [
+    {
+      "id": "s1",
+      "capability": "users.create",
+      "as": "user",
+      "expected_outcome": "applied",
+      "arguments": {
+        "username": "authz_a_000000",
+        "email": "authz_a_000000@test.com",
+        "password": "password123"
+      }
+    },
+    {
+      "id": "s2",
+      "capability": "users.create",
+      "as": "user2",
+      "expected_outcome": "applied",
+      "arguments": {
+        "username": "authz_b_000000",
+        "email": "authz_b_000000@test.com",
+        "password": "password123"
+      }
+    },
+    {
+      "id": "s3",
+      "capability": "articles.create",
+      "as": "user",
+      "expected_outcome": "applied",
+      "arguments": {
+        "title": "Authz Article 000000",
+        "description": "test",
+        "body": "test"
+      }
+    },
+    {
+      "id": "s4",
+      "capability": "articles.delete",
+      "as": "user2",
+      "expected_outcome": "rejected",
+      "arguments": {
+        "slug": "$s3.article.slug"
+      }
+    },
+    {
+      "id": "s5",
+      "capability": "articles.update",
+      "as": "user2",
+      "expected_outcome": "rejected",
+      "arguments": {
+        "body": "hijacked",
+        "slug": "$s3.article.slug"
+      }
+    },
+    {
+      "id": "s6",
+      "capability": "comments.create",
+      "as": "user",
+      "expected_outcome": "applied",
+      "arguments": {
+        "body": "A's comment",
+        "slug": "$s3.article.slug"
+      }
+    },
+    {
+      "id": "s7",
+      "capability": "comments.delete",
+      "as": "user2",
+      "expected_outcome": "rejected",
+      "arguments": {
+        "slug": "$s3.article.slug",
+        "id": "$s6.comment.id"
+      }
+    },
+    {
+      "id": "s8",
+      "capability": "comments.list",
+      "as": "anonymous",
+      "expected_outcome": "applied",
+      "arguments": {
+        "slug": "$s3.article.slug"
+      }
+    },
+    {
+      "id": "s9",
+      "capability": "articles.delete",
+      "as": "user",
+      "expected_outcome": "applied",
+      "arguments": {
+        "slug": "$s3.article.slug"
+      }
+    }
+  ],
+  "observability": {
+    "declared_scopes": []
+  },
+  "draft": {
+    "status": "confirmed",
+    "generated_by": "agent-web import hurl",
+    "note": "全部请求与断言都转成了案例结构",
+    "reviewed_by": "阿蓝",
+    "reviewed_at": "2026-11-05T13:54:02.739Z"
+  }
+}

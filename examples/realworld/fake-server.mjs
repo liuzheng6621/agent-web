@@ -170,7 +170,7 @@ const server = http.createServer(async (req, res) => {
   }
   // GET /articles/feed
   if (method === 'GET' && path === '/articles/feed') {
-    if (!viewer) return errs(res, 401, { feed: ['is not authenticated'] });
+    if (!viewer) return errs(res, 401, { token: ['is missing'] });
     const mine = [...db.articles.values()].filter((a) => db.follows.has(`${viewer.username}|${a.author}`));
     return send(res, 200, { articles: mine.map((a) => articleOf(a, viewer)), articlesCount: mine.length });
   }
@@ -191,7 +191,7 @@ const server = http.createServer(async (req, res) => {
   }
   // POST /articles
   if (method === 'POST' && path === '/articles') {
-    if (!viewer) return errs(res, 401, { article: ['is not authenticated'] });
+    if (!viewer) return errs(res, 401, { token: ['is missing'] });
     const a = (body && body.article) || {};
     const missing = ['title', 'description', 'body'].filter((k) => !a[k]);
     if (missing.length) return errs(res, 422, Object.fromEntries(missing.map((k) => [k, ["can't be blank"]])));
@@ -214,7 +214,7 @@ const server = http.createServer(async (req, res) => {
         return send(res, 200, { comments: list.map((c) => ({ id: c.id, body: c.body, createdAt: c.createdAt, author: profileOf(db.byName.get(c.author), viewer) })) });
       }
       if (method === 'POST') {
-        if (!viewer) return errs(res, 401, { comment: ['is not authenticated'] });
+        if (!viewer) return errs(res, 401, { token: ['is missing'] });
         if (!art) return errs(res, 404, { article: ['not found'] });
         const b = body && body.comment && body.comment.body;
         if (!b) return errs(res, 422, { body: ["can't be blank"] });
@@ -224,7 +224,7 @@ const server = http.createServer(async (req, res) => {
         return send(res, 201, { comment: { id, body: b, createdAt: rec.createdAt, author: profileOf(viewer, viewer) } });
       }
       if (method === 'DELETE' && seg[3]) {
-        if (!viewer) return errs(res, 401, { comment: ['is not authenticated'] });
+        if (!viewer) return errs(res, 401, { token: ['is missing'] });
         const rec = db.comments.get(Number(seg[3]));
         if (!rec) return errs(res, 404, { comment: ['not found'] });
         if (rec.author !== viewer.username) return errs(res, 403, { comment: ['is not yours'] });
@@ -233,7 +233,7 @@ const server = http.createServer(async (req, res) => {
       }
     }
     if (seg[2] === 'favorite') {
-      if (!viewer) return errs(res, 401, { article: ['is not authenticated'] });
+      if (!viewer) return errs(res, 401, { token: ['is missing'] });
       if (!art) return errs(res, 404, { article: ['not found'] });
       if (method === 'POST') db.favorites.add(`${viewer.username}|${slug}`);
       if (method === 'DELETE') db.favorites.delete(`${viewer.username}|${slug}`);
@@ -242,16 +242,16 @@ const server = http.createServer(async (req, res) => {
     if (!art) return errs(res, 404, { article: ['not found'] });
     if (method === 'GET') return send(res, 200, { article: articleOf(art, viewer) });
     if (method === 'PUT') {
-      if (!viewer) return errs(res, 401, { article: ['is not authenticated'] });
-      if (art.author !== viewer.username) return errs(res, 403, { article: ['is not yours'] });
+      if (!viewer) return errs(res, 401, { token: ['is missing'] });
+      if (art.author !== viewer.username) return errs(res, 403, { article: ['forbidden'] });
       const a = (body && body.article) || {};
       for (const k of ['title', 'description', 'body']) if (a[k] !== undefined) art[k] = a[k];
       art.updatedAt = new Date().toISOString();
       return send(res, 200, { article: articleOf(art, viewer) });
     }
     if (method === 'DELETE') {
-      if (!viewer) return errs(res, 401, { article: ['is not authenticated'] });
-      if (art.author !== viewer.username) return errs(res, 403, { article: ['is not yours'] });
+      if (!viewer) return errs(res, 401, { token: ['is missing'] });
+      if (art.author !== viewer.username) return errs(res, 403, { article: ['forbidden'] });
       db.articles.delete(slug);
       res.writeHead(200); return res.end();
     }

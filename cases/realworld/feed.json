@@ -1,0 +1,276 @@
+{
+  "schema_version": "agent-web/0.1",
+  "id": "realworld/feed",
+  "title": "从 hurl 转来：feed",
+  "environment": {
+    "adapter": "realworld",
+    "seed": {}
+  },
+  "task": {
+    "natural_goal": "按 hurl 套件 feed 的顺序重放一遍，并检查每一步的返回体。",
+    "goal_assertions": [
+      {
+        "kind": "payload",
+        "step": 3,
+        "path": "$.articlesCount",
+        "op": "equals",
+        "value": 0
+      },
+      {
+        "kind": "payload",
+        "step": 3,
+        "path": "$.articles",
+        "op": "count_equals",
+        "value": 0
+      },
+      {
+        "kind": "payload",
+        "step": 4,
+        "path": "$.profile.following",
+        "op": "equals",
+        "value": true
+      },
+      {
+        "kind": "payload",
+        "step": 7,
+        "path": "$.articles",
+        "op": "is_list"
+      },
+      {
+        "kind": "payload",
+        "step": 7,
+        "path": "$.articlesCount",
+        "op": "equals",
+        "value": 2
+      },
+      {
+        "kind": "payload",
+        "step": 7,
+        "path": "$.articles",
+        "op": "count_equals",
+        "value": 2
+      },
+      {
+        "kind": "payload",
+        "step": 7,
+        "path": "$.articles[0].title",
+        "op": "is_string"
+      },
+      {
+        "kind": "payload",
+        "step": 7,
+        "path": "$.articles[0].slug",
+        "op": "is_string"
+      },
+      {
+        "kind": "payload",
+        "step": 7,
+        "path": "$.articles[0].description",
+        "op": "is_string"
+      },
+      {
+        "kind": "payload",
+        "step": 7,
+        "path": "$.articles[0].tagList",
+        "op": "is_list"
+      },
+      {
+        "kind": "payload",
+        "step": 7,
+        "path": "$.articles[0].author.username",
+        "op": "equals",
+        "value": "feedc_000000"
+      },
+      {
+        "kind": "payload",
+        "step": 8,
+        "path": "$.articles",
+        "op": "count_equals",
+        "value": 1
+      },
+      {
+        "kind": "payload",
+        "step": 8,
+        "path": "$.articlesCount",
+        "op": "equals",
+        "value": 2
+      },
+      {
+        "kind": "payload",
+        "step": 8,
+        "path": "$.articles[0].title",
+        "op": "is_string"
+      },
+      {
+        "kind": "payload",
+        "step": 8,
+        "path": "$.articles[0].slug",
+        "op": "is_string"
+      },
+      {
+        "kind": "payload",
+        "step": 8,
+        "path": "$.articles[0].description",
+        "op": "is_string"
+      },
+      {
+        "kind": "payload",
+        "step": 8,
+        "path": "$.articles[0].tagList",
+        "op": "is_list"
+      },
+      {
+        "kind": "payload",
+        "step": 8,
+        "path": "$.articles[0].author.username",
+        "op": "equals",
+        "value": "feedc_000000"
+      },
+      {
+        "kind": "payload",
+        "step": 8,
+        "path": "$.articles[0].author.following",
+        "op": "equals",
+        "value": true
+      },
+      {
+        "kind": "payload",
+        "step": 9,
+        "path": "$.articles",
+        "op": "count_equals",
+        "value": 1
+      },
+      {
+        "kind": "payload",
+        "step": 9,
+        "path": "$.articlesCount",
+        "op": "equals",
+        "value": 2
+      }
+    ],
+    "invariants": []
+  },
+  "reference_trajectory": [
+    {
+      "id": "s1",
+      "capability": "users.create",
+      "as": "user",
+      "expected_outcome": "applied",
+      "arguments": {
+        "username": "feedm_000000",
+        "email": "feedm_000000@test.com",
+        "password": "password123"
+      }
+    },
+    {
+      "id": "s2",
+      "capability": "users.create",
+      "as": "user2",
+      "expected_outcome": "applied",
+      "arguments": {
+        "username": "feedc_000000",
+        "email": "feedc_000000@test.com",
+        "password": "password123"
+      }
+    },
+    {
+      "id": "s3",
+      "capability": "articles.feed",
+      "as": "user",
+      "expected_outcome": "applied"
+    },
+    {
+      "id": "s4",
+      "capability": "profiles.follow",
+      "as": "user",
+      "expected_outcome": "applied",
+      "arguments": {
+        "username": "feedc_000000"
+      }
+    },
+    {
+      "id": "s5",
+      "capability": "articles.create",
+      "as": "user2",
+      "expected_outcome": "applied",
+      "arguments": {
+        "title": "Feed Article 1 000000",
+        "description": "Feed test 1",
+        "body": "Feed body 1"
+      }
+    },
+    {
+      "id": "s6",
+      "capability": "articles.create",
+      "as": "user2",
+      "expected_outcome": "applied",
+      "arguments": {
+        "title": "Feed Article 2 000000",
+        "description": "Feed test 2",
+        "body": "Feed body 2"
+      }
+    },
+    {
+      "id": "s7",
+      "capability": "articles.feed",
+      "as": "user",
+      "expected_outcome": "applied"
+    },
+    {
+      "id": "s8",
+      "capability": "articles.feed",
+      "as": "user",
+      "expected_outcome": "applied",
+      "arguments": {
+        "limit": 1
+      }
+    },
+    {
+      "id": "s9",
+      "capability": "articles.feed",
+      "as": "user",
+      "expected_outcome": "applied",
+      "arguments": {
+        "limit": 1,
+        "offset": 1
+      }
+    },
+    {
+      "id": "s10",
+      "capability": "articles.delete",
+      "as": "user2",
+      "expected_outcome": "applied",
+      "arguments": {
+        "slug": "$s5.article.slug"
+      }
+    },
+    {
+      "id": "s11",
+      "capability": "articles.delete",
+      "as": "user2",
+      "expected_outcome": "applied",
+      "arguments": {
+        "slug": "$s6.article.slug"
+      }
+    },
+    {
+      "id": "s12",
+      "capability": "profiles.follow",
+      "as": "user",
+      "expected_outcome": "applied",
+      "arguments": {
+        "username": "feedc_000000"
+      }
+    }
+  ],
+  "observability": {
+    "declared_scopes": []
+  },
+  "draft": {
+    "status": "confirmed",
+    "generated_by": "agent-web import hurl",
+    "note": "11 处需要人看，见同目录的 .todo.md",
+    "reviewed_by": "阿蓝",
+    "reviewed_at": "2026-11-05T13:54:04.201Z"
+  }
+}

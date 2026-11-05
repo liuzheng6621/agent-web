@@ -1,0 +1,256 @@
+{
+  "schema_version": "agent-web/0.1",
+  "id": "realworld/comments",
+  "title": "从 hurl 转来：comments",
+  "environment": {
+    "adapter": "realworld",
+    "seed": {}
+  },
+  "task": {
+    "natural_goal": "按 hurl 套件 comments 的顺序重放一遍，并检查每一步的返回体。",
+    "goal_assertions": [
+      {
+        "kind": "payload",
+        "step": 3,
+        "path": "$.comment.body",
+        "op": "equals",
+        "value": "Test comment body"
+      },
+      {
+        "kind": "payload",
+        "step": 3,
+        "path": "$.comment.author.username",
+        "op": "equals",
+        "value": "cmt_000000"
+      },
+      {
+        "kind": "payload",
+        "step": 4,
+        "path": "$.comments",
+        "op": "is_list"
+      },
+      {
+        "kind": "payload",
+        "step": 4,
+        "path": "$.comments",
+        "op": "count_equals",
+        "value": 1
+      },
+      {
+        "kind": "payload",
+        "step": 4,
+        "path": "$.comments[0].id",
+        "op": "equals",
+        "value_from": "$s3.comment.id"
+      },
+      {
+        "kind": "payload",
+        "step": 4,
+        "path": "$.comments[0].body",
+        "op": "equals",
+        "value": "Test comment body"
+      },
+      {
+        "kind": "payload",
+        "step": 4,
+        "path": "$.comments[0].author.username",
+        "op": "equals",
+        "value": "cmt_000000"
+      },
+      {
+        "kind": "payload",
+        "step": 5,
+        "path": "$.comments",
+        "op": "is_list"
+      },
+      {
+        "kind": "payload",
+        "step": 5,
+        "path": "$.comments",
+        "op": "count_equals",
+        "value": 1
+      },
+      {
+        "kind": "payload",
+        "step": 5,
+        "path": "$.comments[0].body",
+        "op": "equals",
+        "value": "Test comment body"
+      },
+      {
+        "kind": "payload",
+        "step": 5,
+        "path": "$.comments[0].author.username",
+        "op": "equals",
+        "value": "cmt_000000"
+      },
+      {
+        "kind": "payload",
+        "step": 7,
+        "path": "$.comments",
+        "op": "count_equals",
+        "value": 0
+      },
+      {
+        "kind": "payload",
+        "step": 10,
+        "path": "$.comments",
+        "op": "count_equals",
+        "value": 2
+      },
+      {
+        "kind": "payload",
+        "step": 12,
+        "path": "$.comments",
+        "op": "count_equals",
+        "value": 1
+      },
+      {
+        "kind": "payload",
+        "step": 12,
+        "path": "$.comments[0].body",
+        "op": "equals",
+        "value": "Second comment"
+      }
+    ],
+    "invariants": []
+  },
+  "reference_trajectory": [
+    {
+      "id": "s1",
+      "capability": "users.create",
+      "as": "user",
+      "expected_outcome": "applied",
+      "arguments": {
+        "username": "cmt_000000",
+        "email": "cmt_000000@test.com",
+        "password": "password123"
+      }
+    },
+    {
+      "id": "s2",
+      "capability": "articles.create",
+      "as": "user",
+      "expected_outcome": "applied",
+      "arguments": {
+        "title": "Comment Article 000000",
+        "description": "For comments",
+        "body": "Article body"
+      }
+    },
+    {
+      "id": "s3",
+      "capability": "comments.create",
+      "as": "user",
+      "expected_outcome": "applied",
+      "arguments": {
+        "body": "Test comment body",
+        "slug": "$s2.article.slug"
+      }
+    },
+    {
+      "id": "s4",
+      "capability": "comments.list",
+      "as": "user",
+      "expected_outcome": "applied",
+      "arguments": {
+        "slug": "$s2.article.slug"
+      }
+    },
+    {
+      "id": "s5",
+      "capability": "comments.list",
+      "as": "anonymous",
+      "expected_outcome": "applied",
+      "arguments": {
+        "slug": "$s2.article.slug"
+      }
+    },
+    {
+      "id": "s6",
+      "capability": "comments.delete",
+      "as": "user",
+      "expected_outcome": "applied",
+      "arguments": {
+        "slug": "$s2.article.slug",
+        "id": "$s3.comment.id"
+      }
+    },
+    {
+      "id": "s7",
+      "capability": "comments.list",
+      "as": "anonymous",
+      "expected_outcome": "applied",
+      "arguments": {
+        "slug": "$s2.article.slug"
+      }
+    },
+    {
+      "id": "s8",
+      "capability": "comments.create",
+      "as": "user",
+      "expected_outcome": "applied",
+      "arguments": {
+        "body": "First comment",
+        "slug": "$s2.article.slug"
+      }
+    },
+    {
+      "id": "s9",
+      "capability": "comments.create",
+      "as": "user",
+      "expected_outcome": "applied",
+      "arguments": {
+        "body": "Second comment",
+        "slug": "$s2.article.slug"
+      }
+    },
+    {
+      "id": "s10",
+      "capability": "comments.list",
+      "as": "anonymous",
+      "expected_outcome": "applied",
+      "arguments": {
+        "slug": "$s2.article.slug"
+      }
+    },
+    {
+      "id": "s11",
+      "capability": "comments.delete",
+      "as": "user",
+      "expected_outcome": "applied",
+      "arguments": {
+        "slug": "$s2.article.slug",
+        "id": "$s8.comment.id"
+      }
+    },
+    {
+      "id": "s12",
+      "capability": "comments.list",
+      "as": "anonymous",
+      "expected_outcome": "applied",
+      "arguments": {
+        "slug": "$s2.article.slug"
+      }
+    },
+    {
+      "id": "s13",
+      "capability": "articles.delete",
+      "as": "user",
+      "expected_outcome": "applied",
+      "arguments": {
+        "slug": "$s2.article.slug"
+      }
+    }
+  ],
+  "observability": {
+    "declared_scopes": []
+  },
+  "draft": {
+    "status": "confirmed",
+    "generated_by": "agent-web import hurl",
+    "note": "8 处需要人看，见同目录的 .todo.md",
+    "reviewed_by": "阿蓝",
+    "reviewed_at": "2026-11-05T13:54:01.692Z"
+  }
+}

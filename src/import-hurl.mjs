@@ -46,8 +46,12 @@ export function splitUrl(url) {
   for (const p of parts) {
     const varName = p.replace(/[{}]/g, '').trim();
     if (['host', 'base', 'baseUrl', 'BASE_URL'].includes(varName)) continue;
-    if (/^\{\{/.test(p) || /^:/.test(p) || /^\d+$/.test(p) || p.startsWith(MARK)) {
-      params.push(varName.replace(/^:/, ''));
+    if (/^\{\{/.test(p)) {
+      params.push(varName.replace(/^:/, ''));            // `{{slug}}` → 捕获名 slug
+    } else if (p.includes('{{')) {
+      params.push(p);                                    // `unknown-slug-{{uid}}` → 原样，它是一个值
+    } else if (/^:/.test(p) || /^\d+$/.test(p) || p.startsWith(MARK)) {
+      params.push(p.replace(/^:/, ''));
     } else if (!['api', 'v1', 'v2', 'v3'].includes(p)) {
       statics.push(p);
     }
@@ -60,7 +64,16 @@ const ACTION_BY_METHOD = { GET: 'list', POST: 'create', PUT: 'update', PATCH: 'u
 // 路径末段本身就是一个动作时（RealWorld 这类契约里很常见），它才是动作名，
 // 资源名取前一段：`/api/users/login` → users.login、`/api/articles/{slug}/favorite` → articles.favorite。
 // 路径参数在各资源里叫什么（RealWorld 契约的约定，不是通用规律）。
-const ARG_NAMES = { articles: 'slug', comments: 'id', profiles: 'username', users: 'username', user: 'username' };
+// 路径参数**按位置**定名：`/articles/{{slug}}/comments/{{id}}` 的第一个是父资源的 slug，
+// 第二个才是这条评论自己的 id。只按资源取一个名字，会把 slug 传成 id。
+const PARAM_NAMES = {
+  articles: ['slug'],
+  comments: ['slug', 'id'],
+  profiles: ['username'],
+  users: ['username'],
+  user: ['username'],
+};
+const ARG_NAMES = { articles: 'slug', comments: 'slug', profiles: 'username', users: 'username', user: 'username' };
 
 const PATH_ACTIONS = new Set(['login', 'logout', 'register', 'follow', 'feed', 'favorite']);
 
@@ -70,14 +83,14 @@ export function capabilityOf(method, url) {
   const last = lastRaw.replace(/[{}]/g, '');
   const { resource, params } = splitUrl(url);
   if (PATH_ACTIONS.has(last)) {
-    const statics = raw.filter((p) => p !== last && !/^\{\{/.test(p) && !/^:/.test(p) && !['api', 'v1', 'v2', 'v3'].includes(p));
+    const statics = raw.filter((p) => p !== last && !p.includes('{{') && !/^:/.test(p) && !/^\d+$/.test(p) && !['api', 'v1', 'v2', 'v3'].includes(p));
     const owner = statics[statics.length - 1] || resource;
     return { capability: `${owner}.${last}`, resource: owner, params };
   }
   if (method === 'GET') {
     // 末段是路径参数 → 取那一个；末段是复数资源名 → 列那一片。
     // 判断是不是路径参数要看**原样**的那一段：去掉花括号后 `{{slug}}` 会变成 `slug`，就认不出来了
-    const lastIsParam = lastRaw.startsWith('{{') || /^:/.test(lastRaw) || /^\d+$/.test(lastRaw);
+    const lastIsParam = lastRaw.includes('{{') || /^:/.test(lastRaw) || /^\d+$/.test(lastRaw);
     const action = lastIsParam ? 'get' : (resource && resource.endsWith('s') ? 'list' : 'get');
     return { capability: `${resource}.${action}`, resource, params };
   }
@@ -188,6 +201,31 @@ export function toCases(blocks, opts = {}) {
   const todo = [];
   const capturedAt = new Map();
 
+
+  // 身份由「注册/登录时提交的那个用户名」决定，**token 变量名不算身份**：
+  // 同一套件里可能注册一次再登录一次，捕获到的变量叫 reg_token / token，
+  // 把变量名当身份会让后半段步骤以陌生人的身份执行，断言必然对不上。
+  const roleByUsername = new Map();
+  const roleOfStep = new Map();
+  let identityCount = 0;
+  blocks.forEach((b, i) => {
+    const { capability: cap } = capabilityOf(b.method, b.url);
+    if (cap !== 'users.create' && cap !== 'users.login') return;
+    const uname = (b.body && b.body.user && b.body.user.username) || (b.body && b.body.username);
+    const key = uname ? String(uname) : '#' + i;
+    if (!roleByUsername.has(key)) {
+      roleByUsername.set(key, identityCount === 0 ? as : 'user2');
+      identityCount += 1;
+    }
+    roleOfStep.set(i, roleByUsername.get(key));
+  });
+  const varRole = new Map();
+  blocks.forEach((b, i) => {
+    const r = roleOfStep.get(i);
+    if (!r) return;
+    for (const c of b.captures) if (/token/i.test(c.name)) varRole.set(c.name, r);
+  });
+  const roleOfTokenVar = (name) => varRole.get(name) || as;
   blocks.forEach((b, i) => {
     if (b.url && /\{\{\s*host\s*\}\}/.test(b.url) === false && /^https?:/.test(b.url) === false) {
       // 相对路径也接受
@@ -220,10 +258,19 @@ export function toCases(blocks, opts = {}) {
     }
     if (Array.isArray(params) && params.length > 0) {
       for (const p of params) {
+        if (p.includes(MARK) || String(p).includes('{{')) {
+          // 末段不是捕获名，而是一个值本身（`unknown-slug-{{uid}}` = 一个不存在的 slug）
+          const name = ARG_NAMES[capability.split('.')[0]] || 'id';
+          const plain = String(p).replace(VAR_RE, (_, n) => (n === 'uid' ? uid : `${MARK}${n}${MARK}`));
+          args[name] = deepFill(plain, uid);
+          continue;
+        }
         const src = capturedAt.get(p);
         // hurl 的捕获名（slug1/slug2）是套件自己的命名，不是接口参数名。
         // 路径参数按资源定名：articles→slug、comments→id、profiles→username。
-        const argName = ARG_NAMES[capability.split('.')[0]] || p;
+        const res = capability.split('.')[0];
+        const pos = params.indexOf(p);
+        const argName = (PARAM_NAMES[res] || [])[pos] || p;
         if (src) args[argName] = src;
         else todo.push(`第 ${i + 1} 个请求要路径参数 {{${p}}}，但没有更早的捕获，参数留空`);
       }
@@ -231,7 +278,11 @@ export function toCases(blocks, opts = {}) {
     // 注册与登录不是匿名动作：它就是在确立这个角色的身份，后续步骤才以这个身份执行。
     // 写成 anonymous 会让适配器把新 token 记在 anonymous 名下，后面 as=user 的步骤还在用复位的旧 token。
     const establishesIdentity = capability === 'users.create' || capability === 'users.login';
-    const role = establishesIdentity || b.headers.authorization || b.headers.Authorization ? as : 'anonymous';
+    const authVar = String(b.headers.authorization || b.headers.Authorization || '').match(/\{\{\s*(\w+)\s*\}\}/);
+    const ownToken = b.captures.find((c) => varRole.has(c.name));
+    const role = establishesIdentity
+      ? (roleOfStep.get(i) || as)
+      : (authVar ? roleOfTokenVar(authVar[1]) : 'anonymous');
     const expected = b.status >= 400 ? 'rejected' : 'applied';
     const step = { id: stepId, capability, as: role, expected_outcome: expected };
     if (Object.keys(args).length > 0) step.arguments = args;

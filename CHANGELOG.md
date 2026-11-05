@@ -6,6 +6,17 @@
 CI 也在查。这条规则是买来的：这个仓库曾经同时存在 `package.json` 0.16、README 0.9、
 Gitee Release v0.6.0 三个数，谁看都是三个项目。
 
+## 0.37.1
+
+把 RealWorld 的 13 个 hurl 套件全量转进来，并把「转得动」与「跑得绿」分开说。
+
+- 转出 **13 条案例 / 157 步 / 296 条 `payload` 断言**，94 处转不成断言的进同名 `.todo.md`。
+- 能力名推导修两处：末段是动作词（`login`/`follow`/`favorite`/`feed`）时资源取前一段；含变量的字面量段（`some-slug-{{uid}}`）算参数不算资源名。
+- 路径参数按**位置**定名：`/articles/{{slug}}/comments/{{id}}` 的第一个是父资源 slug，第二个才是评论 id。
+- 身份只由「注册/登录时提交的用户名」决定，**token 变量名不算身份**——同一套件注册一次再登录一次会捕获 `reg_token`/`token` 两个名字，把变量名当身份会让后半段以陌生人的身份执行。
+- `examples/realworld/README.md` 记实测：**pass 3 / fail 9 / unknown 1**，十条红按六类归因（夹具文案、缺字段、鉴权字段、多身份、计数口径、状态回读）。
+- `cases/realworld` **不进 CI**：`expected.json` 写的是目标标签而不是实测，这条红线留着当进度条。
+
 ## 0.37.0
 
 把 RealWorld 的现成断言套件真的跑起来：`src/adapter/realworld.mjs` + `examples/realworld/fake-server.mjs`。

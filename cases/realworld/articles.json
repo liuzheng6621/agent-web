@@ -1,0 +1,701 @@
+{
+  "schema_version": "agent-web/0.1",
+  "id": "realworld/articles",
+  "title": "从 hurl 转来：articles",
+  "environment": {
+    "adapter": "realworld",
+    "seed": {}
+  },
+  "task": {
+    "natural_goal": "按 hurl 套件 articles 的顺序重放一遍，并检查每一步的返回体。",
+    "goal_assertions": [
+      {
+        "kind": "payload",
+        "step": 2,
+        "path": "$.article.title",
+        "op": "equals",
+        "value": "Test Article 000000"
+      },
+      {
+        "kind": "payload",
+        "step": 2,
+        "path": "$.article.slug",
+        "op": "is_string"
+      },
+      {
+        "kind": "payload",
+        "step": 2,
+        "path": "$.article.description",
+        "op": "equals",
+        "value": "Test description"
+      },
+      {
+        "kind": "payload",
+        "step": 2,
+        "path": "$.article.body",
+        "op": "equals",
+        "value": "Test body content"
+      },
+      {
+        "kind": "payload",
+        "step": 2,
+        "path": "$.article.tagList",
+        "op": "contains",
+        "value": "d_000000"
+      },
+      {
+        "kind": "payload",
+        "step": 2,
+        "path": "$.article.tagList",
+        "op": "contains",
+        "value": "t_000000"
+      },
+      {
+        "kind": "payload",
+        "step": 2,
+        "path": "$.article.tagList[0]",
+        "op": "equals",
+        "value": "d_000000"
+      },
+      {
+        "kind": "payload",
+        "step": 2,
+        "path": "$.article.tagList[1]",
+        "op": "equals",
+        "value": "t_000000"
+      },
+      {
+        "kind": "payload",
+        "step": 2,
+        "path": "$.article.favorited",
+        "op": "equals",
+        "value": false
+      },
+      {
+        "kind": "payload",
+        "step": 2,
+        "path": "$.article.favoritesCount",
+        "op": "equals",
+        "value": 0
+      },
+      {
+        "kind": "payload",
+        "step": 2,
+        "path": "$.article.author.username",
+        "op": "equals",
+        "value": "art_000000"
+      },
+      {
+        "kind": "payload",
+        "step": 3,
+        "path": "$.articles",
+        "op": "is_list"
+      },
+      {
+        "kind": "payload",
+        "step": 3,
+        "path": "$.articles[0].title",
+        "op": "is_string"
+      },
+      {
+        "kind": "payload",
+        "step": 3,
+        "path": "$.articles[0].slug",
+        "op": "is_string"
+      },
+      {
+        "kind": "payload",
+        "step": 3,
+        "path": "$.articles[0].description",
+        "op": "is_string"
+      },
+      {
+        "kind": "payload",
+        "step": 3,
+        "path": "$.articles[0].tagList",
+        "op": "is_list"
+      },
+      {
+        "kind": "payload",
+        "step": 3,
+        "path": "$.articles[0].author.username",
+        "op": "is_string"
+      },
+      {
+        "kind": "payload",
+        "step": 4,
+        "path": "$.articles",
+        "op": "is_list"
+      },
+      {
+        "kind": "payload",
+        "step": 4,
+        "path": "$.articles[0].title",
+        "op": "is_string"
+      },
+      {
+        "kind": "payload",
+        "step": 4,
+        "path": "$.articles[0].slug",
+        "op": "is_string"
+      },
+      {
+        "kind": "payload",
+        "step": 4,
+        "path": "$.articles[0].description",
+        "op": "is_string"
+      },
+      {
+        "kind": "payload",
+        "step": 4,
+        "path": "$.articles[0].tagList",
+        "op": "is_list"
+      },
+      {
+        "kind": "payload",
+        "step": 4,
+        "path": "$.articles[0].author.username",
+        "op": "equals",
+        "value": "art_000000"
+      },
+      {
+        "kind": "payload",
+        "step": 5,
+        "path": "$.articles",
+        "op": "is_list"
+      },
+      {
+        "kind": "payload",
+        "step": 5,
+        "path": "$.articles[0].title",
+        "op": "is_string"
+      },
+      {
+        "kind": "payload",
+        "step": 5,
+        "path": "$.articles[0].slug",
+        "op": "is_string"
+      },
+      {
+        "kind": "payload",
+        "step": 5,
+        "path": "$.articles[0].description",
+        "op": "is_string"
+      },
+      {
+        "kind": "payload",
+        "step": 5,
+        "path": "$.articles[0].tagList",
+        "op": "is_list"
+      },
+      {
+        "kind": "payload",
+        "step": 5,
+        "path": "$.articles[0].author.username",
+        "op": "is_string"
+      },
+      {
+        "kind": "payload",
+        "step": 6,
+        "path": "$.articles",
+        "op": "is_list"
+      },
+      {
+        "kind": "payload",
+        "step": 6,
+        "path": "$.articles[0].title",
+        "op": "is_string"
+      },
+      {
+        "kind": "payload",
+        "step": 6,
+        "path": "$.articles[0].slug",
+        "op": "is_string"
+      },
+      {
+        "kind": "payload",
+        "step": 6,
+        "path": "$.articles[0].description",
+        "op": "is_string"
+      },
+      {
+        "kind": "payload",
+        "step": 6,
+        "path": "$.articles[0].tagList",
+        "op": "is_list"
+      },
+      {
+        "kind": "payload",
+        "step": 6,
+        "path": "$.articles[0].author.username",
+        "op": "equals",
+        "value": "art_000000"
+      },
+      {
+        "kind": "payload",
+        "step": 7,
+        "path": "$.articles",
+        "op": "is_list"
+      },
+      {
+        "kind": "payload",
+        "step": 7,
+        "path": "$.articles[0].title",
+        "op": "is_string"
+      },
+      {
+        "kind": "payload",
+        "step": 7,
+        "path": "$.articles[0].slug",
+        "op": "is_string"
+      },
+      {
+        "kind": "payload",
+        "step": 7,
+        "path": "$.articles[0].description",
+        "op": "is_string"
+      },
+      {
+        "kind": "payload",
+        "step": 7,
+        "path": "$.articles[0].tagList",
+        "op": "is_list"
+      },
+      {
+        "kind": "payload",
+        "step": 7,
+        "path": "$.articles[0].tagList",
+        "op": "contains",
+        "value": "d_000000"
+      },
+      {
+        "kind": "payload",
+        "step": 7,
+        "path": "$.articles[0].author.username",
+        "op": "is_string"
+      },
+      {
+        "kind": "payload",
+        "step": 8,
+        "path": "$.articles",
+        "op": "is_list"
+      },
+      {
+        "kind": "payload",
+        "step": 9,
+        "path": "$.article.title",
+        "op": "equals",
+        "value": "Test Article 000000"
+      },
+      {
+        "kind": "payload",
+        "step": 9,
+        "path": "$.article.slug",
+        "op": "equals",
+        "value_from": "$s2.article.slug"
+      },
+      {
+        "kind": "payload",
+        "step": 9,
+        "path": "$.article.description",
+        "op": "equals",
+        "value": "Test description"
+      },
+      {
+        "kind": "payload",
+        "step": 9,
+        "path": "$.article.body",
+        "op": "equals",
+        "value": "Test body content"
+      },
+      {
+        "kind": "payload",
+        "step": 9,
+        "path": "$.article.tagList",
+        "op": "is_list"
+      },
+      {
+        "kind": "payload",
+        "step": 9,
+        "path": "$.article.favorited",
+        "op": "equals",
+        "value": false
+      },
+      {
+        "kind": "payload",
+        "step": 9,
+        "path": "$.article.favoritesCount",
+        "op": "equals",
+        "value": 0
+      },
+      {
+        "kind": "payload",
+        "step": 9,
+        "path": "$.article.author.username",
+        "op": "equals",
+        "value": "art_000000"
+      },
+      {
+        "kind": "payload",
+        "step": 10,
+        "path": "$.article.title",
+        "op": "equals",
+        "value": "Test Article 000000"
+      },
+      {
+        "kind": "payload",
+        "step": 10,
+        "path": "$.article.slug",
+        "op": "equals",
+        "value_from": "$s2.article.slug"
+      },
+      {
+        "kind": "payload",
+        "step": 10,
+        "path": "$.article.description",
+        "op": "equals",
+        "value": "Test description"
+      },
+      {
+        "kind": "payload",
+        "step": 10,
+        "path": "$.article.body",
+        "op": "equals",
+        "value": "Updated body content"
+      },
+      {
+        "kind": "payload",
+        "step": 10,
+        "path": "$.article.tagList",
+        "op": "is_list"
+      },
+      {
+        "kind": "payload",
+        "step": 10,
+        "path": "$.article.tagList",
+        "op": "count_equals",
+        "value": 2
+      },
+      {
+        "kind": "payload",
+        "step": 10,
+        "path": "$.article.tagList",
+        "op": "contains",
+        "value": "d_000000"
+      },
+      {
+        "kind": "payload",
+        "step": 10,
+        "path": "$.article.tagList",
+        "op": "contains",
+        "value": "t_000000"
+      },
+      {
+        "kind": "payload",
+        "step": 10,
+        "path": "$.article.createdAt",
+        "op": "equals",
+        "value_from": "$s2.article.createdAt"
+      },
+      {
+        "kind": "payload",
+        "step": 10,
+        "path": "$.article.author.username",
+        "op": "equals",
+        "value": "art_000000"
+      },
+      {
+        "kind": "payload",
+        "step": 11,
+        "path": "$.article.title",
+        "op": "equals",
+        "value": "Test Article 000000"
+      },
+      {
+        "kind": "payload",
+        "step": 11,
+        "path": "$.article.slug",
+        "op": "equals",
+        "value_from": "$s2.article.slug"
+      },
+      {
+        "kind": "payload",
+        "step": 11,
+        "path": "$.article.description",
+        "op": "equals",
+        "value": "Test description"
+      },
+      {
+        "kind": "payload",
+        "step": 11,
+        "path": "$.article.body",
+        "op": "equals",
+        "value": "Updated body content"
+      },
+      {
+        "kind": "payload",
+        "step": 11,
+        "path": "$.article.tagList",
+        "op": "is_list"
+      },
+      {
+        "kind": "payload",
+        "step": 11,
+        "path": "$.article.tagList",
+        "op": "count_equals",
+        "value": 2
+      },
+      {
+        "kind": "payload",
+        "step": 11,
+        "path": "$.article.tagList",
+        "op": "contains",
+        "value": "d_000000"
+      },
+      {
+        "kind": "payload",
+        "step": 11,
+        "path": "$.article.tagList",
+        "op": "contains",
+        "value": "t_000000"
+      },
+      {
+        "kind": "payload",
+        "step": 11,
+        "path": "$.article.author.username",
+        "op": "equals",
+        "value": "art_000000"
+      },
+      {
+        "kind": "payload",
+        "step": 12,
+        "path": "$.article.body",
+        "op": "equals",
+        "value": "Body without touching tags"
+      },
+      {
+        "kind": "payload",
+        "step": 12,
+        "path": "$.article.tagList",
+        "op": "count_equals",
+        "value": 2
+      },
+      {
+        "kind": "payload",
+        "step": 12,
+        "path": "$.article.tagList",
+        "op": "contains",
+        "value": "d_000000"
+      },
+      {
+        "kind": "payload",
+        "step": 12,
+        "path": "$.article.tagList",
+        "op": "contains",
+        "value": "t_000000"
+      },
+      {
+        "kind": "payload",
+        "step": 13,
+        "path": "$.article.tagList",
+        "op": "is_list"
+      },
+      {
+        "kind": "payload",
+        "step": 13,
+        "path": "$.article.tagList",
+        "op": "count_equals",
+        "value": 0
+      },
+      {
+        "kind": "payload",
+        "step": 14,
+        "path": "$.article.tagList",
+        "op": "is_list"
+      },
+      {
+        "kind": "payload",
+        "step": 14,
+        "path": "$.article.tagList",
+        "op": "count_equals",
+        "value": 0
+      },
+      {
+        "kind": "payload",
+        "step": 17,
+        "path": "$.errors.article[0]",
+        "op": "equals",
+        "value": "not found"
+      }
+    ],
+    "invariants": []
+  },
+  "reference_trajectory": [
+    {
+      "id": "s1",
+      "capability": "users.create",
+      "as": "user",
+      "expected_outcome": "applied",
+      "arguments": {
+        "username": "art_000000",
+        "email": "art_000000@test.com",
+        "password": "password123"
+      }
+    },
+    {
+      "id": "s2",
+      "capability": "articles.create",
+      "as": "user",
+      "expected_outcome": "applied",
+      "arguments": {
+        "title": "Test Article 000000",
+        "description": "Test description",
+        "body": "Test body content",
+        "tagList": [
+          "d_000000",
+          "t_000000"
+        ]
+      }
+    },
+    {
+      "id": "s3",
+      "capability": "articles.list",
+      "as": "anonymous",
+      "expected_outcome": "applied"
+    },
+    {
+      "id": "s4",
+      "capability": "articles.list",
+      "as": "anonymous",
+      "expected_outcome": "applied",
+      "arguments": {
+        "author": "art_000000"
+      }
+    },
+    {
+      "id": "s5",
+      "capability": "articles.list",
+      "as": "user",
+      "expected_outcome": "applied"
+    },
+    {
+      "id": "s6",
+      "capability": "articles.list",
+      "as": "user",
+      "expected_outcome": "applied",
+      "arguments": {
+        "author": "art_000000"
+      }
+    },
+    {
+      "id": "s7",
+      "capability": "articles.list",
+      "as": "anonymous",
+      "expected_outcome": "applied",
+      "arguments": {
+        "tag": "d_000000"
+      }
+    },
+    {
+      "id": "s8",
+      "capability": "articles.list",
+      "as": "anonymous",
+      "expected_outcome": "applied"
+    },
+    {
+      "id": "s9",
+      "capability": "articles.get",
+      "as": "anonymous",
+      "expected_outcome": "applied",
+      "arguments": {
+        "slug": "$s2.article.slug"
+      }
+    },
+    {
+      "id": "s10",
+      "capability": "articles.update",
+      "as": "user",
+      "expected_outcome": "applied",
+      "arguments": {
+        "body": "Updated body content",
+        "slug": "$s2.article.slug"
+      }
+    },
+    {
+      "id": "s11",
+      "capability": "articles.get",
+      "as": "anonymous",
+      "expected_outcome": "applied",
+      "arguments": {
+        "slug": "$s2.article.slug"
+      }
+    },
+    {
+      "id": "s12",
+      "capability": "articles.update",
+      "as": "user",
+      "expected_outcome": "applied",
+      "arguments": {
+        "body": "Body without touching tags",
+        "slug": "$s2.article.slug"
+      }
+    },
+    {
+      "id": "s13",
+      "capability": "articles.update",
+      "as": "user",
+      "expected_outcome": "applied",
+      "arguments": {
+        "tagList": [],
+        "slug": "$s2.article.slug"
+      }
+    },
+    {
+      "id": "s14",
+      "capability": "articles.get",
+      "as": "anonymous",
+      "expected_outcome": "applied",
+      "arguments": {
+        "slug": "$s2.article.slug"
+      }
+    },
+    {
+      "id": "s15",
+      "capability": "articles.update",
+      "as": "user",
+      "expected_outcome": "rejected",
+      "arguments": {
+        "tagList": null,
+        "slug": "$s2.article.slug"
+      }
+    },
+    {
+      "id": "s16",
+      "capability": "articles.delete",
+      "as": "user",
+      "expected_outcome": "applied",
+      "arguments": {
+        "slug": "$s2.article.slug"
+      }
+    },
+    {
+      "id": "s17",
+      "capability": "articles.get",
+      "as": "anonymous",
+      "expected_outcome": "rejected",
+      "arguments": {
+        "slug": "$s2.article.slug"
+      }
+    }
+  ],
+  "observability": {
+    "declared_scopes": []
+  },
+  "draft": {
+    "status": "confirmed",
+    "generated_by": "agent-web import hurl",
+    "note": "47 处需要人看，见同目录的 .todo.md",
+    "reviewed_by": "阿蓝",
+    "reviewed_at": "2026-11-05T13:54:00.969Z"
+  }
+}

@@ -1,53 +1,58 @@
-# 现成案例：把 RealWorld 的 hurl 套件转成 agent-web 案例
+# RealWorld 语料：13 个套件转成案例
 
-RealWorld（[realworld-apps/realworld](https://github.com/realworld-apps/realworld)，MIT）给的是
-**一份契约 + 上百个实现 + 现成的断言套件**。这里用它的 `specs/api/hurl/*.hurl` 做语料，
-用 `agent-web import hurl` 转成案例，再用 `src/adapter/realworld.mjs` 打它。
+`realworld-apps/realworld`（原 `gothinkster/realworld`）是「同一份契约、上百个实现」的那个项目。
+`specs/api/` 里除了 `openapi.yml`，还有两套能直接跑的断言套件：`hurl/`（13 个文件）和 `bruno/`。
+本目录放的就是这两样东西的副本，以及我们用它造的适配器和案例。
 
-## 三步跑起来
-
-```bash
-# 1) 起一个实现（这里用仓库自带的内存夹具，零依赖）
-node examples/realworld/fake-server.mjs 8299 --allow-reset
-
-# 2) 把 hurl 套件转成案例（已随仓库提供，重转一次也行）
-agent-web import hurl examples/realworld/hurl --out=cases/realworld --as=user
-agent-web accept cases/realworld/auth.json --by=<你的名字>
-
-# 3) 跑
-agent-web probe  --adapter=realworld
-agent-web verify cases/realworld --adapter=realworld
+```
+openapi.yml              19 个端点的契约（留给 discover 用）
+hurl/*.hurl              13 个套件：157 步、296 条断言
+fake-server.mjs          零依赖的内存实现，19 个端点，跑在 8299
 ```
 
-实测（本机，夹具在 8299）：`probe` 6/6 通过；`verify` **3/3 与预期一致**（auth / pagination / tags 全部 pass，
-可判定率 100%）；转出来的是 31 步 / 74 条断言 / 0 处待办。
-
-## 夹具与真后端的区别（别把夹具当证据）
-
-`fake-server.mjs` 是本仓库写的**内存实现**，只为演示链路。它能证明的是「转换器 + 适配器 + 判决链路是通的」，
-不能证明「某个 RealWorld 实现是对的」。要证明后者，把 `REALWORLD_BASE_URL` 指向一个真实现：
+## 怎么跑
 
 ```bash
-REALWORLD_BASE_URL=https://your-realworld-instance.example \
-  node bin/agent-web.mjs verify cases/realworld --adapter=realworld
+# 1. 起夹具（--allow-reset 打开 /_fixture/reset，重复跑同一批案例必须开）
+node examples/realworld/fake-server.mjs 8299 --allow-reset &
+
+# 2. 把套件转成案例（--as 是「谁在操作」，默认 user）
+node bin/agent-web.mjs import hurl examples/realworld/hurl --out=cases/realworld --as=user
+
+# 3. 确认（草稿不出判决）
+for f in cases/realworld/*.json; do node bin/agent-web.mjs accept "$f" --by=你的名字; done
+
+# 4. 出判决
+node bin/agent-web.mjs verify cases/realworld --adapter=realworld --detail
 ```
 
-真后端上没有 `/_fixture/reset`，`reset()` 会退化成「按历史作者删文章 + 注册新的角色账号」；
-同一条案例重复跑两次，注册类步骤会撞 422 —— 上游做法是每轮生成新的 `{{uid}}`，
-所以重跑前请先 `import hurl --uid=<新值>` 重新生成案例。
+## 当前状态（2026-11-05，v0.37.1）
 
-## 这套语料的价值
+| 指标 | 数字 |
+|---|---|
+| 套件 → 案例 | 13 |
+| 步 | 157 |
+| `payload` 断言 | 296 |
+| 转不成断言的待办 | 94（favorites 24、feed 11、errors_comments 3、errors_articles 1） |
+| `verify` 实测 | **pass 3 / fail 9 / unknown 1** |
 
-- **断言是别人写的**：`jsonpath "$.user.bio" == null`、`count >= 1`、`isString` 这些不是我编的理想案例，
-  是社区维护的契约断言；转进来以后本项目的判决器要接受真实世界的口味。
-- **一份契约、上百个实现**：同一批案例可以打任意 RealWorld 实现，正是「跨实现对照」的天然场地。
-- **换域就是换契约**：换 Cassandra/Petstore 之类契约只需要换 `openapi.yml` 与 hurl 套件，
-  适配器那一层几乎不动（能力名由 `capabilityOf` 推导，参数名按资源定）。
+`cases/realworld/expected.json` 里写的是**目标标签**（13 条全 `pass`），不是实测结果——
+所以这个目录现在是一条红线：它把「我们的实现还没对齐契约」明明白白摆出来。
+**因此它不进 CI**：CI 只跑 `cases/coffee` 与 `cases/animal` 的闸门。
 
-## 还没做的
+## 十条红的分类（都是真差异，不是工具失灵）
 
-- 只转了 3 个套件（auth / pagination / tags）；`articles`、`comments`、`favorites`、`feed`、`profiles`
-  与 5 个 `errors_*` 套件还没转（它们更大，也更依赖前置数据）。
-- 这批案例目前没有配套变异体，所以 `certify` 对它们不产生「准入」结论 —— 变异体是按咖啡域写的，
-  换域要另写（`docs/mutants/` 的投稿规则适用于任何域）。
-- `import hurl` 不猜业务规则：断言只按 hurl 原文转，原文没写的就不写。
+| 类别 | 例 | 原因 |
+|---|---|---|
+| 夹具文案 | `$.errors.comment[0]` 期望 `forbidden`、实际 `is not yours` | 内存夹具的错误文案与参考实现不同 |
+| 夹具缺字段 | `$.errors.article[0]` 期望 `not found`、实际 `undefined` | 未命中路由时回的是 `{route:[…]}` |
+| 鉴权字段 | `$.errors.token[0]` 期望 `is missing`、实际 `undefined` | 部分路由没走「未登录」分支 |
+| 多身份 | `articles.update 应被拒绝，实际被执行` | 套件用两个 token 操作两个人，角色绑定还没完全对上 |
+| 计数口径 | `feed` 期望 1 条，实际 2 条 | 夹具的 `follows` 过滤与套件预期不一致 |
+| 状态回读 | `favorited` 取消后仍为 `true` | 取消收藏那一步的执行者与查询者不是同一个人 |
+
+## 这个目录证明了什么
+
+一份第三方套件，**不写代码**就能变成 13 条案例、157 步、296 条断言，判决由我们自己的三值引擎给出。
+红的部分不是「工具不行」，是「夹具还没长成契约的样子」——而这恰好是这套工具存在的理由：
+它把「实现与契约的差距」变成可数的数字，而不是一句「应该差不多」。
