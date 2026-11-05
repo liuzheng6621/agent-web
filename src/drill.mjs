@@ -8,7 +8,7 @@ import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 
 import { flatAssertions, probe } from './certify.mjs';
 import { MUTATIONS } from './mutate.mjs';
-import { validateAssertions } from './assert/index.mjs';
+import { KINDS, PHASE_MATRIX, validateAssertions } from './assert/index.mjs';
 import { stableStringify } from './values.mjs';
 
 export const DRILL_VERSION = 'agent-web/drill-1';
@@ -64,12 +64,21 @@ export function taskSheet(item) {
   out.push('');
   out.push('1. 你写的每条断言必须在**正确实现**上为真 —— 否则它是废的，记 unarmed。');
   out.push('2. 至少一条必须在**这份坏实现**上为假 —— 否则你什么也没抓到。');
-  out.push('3. 声明 phase 时必须符合矩阵：entity_exists/field_equals 只能 final，');
-  out.push('   count_delta/unchanged 只能 initial_vs_final，status_transition/event_absent 只能 trace。');
+  out.push('3. 声明 phase 时必须符合矩阵（下面按允许的相位分组）：');
+  var byPhase = {};
+  KINDS.forEach(function (k) {
+    var m = PHASE_MATRIX[k];
+    var ph = (m && m.allowed && m.allowed.length === 1) ? m.allowed[0] : '任意';
+    (byPhase[ph] = byPhase[ph] || []).push(k);
+  });
+  Object.keys(byPhase).forEach(function (ph) {
+    out.push('   ' + ph + '：' + byPhase[ph].join(' / '));
+  });
   out.push('4. 没有 llm_judge 这种 kind，也不会加。');
   out.push('');
-  out.push('可用断言：entity_exists / field_equals / count_delta / unchanged / status_transition /');
-  out.push('event_absent / composite(and|or|not)。');
+  out.push('可用断言（' + KINDS.length + ' 种，全部机器可判）：');
+  out.push('   ' + KINDS.join(' / '));
+  out.push('   composite 的子断言也可以任意组合（and / or / not），但每层子断言仍要满足上面的相位矩阵。');
   out.push('');
   out.push('提示：答案不在原断言的参数里微调，而在**你没断言过的地方**。');
   return out.join('\n') + '\n';

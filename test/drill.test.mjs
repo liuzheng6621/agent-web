@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { createMemoryAdapter } from '../src/adapter/memory.mjs';
 import { buildDrills, gradeDrills, taskSheet, safeName, gradeExit } from '../src/drill.mjs';
 import { MUTATIONS } from '../src/mutate.mjs';
+import { KINDS } from '../src/assert/index.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..');
@@ -71,6 +72,24 @@ test('题面不含答案', async () => {
     assert.ok(!sheet.includes('"mutant"'), '题面不该暴露变异体 id');
   }
 });
+
+test('题面必须把十二种断言全列出来，不能停在一半', () => {
+  const item = {
+    id: 'coffee/demo@m-demo',
+    question: '这一条故障，现有断言抓不住。补一条能抓住它的断言。',
+    case: 'coffee/demo',
+    symptom: '总额少一分',
+    mechanism: '写总额时少加一分',
+    catch_hint: '这是答案，不该出现',
+    given: { steps: 3, assertions: [{ kind: 'field_equals', selector: { collection: 'orders', index: 0 }, path: 'status', value: 'PICKED' }] },
+  };
+  const sheet = taskSheet(item);
+  for (const k of KINDS) {
+    assert.ok(sheet.includes(k), '题面漏了断言种类 ' + k + '：答题人不知道它能用，就会以为没有');
+  }
+  assert.ok(sheet.includes(String(KINDS.length)), '题面要写清可用种类总数，否则读者不知道清单完不完整');
+});
+
 
 test('文件名安全化：/ 和 @ 都要换掉', () => {
   assert.equal(safeName('coffee/happy-path@m-no-reject'), 'coffee__happy-path-at-m-no-reject');

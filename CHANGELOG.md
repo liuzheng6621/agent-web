@@ -6,6 +6,15 @@
 CI 也在查。这条规则是买来的：这个仓库曾经同时存在 `package.json` 0.16、README 0.9、
 Gitee Release v0.6.0 三个数，谁看都是三个项目。
 
+## 0.30.0
+
+把「现在做不到什么」从散文变成台账，并修掉两条自相矛盾。
+
+- **第 9 条曾写成「并发已做但有限，`--jobs` 只并发案例级」——代码里没有 `--jobs`。** 并发在 `k04` 里被撤回了（串行 77s → 6 并发 8s，但同一变异体从「被第 4 条断言抓住」变成「判决级 ×3」）。已改为「并发被撤回了」并指向 k04。
+- **`drill` 题面只列 7 种断言**，而 `KINDS` 有 12 种：`relation` / `sorted_by` / `unique` / `type_of` / `subset` 从没告诉答题人能用。现在是 `KINDS` 插值 + 按相位矩阵分组，`test/drill.test.mjs` 加守卫。
+- 新增 `docs/LIMITS.md`：L1–L11 每条带 `status`（open / mitigated / by-design / withdrawn / continuous）、验收命令、为什么不解决。
+- 新增 `test/limits.test.mjs` 三道门：中英 README 各 11 条且与台账一一对应；每条必有 status 且取值受限；L9 撤回后代码里不许再出现 `--jobs`。
+
 ## 0.29.4
 
 删掉 `badge-tests.svg`。

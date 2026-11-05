@@ -1,4 +1,4 @@
-# agent-web v0.29.4
+# agent-web v0.30.0
 
 <p align="center">
   <img src="docs/media/hero.png" alt="agent-web：给 Agent 写机器可判的集成测试" width="100%">
@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <b>当前版本 0.29.4</b> · 12 种断言 · 26 条命令 · 22 个变异体
+  <b>当前版本 0.30.0</b> · 12 种断言 · 26 条命令 · 22 个变异体
 </p>
 
 <p align="center">
@@ -312,7 +312,7 @@ FAIL todo/recorded   assertion_false
 6. **等价变异体问题没有解决。** 只是显式化：杀不掉但造得出差异 → 欠账；连差异都造不出 → 说不清，要求给证明。
 7. **断言表达能力仍有缺口。** 分页、跨步切片的不变式（账本域公开的那条）表达不了。
 8. **适配器可以撒谎。** `probe` 只查六项机械性质；加载适配器等于以你的身份执行代码，CLI 会提示一次。
-9. **并发已做但有限。** `--jobs` 只并发案例级，不并发变异体级；并发会让判决顺序漂移，靠 drift 机制兜底。
+9. **并发被撤回了。** 试过：串行 77 秒 → 6 并发 8 秒，但同一个变异体从「被第 4 条断言抓住」变成「判决级 ×3」，结论会漂。快 9 倍但答案会变的评估器没用，代码已撤，不提供 `--jobs`（`k04-parallel-verdict-drift`）。
 10. **难度标签只是统计。** drill 实测通过率还没接进来。
 11. **只在三个域上验过。** 换个域大概率会暴露新缺口——这正是下一个域的意义。
 
@@ -322,6 +322,7 @@ FAIL todo/recorded   assertion_false
 - [docs/SPEC.md](docs/SPEC.md) —— 规范：案例格式、12 种断言与相位、判决顺序表、各机制的判定规则
 - [docs/ADAPTER-GUIDE.md](docs/ADAPTER-GUIDE.md) —— 接自己的应用：三档路径、只改四处、验收顺序
 - [CHANGELOG.md](CHANGELOG.md) —— 每个版本做了什么、因为什么
+- [docs/LIMITS.md](docs/LIMITS.md) —— 11 条限制的台账：状态、验收命令、为什么这条不解决
 - [docs/mutants/](docs/mutants/README.md) —— 变异体目录与投稿标准
 - [knowledge/](knowledge/README.md) —— 事故档案与入库宪法
 - [docs/media/](docs/media/) —— 本页面所有图、动图与介绍片，全部本地生成

@@ -1,4 +1,4 @@
-# agent-web v0.29.4
+# agent-web v0.30.0
 
 <p align="center">
   <img src="docs/media/hero.png" alt="agent-web: integration tests an agent can be judged on" width="100%">
@@ -18,7 +18,7 @@
 </p>
 
 <p align="center">
-  <b>v0.29.4</b> · 12 assertion kinds · 26 commands · 22 mutants
+  <b>v0.30.0</b> · 12 assertion kinds · 26 commands · 22 mutants
 </p>
 
 <p align="center">
@@ -295,7 +295,7 @@ Ordered by proximity to real use.
 6. **Equivalent mutant problem unsolved.** Just made explicit: unkillable but difference producible -> owed; cannot even produce a difference -> undetermined, proof required.
 7. **Assertion vocabulary still has gaps.** Pagination, cross-step slice invariants (the one the bookkeeping domain exposed) cannot be expressed.
 8. **An adapter can lie.** `probe` checks six mechanical properties; loading an adapter executes code with your privileges, the CLI warns once.
-9. **Concurrency done but limited.** `--jobs` parallelizes cases, not mutants; concurrency causes verdict-order drift, mitigated by the drift mechanism.
+9. **Concurrency was withdrawn.** It was tried: serial 77s -> 6-way 8s, but the same mutant moved from "caught by assertion 4" to "verdict-level x3" — the answer drifts. An evaluator that is 9x faster but sometimes answers differently is worse than the slow one. The code was reverted; there is no `--jobs` (`k04-parallel-verdict-drift`).
 10. **Difficulty labels are statistics only.** Drill-measured pass rates are not wired in yet.
 11. **Validated in three domains only.** A new domain will likely expose new gaps — that is exactly the point of the next domain.
 
@@ -305,6 +305,7 @@ Ordered by proximity to real use.
 - [docs/SPEC.md](docs/SPEC.md) — Spec: case format, 12 assertion kinds and phases, verdict order table, per-mechanism rules
 - [docs/ADAPTER-GUIDE.md](docs/ADAPTER-GUIDE.md) — Connect your own app: three-tier paths, change only four places, verification order
 - [CHANGELOG.md](CHANGELOG.md) — What each version did and why
+- [docs/LIMITS.md](docs/LIMITS.md) — Ledger of the 11 limits: status, acceptance command, why it stays
 - [docs/mutants/](docs/mutants/README.md) — Mutant directory and submission standards
 - [knowledge/](knowledge/README.md) — Incident archive and admission constitution
 - [docs/media/](docs/media/) — All images, animations and the introduction video on this page, all generated locally
