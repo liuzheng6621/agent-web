@@ -1,4 +1,4 @@
-# agent-web v0.29.2
+# agent-web v0.29.3
 
 <p align="center">
   <img src="docs/media/hero.png" alt="agent-web: integration tests an agent can be judged on" width="100%">
@@ -19,7 +19,7 @@
 </p>
 
 <p align="center">
-  <b>v0.29.2</b> · 12 assertion kinds · 26 commands · 22 mutants
+  <b>v0.29.3</b> · 12 assertion kinds · 26 commands · 22 mutants
 </p>
 
 <p align="center">
@@ -31,9 +31,9 @@
 
 ## Sixty seconds
 
-<img src="docs/media/terminal.png" alt="agent-web selftest output" width="100%">
+<img src="docs/media/terminal.png" alt="agent-web: selftest first, then record traffic to grow an adapter" width="100%">
 
-Three commands, first verdicts:
+The first command needs no preparation:
 
 ```bash
 git clone https://gitee.com/liu-everything_impossble/agent-web.git
@@ -44,11 +44,22 @@ node bin/agent-web.mjs selftest
 `selftest` runs built-in cases against the built-in memory implementation: pass, fail, unknown — one of each.
 The fail tells you "order 1001 is currently MAKING, cannot jump straight to PICKED" — not just "test failed".
 
+Already have a running system? Pick the step you want to skip:
+
+```bash
+./quickstart.sh http://127.0.0.1:8080        # Windows: .\quickstart.ps1 <that url>
+#   read-only endpoints  -> a working adapter + case drafts + a NEXT.md work order
+#   traffic you can record -> tap + learn: adapter, twin and cases all at once
+```
+
+`quickstart.sh` is `discover` plus three "what next" hints. It does not guess business rules:
+whatever it could not infer goes into `NEXT.md` instead of being quietly made up.
+
 See it move:
 
-<img src="docs/media/demo.gif" alt="selftest and recall terminal animation" width="100%">
+<img src="docs/media/demo.gif" alt="selftest -> tap/learn -> certify terminal animation" width="100%">
 
-Four-minute introduction (dual-implementation comparison, false-pass caught live): [docs/media/promo.mp4](docs/media/promo.mp4)
+52-second introduction (three verdicts, point at a URL, record traffic, assertion admission, drills): [docs/media/promo.mp4](docs/media/promo.mp4)
 
 ## The problem
 

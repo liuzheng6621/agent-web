@@ -70,15 +70,30 @@ O1=[
  ('out','可判定率 87.5% (7/8)    CI95[53%, 98%]'),
 ]
 O2=[
- ('hl','事故档案 agent-web/knowledge-1 · 命中 1 条'),
+ ('hl','8 条请求 → 5 个能力 / 2 个视图集合'),
  ('out',''),
- ('hl','  k-unportable-assertion   第 2 次'),
- ('out','    当时怎么修的：NON_PORTABLE 字段一律不给建议'),
- ('out','    判据落在：certify 的 suggestionBlocked'),
- ('bad','    → 这条已经犯过，按规矩拦下来'),
+ ('ok','adapter.yml        声明式适配器，不写代码'),
+ ('ok','twin.json          回放孪生 = 白送的第二个实现'),
+ ('ok','cases/recorded.json  案例草稿，只有观测算得出来的断言'),
+ ('ok','unclassified.jsonl   认不出的形状，一条不藏'),
+ ('warn','案例默认草稿：accept --by=名字 之后才出判决'),
 ]
-CMD1='agent-web selftest'; CMD2='agent-web recall'
-L1=[('cmd',CMD1)]+O1; L2=L1+[('cmd',CMD2)]
+O3=[
+ ('hl','9 条案例 × 22 个变异体'),
+ ('ok','抓到 17 / 适用 19    89.5%'),
+ ('out',''),
+ ('out','欠账 2 · 说不清 0 · 不适用 3'),
+ ('hl','建议断言 3 条（每条都当场验过）'),
+ ('out','  coffee/cancel-before-pickup  totalAmount = 56'),
+ ('bad','  m-pickup-no-offset 仍然欠账：偏移是各实现自己的约定'),
+]
+CMD1='agent-web selftest'
+CMD2='agent-web learn .tmp-tap/rec/traffic.jsonl --out=.tmp-tap/learned --name=tasks'
+CMD3='agent-web certify cases/coffee --adapter=memory'
+L1=[('cmd',CMD1)]+O1
+L2=[('cmd',CMD1)]+O1+[('cmd','agent-web tap --target=http://127.0.0.1:8199 --port=8197 --out=.tmp-tap/rec'),
+                      ('out','反向代理已起，脱敏后落盘 → .tmp-tap/rec/traffic.jsonl')]+[('cmd',CMD2)]
+L3=L2+O2+[('cmd',CMD3)]
 
 def build():
     if os.path.isdir(FR): shutil.rmtree(FR)
@@ -87,17 +102,31 @@ def build():
         nonlocal n
         for _ in range(hold):
             frame(lines,typed,os.path.join(FR,'f%04d.png'%n)); n+=1
-    for i in range(1,len(CMD1)+1,6): snap([],CMD1[:i])
+    for i in range(1,len(CMD1)+1,5): snap([],CMD1[:i])
     snap([],CMD1,2)
     for i in range(1,len(O1)+1): snap(L1[:1]+O1[:i],None,1)
-    snap(L1,None,4)
-    for i in range(1,len(CMD2)+1,6): snap(L1,CMD2[:i])
-    snap(L1,CMD2,2)
+    snap(L1,None,3)
     for i in range(1,len(O2)+1): snap(L2+O2[:i],None,1)
-    snap(L2+O2,None,8)
+    snap(L2+O2,None,4)
+    for i in range(1,len(O3)+1,2): snap(L3+O3[:i],None,1)
+    snap(L3+O3,None,6)
     print('frames',n)
+
+def build_recall():
+    R=[('cmd','agent-web recall'),
+       ('hl','事故档案 agent-web/knowledge-1 · 14 条 · 命中 1 条'),
+       ('out',''),
+       ('hl','  k-unportable-assertion   第 2 次'),
+       ('out','    当时怎么修的：NON_PORTABLE 字段一律不给建议'),
+       ('out','    判据落在：certify 的 suggestionBlocked'),
+       ('bad','    → 这条已经犯过，按规矩拦下来'),
+       ('out',''),
+       ('out','另有 5 条档案不靠这条命令守（由 CI / 单测兜底）')]
+    frame(R,None,os.path.join(OUT,'recall.png'))
+    print('recall.png')
 
 if __name__=='__main__':
     build()
-    frame(L1,None,os.path.join(OUT,'terminal.png'))
+    frame(L2+O2,None,os.path.join(OUT,'terminal.png'))
     print('terminal.png')
+    build_recall()

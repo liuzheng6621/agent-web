@@ -6,6 +6,18 @@
 CI 也在查。这条规则是买来的：这个仓库曾经同时存在 `package.json` 0.16、README 0.9、
 Gitee Release v0.6.0 三个数，谁看都是三个项目。
 
+## 0.29.3
+
+配图和用法整体重做——之前文字更新了，图还停在旧版本。
+
+- `terminal.png`、`demo.gif`：从「selftest + recall」改成现在的真实链路 `selftest → tap → learn`；`recall.png` 重渲到 14 条档案。
+- `promo.mp4`：42 秒的 v0.18 版作废，重做 52 秒七幕（判决三种 / 输入网址 / 录五分钟流量 / 断言准入 17-19 / 出题批改 11-11 / 结尾），脚本 `tools/media/8-promo.py`。
+- `certify.png`：数字换成当前的 22 个变异体、17/19、89.5%，并加一行「分母在变，四张牌不能直接比大小」。
+- `drill.png`：3/3 换成 11/11（22 题、`--allow-missed`）。
+- `badge-tests.svg`：129 → 187。
+- README 中英「六十秒上手」改为先 `selftest`，再看 `quickstart.sh <网址>`，并说明 `quickstart` 就是 `discover` 加三条提示。
+- `docs/GUIDE.md` 里两处版本号（0.19）跟到 0.29.3。
+
 ## 0.29.2
 
 - 修 CI 第 21 步（出题与批改）：`examples/drills/good` 只覆盖 22 道题里的 11 道，而这一步要求「好提交必须满分」，于是一直红。

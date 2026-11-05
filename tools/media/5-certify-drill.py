@@ -100,8 +100,8 @@ def certify_stages(d, rows_shown=3, cards_lit=4):
     text(d, (952, 468), '这四行不是我想出来的，是跑出来的', cn(15, False), AMBER)
 
     # 第三行：数字演进
-    stages = [('12 个变异体', '8 / 12', '66.7%', MUTED), ('+ 关系式', '11 / 12', '91.7%', BLUE),
-              ('+ 形状断言', '14 / 16', '87.5%', PURPLE), ('+ breed 生成', '38 / 40', '95.0%', GREEN)]
+    stages = [('12 个手写变异体', '8 / 12', '66.7%', MUTED), ('+ 关系式与形状', '14 / 16', '87.5%', BLUE),
+              ('+ breed 生成', '38 / 40', '95.0%', PURPLE), ('现在：22 个变异体', '17 / 19', '89.5%', GREEN)]
     x = 56
     for i, (label, got, pct, color) in enumerate(stages):
         lit = i < cards_lit
@@ -113,6 +113,9 @@ def certify_stages(d, rows_shown=3, cards_lit=4):
         if x + 320 <= 1092:
             arrow(d, x + 320, 603, x + 352, 603)
         x += 352
+
+    text(d, (56, 676), '分母在变：12→16→40→19，所以四张牌不能直接比大小；能比的是「同一批变异体上，断言多杀了一个没有」',
+         cn(15, False), MUTED)
 
 
 def make_certify():
@@ -158,17 +161,17 @@ def make_drill():
     arrow(d, 940, 217, 980, 217)
 
     # 第二行：成绩
-    text(d, (56, 330), '两份提交，同一批题', cn(21), MUTED)
+    text(d, (56, 330), '两份提交，同一批 22 道题（答了 11 道，--allow-missed 只查答了的）', cn(19), MUTED)
 
     box(d, (56, 372, 726, 552), fill=(16, 30, 22), out=GREEN)
     text(d, (78, 390), '认真写的那份', cn(20), GREEN)
-    text(d, (78, 428), '3 / 3 题解出', cn(28), FG)
+    text(d, (78, 428), '11 / 11 题解出', cn(28), FG)
     text(d, (78, 476), 'exit 0', mono(17), GREEN)
     text(d, (78, 508), '每条断言都只在坏实现上为假', cn(15, False), MUTED)
 
     box(d, (774, 372, 1444, 552), fill=(38, 24, 24), out=RED)
     text(d, (796, 390), '把案例原有断言抄一遍的那份', cn(20), RED)
-    text(d, (796, 428), '0 / 3 题解出', cn(28), FG)
+    text(d, (796, 428), '0 / 11 题解出', cn(28), FG)
     text(d, (796, 476), 'exit 1', mono(17), RED)
     text(d, (796, 508), '它交的全是真断言，读代码看不出区别，只能跑', cn(15, False), MUTED)
 

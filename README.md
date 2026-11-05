@@ -1,4 +1,4 @@
-# agent-web v0.29.2
+# agent-web v0.29.3
 
 <p align="center">
   <img src="docs/media/hero.png" alt="agent-web：给 Agent 写机器可判的集成测试" width="100%">
@@ -18,7 +18,7 @@
 </p>
 
 <p align="center">
-  <b>当前版本 0.29.2</b> · 12 种断言 · 26 条命令 · 22 个变异体
+  <b>当前版本 0.29.3</b> · 12 种断言 · 26 条命令 · 22 个变异体
 </p>
 
 <p align="center">
@@ -30,9 +30,9 @@
 
 ## 六十秒上手
 
-<img src="docs/media/terminal.png" alt="agent-web selftest 的真实输出" width="100%">
+<img src="docs/media/terminal.png" alt="agent-web：先 selftest，再录一段流量长出适配器" width="100%">
 
-三条命令看到第一批判决：
+第一条命令不需要任何准备：
 
 ```bash
 git clone https://gitee.com/liu-everything_impossble/agent-web.git
@@ -43,11 +43,22 @@ node bin/agent-web.mjs selftest
 `selftest` 用内置内存实现跑内置案例：pass、fail、unknown 三种判决各出现一次。
 fail 的那条会直接告诉你「订单 1001 当前 MAKING，不允许直接变成 PICKED」——不是「测试失败」四个字。
 
+手上已经有一个能跑的系统？看你想省哪一步：
+
+```bash
+./quickstart.sh http://127.0.0.1:8080        # Windows: .\quickstart.ps1 那个地址
+#   只读接口 → 直接生成能跑的适配器 + 案例草稿 + NEXT.md 施工单
+#   有流量可录 → 用 tap + learn，适配器、孪生、案例一起掉出来（见下两节）
+```
+
+`quickstart.sh` 就是 `discover` 加三条「接下来做什么」的提示；它不猜业务规则，
+猜不出来的会写在 `NEXT.md` 里，而不是悄悄编一条。
+
 想看它动起来：
 
-<img src="docs/media/demo.gif" alt="selftest 与 recall 的终端动画" width="100%">
+<img src="docs/media/demo.gif" alt="selftest → tap/learn → certify 的终端动画" width="100%">
 
-四分钟介绍片（含双实现对照、假通过现场）：[docs/media/promo.mp4](docs/media/promo.mp4)
+52 秒介绍片（判决三种、输入网址、录流量、断言准入、出题批改）：[docs/media/promo.mp4](docs/media/promo.mp4)
 
 ## 它解决的问题
 
