@@ -1,6 +1,6 @@
 {
   "name": "agent-web",
-  "version": "0.28.1",
+  "version": "0.29.0",
   "description": "给 Agent 写机器可判的集成测试：一份案例，多个实现，判决必须一致。",
   "type": "module",
   "bin": {
@@ -28,10 +28,15 @@
     "./recall": "./src/recall.mjs",
     "./discover": "./src/discover.mjs",
     "./breed": "./src/breed.mjs",
-    "./assert/shape": "./src/assert/shape.mjs"
+    "./assert/shape": "./src/assert/shape.mjs",
+    "./yaml": "./src/yaml.mjs",
+    "./tap": "./src/tap.mjs",
+    "./learn": "./src/learn.mjs",
+    "./adapter/decl": "./src/adapter/decl.mjs",
+    "./adapter/twin": "./src/adapter/twin.mjs"
   },
   "scripts": {
-    "test": "node --test test/engine.test.mjs test/traps.test.mjs test/museum.test.mjs test/certify.test.mjs test/drill.test.mjs test/relation.test.mjs test/probe.test.mjs test/recall.test.mjs test/discover.test.mjs test/breed.test.mjs test/shape.test.mjs test/animal-tracking.test.mjs test/help.test.mjs",
+    "test": "node --test test/engine.test.mjs test/traps.test.mjs test/museum.test.mjs test/certify.test.mjs test/drill.test.mjs test/relation.test.mjs test/probe.test.mjs test/recall.test.mjs test/discover.test.mjs test/breed.test.mjs test/shape.test.mjs test/animal-tracking.test.mjs test/help.test.mjs test/tap-learn.test.mjs",
     "selftest": "node bin/agent-web.mjs selftest",
     "compare": "node bin/agent-web.mjs compare cases/coffee --adapters=memory,taixianglian",
     "gh-proxy": "node scripts/gh-proxy.mjs",
@@ -47,7 +52,9 @@
     "discover": "node bin/agent-web.mjs discover",
     "breed": "node bin/agent-web.mjs breed --adapter=memory --from-case=cases/coffee/happy-path.json --out=.tmp-bred",
     "kind-necessity": "node scripts/kind-necessity.mjs",
-    "status-line": "node scripts/status-line.mjs"
+    "status-line": "node scripts/status-line.mjs",
+    "tap": "node bin/agent-web.mjs tap",
+    "learn": "node bin/agent-web.mjs learn"
   },
   "keywords": [
     "agent",

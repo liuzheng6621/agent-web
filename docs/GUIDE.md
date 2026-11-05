@@ -208,6 +208,102 @@ node bin/agent-web.mjs prepare <动作日志.jsonl> --adapter=<你写的一半�
 所以它一条业务断言都不生成。这块只能人给。
 
 ---
+## 录一段流量，把它变成适配器
+
+上一节讲的是「输入一个网址」，那一步只解决只读接口。写操作要不要手写？
+
+不用从头写。`tap` 换个问法：不猜你的业务规则，只问「应用刚才答应过什么」。
+
+### 三步
+
+```
+# 1. 起反向代理，把流量转到你的应用
+agent-web tap --target=http://127.0.0.1:8199 --port=8197 --out=.tmp-tap/rec
+
+# 2. 另开一个终端，正常用一遍：登录、建三条任务、完成一条、看列表
+#    （走的是 http://127.0.0.1:8197，不是 8199）
+#    Ctrl-C 结束录制
+
+# 3. 把录制变成可用的东西
+agent-web learn .tmp-tap/rec/traffic.jsonl --out=.tmp-tap/learned --name=tasks
+```
+
+![tap：录一段真流量，长出适配器、孪生与案例](media/tap.png)
+
+### 掉出来四样
+
+```
+adapter.yml            声明式适配器，不写代码
+twin.json              回放孪生：这五分钟里应用答应过什么
+cases/recorded.json    案例草稿，断言只有从观测直接算得出来的
+unclassified.jsonl     认不出的形状，一条不藏
+```
+
+`adapter.yml` 长这样，改的是地址和字段名，不是逻辑：
+
+```yaml
+adapter: tasks
+base_url:
+  value: http://127.0.0.1:8199
+roles: [dev]
+auth:
+  login: POST /login
+  token: $.token
+capabilities:
+  tasks.create: { POST: /api/tasks, as: [dev], args: { title: $.title } }
+view:
+  tasks:
+    from: GET /api/tasks
+    fields: { id: $.id, title: $.title, done: $.done }
+```
+
+### 孪生是白送的第二个实现
+
+```
+agent-web probe .tmp-tap/learned/adapter.yml
+agent-web compare .tmp-tap/learned/cases --adapters=.tmp-tap/learned/adapter.yml,.tmp-tap/learned/twin.json
+```
+
+```
+跨适配器判决一致率 100.0% (1/1)
+
+视图契约
+  adapter.yml 与 twin.json：兼容（2 个集合逐字相同）
+```
+
+一致说明案例没有依赖真实系统里的具体编号。不一致的地方，要么案例写死了值，要么孪生没录全——两边都得看一眼。
+
+### 最要紧的一步：把应用改坏，不重录
+
+```
+TODO_APP_BUG=1 node examples/todo-app/server.mjs &
+agent-web verify .tmp-tap/learned/cases --adapter=.tmp-tap/learned/adapter.yml
+```
+
+```
+FAIL todo/recorded   assertion_false
+     目标未达成：tasks 变化 2（期望 3）
+```
+
+这条红证明案例抓的是**应用的行为**，不是录制的文本。如果 `tap` 只是把响应存下来，改坏的应用会照样绿。
+
+### 三条硬规矩
+
+- **录状态，不录动作。** 同类工具录动作得到一份脚本，我们录状态，于是顺带得到孪生和判决。
+- **口令与 token 不落盘。** 换成 `password#1` 这种稳定伪名，同一个值始终同一个名字。正文里你自己填的敏感内容（手机号、地址）**不在**脱敏范围内，录制文件仍然是内部资料。
+- **产物一律 `inferred`，案例默认草稿。** 不 `accept` 就不出判决——机器观测不许冒充成人的期望。
+
+```
+agent-web accept cases/recorded.json --by=你的名字
+agent-web verify cases --adapter=.tmp-tap/learned/adapter.yml --detail
+```
+
+### 它明确不做的三件
+
+1. **不猜业务规则。** 录到「下单成功」不等于知道「库存不足该拒绝」。生成的断言只有净计数变化这一类，其余列在案例的 `todo` 里等人补。
+2. **不重放没录到的路径。** 没走过的分支是 `unknown`，不是 `pass`。录制没覆盖的故障抓不到——那是案例没走到，不是工具失灵。
+3. **只支持单角色链路。** 录到管理员才做得成的删除，回放会 403。多角色要按 per-token 伪名反查会话，还没做。
+
 ## 使用指南：从日志到正式判分
 
 ![agent-web 使用流程：收集日志、生成材料、人工审查、正式判分与系统对照](prepare-flow.zh.svg)

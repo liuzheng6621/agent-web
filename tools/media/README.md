@@ -11,6 +11,7 @@
 | playwright + ffmpeg | `dashboard.png`、`dashboard.gif`（总览页首屏与点击跳转） |
 | `5-certify-drill.py` | `certify.png`、`certify.gif`、`drill.png`（判据准入与出题批改） |
 | `6-drift.py` | `drift.png`（跑两遍求漂移集；修前/修后对照） |
+| `7-tap.py` | `tap.png`（录流量→适配器/孪生/案例；改坏应用必须红） |
 | 真实截图（playwright + msedge，经本地 http-server） | `flow.png`（happy-pass 全页）、`flow.gif`（点开被拒步、筛偏差） |
 
 ```bash

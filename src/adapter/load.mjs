@@ -17,6 +17,7 @@
  *   4. 模块自身有 manifest/reset/observe/execute  直接当实例
  */
 
+import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { validateAdapter } from './contract.mjs';
@@ -104,17 +105,39 @@ export async function loadAdapter(spec, options = {}, cwd = process.cwd()) {
     factory = BUILTINS[name];
   } else if (isPathSpec(name)) {
     const abs = path.resolve(cwd, name);
-    warnExternal(name, abs);
-    let mod;
-    try {
-      mod = await import(pathToFileURL(abs).href);
-    } catch (e) {
-      if (e && e.code === 'ERR_MODULE_NOT_FOUND') {
-        throw new Error(`找不到适配器文件 ${abs}（相对路径按 ${cwd} 解析）`);
+    if (/\.(yml|yaml|json)$/i.test(abs)) {
+      // 声明式规格与回放孪生都是数据，不是代码：不 import、不执行。
+      // 这条路径没有「加载即执行」的代码面，是接新域时最安全的入口。
+      if (/\.json$/i.test(abs)) {
+        const raw = JSON.parse(fs.readFileSync(abs, 'utf8'));
+        if (raw && Array.isArray(raw.steps) && raw.initial) {
+          const { createTwinAdapter } = await import('./twin.mjs');
+          factory = () => createTwinAdapter(raw, { name: raw.adapter || 'twin' });
+        } else {
+          const { loadDeclSpec, createAdapterFromSpec } = await import('./decl.mjs');
+          const spec = loadDeclSpec(abs);
+          spec.source = spec.source || abs;
+          factory = () => createAdapterFromSpec(spec);
+        }
+      } else {
+        const { loadDeclSpec, createAdapterFromSpec } = await import('./decl.mjs');
+        const spec = loadDeclSpec(abs);
+        spec.source = spec.source || abs;
+        factory = () => createAdapterFromSpec(spec);
       }
-      throw e;
+    } else {
+      warnExternal(name, abs);
+      let mod;
+      try {
+        mod = await import(pathToFileURL(abs).href);
+      } catch (e) {
+        if (e && e.code === 'ERR_MODULE_NOT_FOUND') {
+          throw new Error(`找不到适配器文件 ${abs}（相对路径按 ${cwd} 解析）`);
+        }
+        throw e;
+      }
+      factory = pickFactory(mod, name);
     }
-    factory = pickFactory(mod, name);
   } else {
     warnExternal(name, name);
     let mod;

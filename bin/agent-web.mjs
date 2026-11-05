@@ -48,6 +48,8 @@ import { buildDrills, gradeDrills, writeDrills, readDrills, readSubmissions, for
 import { collectUsage, summarizeCoverage, formatCoverage, coverageVerdict } from '../src/coverage.mjs';
 import { probeAdapter, formatProbe, probeExit } from '../src/probe.mjs';
 import { discover, formatDiscover } from '../src/discover.mjs';
+import { startTap } from '../src/tap.mjs';
+import { readTraffic, learnTraffic, writeLearnOut } from '../src/learn.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..');
@@ -430,6 +432,68 @@ async function cmdProbe(flags) {
   else console.log(formatProbe(result, { detail: flags.detail === true }));
   return probeExit(result);
 }
+async function cmdTap(args, flags) {
+  const target = flags.target || args[0];
+  if (!target) {
+    console.error('用法：agent-web tap --target=URL [--port=8080] [--out=DIR] [--seconds=N]');
+    return 2;
+  }
+  const port = Number(flags.port || 8080);
+  const out = flags.out || './tap-out';
+  const seconds = Number(flags.seconds || 0);
+  process.stderr.write(
+    `tap：把流量转发到 ${target}
+` +
+      `      监听 http://127.0.0.1:${port}，录到 ${out}/traffic.jsonl
+` +
+      `      红线：流量会真的打到目标；对生产库录写操作是你自己的选择。
+` +
+      `      鉴权头与 cookie 原值不落盘（落假名）。Ctrl-C 结束录制（或 --seconds=N）。
+`,
+  );
+  const tap = startTap({ target, port, out });
+  if (seconds > 0) {
+    await new Promise((r) => setTimeout(r, seconds * 1000));
+  } else {
+    await new Promise((resolve) => {
+      process.once('SIGINT', resolve);
+      process.once('SIGTERM', resolve);
+    });
+  }
+  const info = await tap.stop();
+  console.log(`录制结束：${info.lines} 条请求 -> ${info.file}`);
+  console.log(`下一步：agent-web learn ${info.file} --out=${out}/learned`);
+  return 0;
+}
+
+function cmdLearn(args, flags) {
+  const file = args[0];
+  if (!file) {
+    console.error('用法：agent-web learn <traffic.jsonl> [--out=DIR] [--name=名字] [--env=变量名] [--accept=名字]');
+    return 2;
+  }
+  const out = flags.out || './learned';
+  const records = readTraffic(file);
+  if (records.length === 0) {
+    console.error(`${file} 里一条请求都没解析出来`);
+    return 1;
+  }
+  const learned = learnTraffic(records, { name: flags.name });
+  const written = writeLearnOut(out, learned, { name: flags.name, env: flags.env, accept: flags.accept });
+  console.log(
+    `learn：${records.length} 条请求 -> ${Object.keys(written.spec.capabilities).length} 个能力 / ` +
+      `${Object.keys(written.spec.view).length} 个视图集合 / ${written.twin.steps.length} 步可回放写操作`,
+  );
+  console.log(`  认不出 ${learned.unclassified.length} 条（见 unclassified.jsonl；认不出不猜）`);
+  for (const f of written.files) console.log(`  写了 ${path.join(out, f)}`);
+  console.log('接下来：');
+  console.log('  1 改 adapter.yml 里不对的行（观察推断的都标 inferred）');
+  console.log(`  2 agent-web verify ${path.join(out, 'cases')} --adapter=${path.join(out, 'adapter.yml')}`);
+  console.log(`  3 agent-web verify ${path.join(out, 'cases')} --adapter=${path.join(out, 'twin.json')}   # 孪生对照`);
+  if (!flags.accept) console.log('  案例默认是草稿：agent-web accept <id> --by=<名字> 之后才出判决');
+  return 0;
+}
+
 async function cmdDiscover(args, flags) {
   if (args.length < 1) {
     console.error("用法：agent-web discover <网址> [--out=目录] [--run] [--writes] [--detail] [--accept=名字] [--timeout=8000] [--json]");
@@ -1499,6 +1563,8 @@ const HELP = `agent-web —— 给 Agent 写机器可判的集成测试
   agent-web draft <轨迹文件> --adapter=SPEC   回放轨迹，反推案例草稿（要人确认）
   agent-web flow <案例或目录> [--result=FILE]  单案例流程图；给目录则生成判决总览
   agent-web discover <网址> --out=DIR         探一个站点：生成只读适配器、案例草稿和施工单
+  agent-web tap --target=URL                  录五分钟：流量长出适配器、孪生与案例
+  agent-web learn <traffic.jsonl> --out=DIR  把录制学成四件东西（yaml/孪生/案例/认不出的）
   agent-web mutants                           变异体目录：谁的坏法、怎么抓、怎么投稿
   agent-web audit <真实.jsonl> <候选.jsonl>    假绿审计：拿真实后端当尺子量候选实现
   agent-web traps <结果.jsonl> --cases=DIR    陷阱普查：这批判决有多少是盲的
@@ -1576,6 +1642,10 @@ async function main() {
       return cmdRecall(args, flags);
     case 'discover':
         return await cmdDiscover(args, flags);
+    case 'tap':
+        return await cmdTap(args, flags);
+    case 'learn':
+        return cmdLearn(args, flags);
     case 'probe':
         return await cmdProbe(flags);
       case 'coverage':

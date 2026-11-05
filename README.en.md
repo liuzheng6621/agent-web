@@ -1,4 +1,4 @@
-# agent-web v0.28.1
+# agent-web v0.29.0
 
 <p align="center">
   <img src="docs/media/hero.png" alt="agent-web: integration tests an agent can be judged on" width="100%">
@@ -19,7 +19,7 @@
 </p>
 
 <p align="center">
-  <b>v0.28.1</b> · 12 assertion kinds · 24 commands · 22 mutants
+  <b>v0.29.0</b> · 12 assertion kinds · 26 commands · 22 mutants
 </p>
 
 <p align="center">
@@ -121,6 +121,37 @@ Twenty-one commands, grouped by what you have on hand. Full reference in [docs/G
 | You have two implementations | `compare` `audit` `probe` `coverage` `traps` |
 | You want to check the tests themselves | `certify` `certify --suggest` `mutants` `drill` `drill grade` `knowledge` `recall` |
 | Odds and ends | `selftest` `capabilities` `flow` |
+
+## Record five minutes of traffic, get an adapter
+
+Writing an adapter used to be the expensive part. `tap` asks a different question: not "what should this business rule be", but "what did the app just agree to".
+
+```
+agent-web tap --target=http://127.0.0.1:8199 --port=8197 --out=.tmp-tap/rec
+agent-web learn .tmp-tap/rec/traffic.jsonl --out=.tmp-tap/learned --name=tasks
+```
+
+Four things come out: `adapter.yml` (declarative, no code), `twin.json` (a replay twin — a second implementation for free), `cases/*.json` (drafts, assertions only where observation alone proves them), `unclassified.jsonl` (shapes it could not name, none hidden).
+
+`twin.json` makes `compare` free: same cases against the real system and against the twin, verdicts must agree. Then break the app and **do not re-record** — the case must go red:
+
+```
+TODO_APP_BUG=1 node examples/todo-app/server.mjs &
+agent-web verify .tmp-tap/learned/cases --adapter=.tmp-tap/learned/adapter.yml
+```
+
+```
+FAIL todo/recorded   assertion_false
+     goal not met: tasks changed 2 (expected 3)
+```
+
+That red is the point: the case catches the app's behaviour, not the recording's text.
+
+![tap: record real traffic, grow an adapter, a twin and cases](docs/media/tap.png)
+
+Three hard rules: record state, not actions; passwords and tokens never land on disk (stable pseudonyms such as `password#1`), though user-supplied content is not redacted; everything generated is `inferred` and cases are drafts until `accept`.
+
+What it does not do: guess business rules, replay paths it never recorded (`unknown`, not `pass`), or handle multi-role links.
 
 ## Design choices
 
