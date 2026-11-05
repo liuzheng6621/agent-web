@@ -29,111 +29,96 @@
 
 ---
 
-## The problem
-
-Agents change code fast. "Did it change it correctly" still gets answered by clicking through the app.
-
-Unit tests miss state that crosses requests. End-to-end tests are slow and flaky. agent-web does this instead: a real business operation becomes a **case** (what to do, what the result must be), and the case runs against two implementations — a built-in in-memory one and your real system. The two verdicts have to agree.
-
-<p align="center">
-  <img src="docs/media/loop.png" alt="one case, two implementations, one comparison" width="100%">
-</p>
-
-Agreement means the case is portable and the assertions are not pinned to one implementation. Disagreement points at one place to fix, and tells you which.
-
 ## Sixty seconds
 
-<p align="center">
-  <img src="docs/media/demo.gif" alt="terminal: run the selftest, then compare against the incident archive" width="100%">
-</p>
+<img src="docs/media/terminal.png" alt="agent-web selftest output" width="100%">
+
+Three commands, first verdicts:
 
 ```bash
 git clone https://gitee.com/liu-everything_impossble/agent-web.git
 cd agent-web
-node bin/agent-web.mjs selftest          # built-in cases + built-in implementation, zero config
-node bin/agent-web.mjs report results.jsonl
-node bin/agent-web.mjs recall            # compare against the incident archive
+node bin/agent-web.mjs selftest
 ```
 
-No dependencies. `node >= 20`. To point it at your service:
+`selftest` runs built-in cases against the built-in memory implementation: pass, fail, unknown — one of each.
+The fail tells you "order 1001 is currently MAKING, cannot jump straight to PICKED" — not just "test failed".
 
-```bash
-node bin/agent-web.mjs certify cases/coffee --adapter=memory
-```
+See it move:
+
+<img src="docs/media/demo.gif" alt="selftest and recall terminal animation" width="100%">
+
+Four-minute introduction (dual-implementation comparison, false-pass caught live): [docs/media/promo.mp4](docs/media/promo.mp4)
+
+## The problem
+
+Agents change code fast. "Did it change it correctly" still gets answered by clicking through the app.
+Unit tests miss state that crosses requests. End-to-end tests are slow and flaky.
+
+agent-web does this instead: a real business operation becomes a **case** (what to do + what the result must be), then the case runs against two implementations — a built-in in-memory one and your real system. The two verdicts have to agree.
+
+<img src="docs/media/loop.png" alt="one case, two implementations, one comparison" width="100%">
+
+Agreement means the case is portable and the assertions are not pinned to one implementation. Disagreement points at one place to fix, and tells you which.
 
 ## Three verdicts, not two
 
-<p align="center">
-  <img src="docs/media/verdicts.png" alt="pass / fail / unknown" width="100%">
-</p>
+<img src="docs/media/verdicts.png" alt="pass / fail / unknown" width="100%">
 
-The third one carries the weight. When observation is missing, or a capability is not declared, `unknown` stays in the denominator instead of turning into `pass`. So "how much was measured" and "how much was decided" are reported as two different numbers:
+- **pass**: every assertion holds.
+- **fail**: at least one assertion fails, with which one, expected what, got what.
+- **unknown**: missing observation, environment fault, or case not yet confirmed. **Stays in the denominator, never counts as pass.**
 
-```
-可判定率 87.5% (7/8)   CI95[53%, 98%]
-```
+Decidability rate = (pass + fail) / N. Unknown is not recycled, so this number only rises when observation gets fixed — never when problems get hidden.
 
-More `unknown` means a lower decidability rate. That number says more than a clean 100%.
+## Point it at a URL
 
-## Drift is not a witness
+<img src="docs/media/discover.png" alt="discover: from URL to read-only adapter and case drafts" width="100%">
 
-<img src="docs/media/drift.png" alt="run twice, differences that always change are drift" width="100%">
+No adapter needed to start. `discover <url>` probes the root path, tries 8 common OpenAPI locations, then:
 
-Running the same case twice changes auto-incremented ids, timestamps and pickup numbers.
-Those differences used to be counted as "the mutant was seen": on the real backend the witness
-for `m-duplicate-row` was the order id growing from 196 to 210, and the tool would even suggest
-writing `orders.0.id == 196` — an assertion that goes red on any other implementation.
+- Read-only endpoints → a working read-only adapter (write capabilities return `unsupported`)
+- Each resource → a case draft with one assertion: `unchanged` — reads must not change anything
+- Create endpoints (`--writes`) → round-trip cases: create one, assert `count_delta +1`
+- A `NEXT.md` work order: to add write support, change these four places, verify each step
 
-Now every case is run twice against the correct implementation first; the drift set is subtracted
-from the witnesses before anything is reported.
+It does not guess three things: what write operations should guarantee, paths for parameterized endpoints, or routes when there is no OpenAPI. Guessed 404s become false failures, and false failures destroy trust.
 
-The same release made state-layer mutants cheap: they only wrap `observe()`, so certify no longer
-replays the whole trajectory — it transforms the correct run's context. On the real backend,
-3 cases went from 44.5s to 15.1s (2.95x). Equivalence with full replay is proven cell by cell by
-`scripts/state-equivalence.mjs`, which runs in CI.
+## Record five minutes of traffic, grow an adapter
 
-## Incident archive
-
-<p align="center">
-  <img src="docs/media/recall.png" alt="agent-web recall output" width="100%">
-</p>
-
-`knowledge/` holds the eight mistakes this repository has actually made. One rule admits an entry:
-
-> An error that cannot be reproduced, or cannot be turned into a check, does not get in.
-
-Every entry therefore ships a minimal repro command and a check that already landed. `recall` compares a live run against the archive: the first hit prints a notice, the second hit **blocks** (exit 1, `--no-gate` to pass).
-
-```bash
-node bin/agent-web.mjs knowledge     # list all eight
-node bin/agent-web.mjs recall        # scan, see whether an old mistake came back
-```
-
-"Deepening memory" here is a verifiable action, not a weight: it counts occurrences and it changes an exit code.
-
-## Commands
-
-Twenty-one commands, grouped by what you have on hand. Full reference in [docs/GUIDE.md](docs/GUIDE.md).
-
-| Group | Commands |
-| --- | --- |
-| You have a system, want tests | `init` `prepare` `record` `draft` `accept` `verify` `report` `drift` |
-| You have two implementations | `compare` `audit` `probe` `coverage` `traps` |
-| You want to check the tests themselves | `certify` `certify --suggest` `mutants` `drill` `drill grade` `knowledge` `recall` |
-| Odds and ends | `selftest` `capabilities` `flow` |
-
-## Record five minutes of traffic, get an adapter
-
-Writing an adapter used to be the expensive part. `tap` asks a different question: not "what should this business rule be", but "what did the app just agree to".
+Writing an adapter used to be the expensive part. This section shows how to compress it to ten minutes.
 
 ```
 agent-web tap --target=http://127.0.0.1:8199 --port=8197 --out=.tmp-tap/rec
+# In another terminal, click around: log in, create three tasks, complete one, view the list
 agent-web learn .tmp-tap/rec/traffic.jsonl --out=.tmp-tap/learned --name=tasks
 ```
 
-Four things come out: `adapter.yml` (declarative, no code), `twin.json` (a replay twin — a second implementation for free), `cases/*.json` (drafts, assertions only where observation alone proves them), `unclassified.jsonl` (shapes it could not name, none hidden).
+Four things come out together:
 
-`twin.json` makes `compare` free: same cases against the real system and against the twin, verdicts must agree. Then break the app and **do not re-record** — the case must go red:
+| Artifact | What it is |
+|---|---|
+| `adapter.yml` | Declarative adapter, no code |
+| `twin.json` | Replay twin: what the app agreed to in those five minutes |
+| `cases/*.json` | Case drafts, assertions only where observation alone proves them |
+| `unclassified.jsonl` | Shapes it could not name, none hidden |
+
+![tap: record real traffic, grow an adapter, a twin and cases](docs/media/tap.png)
+
+`twin.json` is a free second implementation. Same cases against the real system and the twin:
+
+```
+agent-web compare .tmp-tap/learned/cases --adapters=.tmp-tap/learned/adapter.yml,.tmp-tap/learned/twin.json
+```
+
+```
+Cross-adapter verdict agreement 100.0% (1/1)
+
+View contract
+  learned/adapter.yml vs learned/twin.json: compatible (2 collections byte-identical)
+```
+
+Then the most important step — **break the app, do not re-record**:
 
 ```
 TODO_APP_BUG=1 node examples/todo-app/server.mjs &
@@ -145,47 +130,175 @@ FAIL todo/recorded   assertion_false
      goal not met: tasks changed 2 (expected 3)
 ```
 
-That red is the point: the case catches the app's behaviour, not the recording's text.
+That red proves the case catches the app's **behaviour**, not the recording's text. If tap just stored responses, the broken app would still go green.
 
-![tap: record real traffic, grow an adapter, a twin and cases](docs/media/tap.png)
+Three hard rules:
 
-Three hard rules: record state, not actions; passwords and tokens never land on disk (stable pseudonyms such as `password#1`), though user-supplied content is not redacted; everything generated is `inferred` and cases are drafts until `accept`.
+- **Record state, not actions.** Similar tools record actions and get a script; we record state and get a twin and a verdict.
+- **Passwords and tokens never land on disk.** Replaced with stable pseudonyms like `password#1`; the same value always gets the same name. User-supplied content in request bodies is not redacted — the recording file is still internal material.
+- **Everything generated is marked `inferred`, cases default to draft.** No `accept` means no verdict — machine observation must not impersonate human expectation.
 
-What it does not do: guess business rules, replay paths it never recorded (`unknown`, not `pass`), or handle multi-role links.
+Three things it does not do: guess business rules (recording a successful delist does not mean knowing "insufficient stock should reject"); replay paths it never recorded (`unknown`, not `pass`); handle multi-role links (recording an admin-only delete replays as 403).
+
+## Assertions say more than "row 0 equals 56"
+
+12 kinds, all machine-judgable, none of them "let the model eyeball it":
+
+| kind | What it says |
+|---|---|
+| `entity_exists` / `field_equals` | A row exists / a field equals a value |
+| `count_delta` | A collection's size changed by N |
+| `status_transition` | Status walked through a given sequence |
+| `unchanged` | A slice of observation did not change from initial to final |
+| `event_absent` | An event type never occurred |
+| `relation` | Relationships between fields: total equals sum of line items, unit price times quantity equals subtotal, list is sorted |
+| `sorted_by` / `unique` / `type_of` / `subset` | Shape: ordered, no duplicates, correct type, values within a set |
+| `composite` | And / or / not |
+
+Relations are more portable than hardcoded values: `totalAmount == Σ items.subTotal` should hold on any implementation, while `totalAmount == 56` only holds when menu prices have not changed. Shape assertions work the same way — "no duplicates" does not depend on any specific id.
+
+## Admission test: an assertion must prove it is useful
+
+<img src="docs/media/certify.png" alt="mutants are machine-generated, admission is machine-judged" width="100%">
+
+Assertions are not descriptions, they are weapons. **An assertion that kills no mutant is not allowed in.**
+
+How: decompose a "capability" into a set of semantic mutations (amount off by one cent, all quantities become 1, history swallowed, unauthorized write accepted…), let each assertion try to kill them. Holds on the correct implementation, fails on the broken one — that counts as caught. Holds on both — decoration.
+
+<img src="docs/media/certify.gif" alt="certify running animation" width="100%">
+
+Catch rate evolution, each step backed by a mechanism going live:
+
+| Phase | Caught | How |
+|---|---|---|
+| 12 hand-written mutants | 8 / 12 | Basic assertio
+ns |
+| + relations | 11 / 12 | `relation` |
+| + shape assertions | 14 / 16 | `sorted_by` / `unique` / `type_of` / `subset` |
+| + machine-generated | 38 / 40 | `breed` generates mutants from the view shape |
+
+Uncaught splits into three tiers, never mixed: **owed** (difference visible, just needs an assertion), **undetermined** (cannot even produce a difference — confirm the case reached that path first), **not applicable** (this adapter does not declare that capability). "Undetermined" is not equivalent — the equivalent mutant problem is forty years unsolved; here we only require the contributor to provide a distinguishability proof.
+
+It does not just say where the hole is, it says which assertion to add: every suggestion from `--suggest` is verified on both implementations on the spot (correct implementation true, broken implementation false). Those four lines were not thought up — they were run.
+
+### Run twice, differences that always change are not faults
+
+<img src="docs/media/drift.png" alt="drift is not a witness" width="100%">
+
+Running the same case twice changes auto-incremented ids, timestamps and pickup numbers. Previously these differences counted as "the mutant was seen": on the real backend the witness for `m-duplicate-row` was the order id growing from 196 to 210, and the tool would even suggest writing `orders.0.id == 196`. Now every case runs twice against the correct implementation first; the drift set is subtracted from the witnesses.
+
+Side benefit: state-layer mutants only wrap observation, so certify no longer replays the whole trajectory — it transforms the correct run's context directly. On the real backend, 3 cases went from 44.5s to 15.1s (2.95x). Equivalence is proven cell by cell by `scripts/state-equivalence.mjs`, which runs in CI.
+
+## Mutants no longer rely on human imagination
+
+`breed` generates faults from the canonical view's shape: numeric fields off-by-one / doubled / dropped, strings emptied / uppercased, arrays tail-dropped / reversed, enums swapped, nested leaves tried one by one. 10 generatable positions yield 28 mutants; 4 identity operators are skipped automatically.
+
+**Generation is not admission**: every mutant must pass certify; unkillable ones fall to "undetermined" automatically and do not pollute the catch rate. Mutants can also declare `applies_to` — a ledger-domain mutant in the coffee domain is "not applicable", not counted in the denominator.
+
+## Drills: labels produced by a mechanism, not a model
+
+<img src="docs/media/drill.png" alt="drilling and grading" width="100%">
+
+One mutant plus one case makes one question. The question gives symptoms and existing assertions, **not `catch_hint`, not the mutant id**. Grading ignores what the submission claims — it puts the submission's assertions on both implementations: holds on correct, fails on broken, that counts as solved.
+
+Same questions, two submissions: carefully written 11/11, exit 0; the one that copies the case's original assertions 0/11, exit 1 — every assertion it submits is genuinely true, indistinguishable from reading the code, only runnable. That is what "labels do not need a human to assign" means.
+
+Why good has only 11 answers but there are 22 questions: suggested assertions can only express "a field value difference within a collection"; whole-entity replacement and cross-collection differences cannot be expressed. The remaining 11 need human-written answers. So grading splits into two checks: default "must answer all" (miss one, exit 1), `--allow-missed` means "answered ones must be correct" (unanswered reported honestly, wrong or ungradable still fail). CI uses the latter — preventing sloppy work and preventing laziness are two different things, do not merge them into one.
+
+## What a verdict looks like: a page you can open
+
+<img src="docs/media/flow.png" alt="single-case verdict page" width="100%">
+
+`flow` renders one case as self-contained HTML: execution flow expandable step by step, state events, each assertion's three-valued result, rejected steps marked red "expected applied, got rejected". Click "show only deviations" to keep just the problematic rows.
+
+<img src="docs/media/flow.gif" alt="verdict page interaction animation" width="100%">
+
+Give it a directory, get a dashboard: verdict distribution, decidability rate, anchored case index, click to jump.
+
+<img src="docs/media/dashboard.png" alt="multi-case verdict dashboard" width="100%">
+
+<img src="docs/media/dashboard.gif" alt="dashboard interaction animation" width="100%">
+
+## Incident archive: mistakes this repo made, not allowed twice
+
+<img src="docs/media/recall.png" alt="recall hits an old mistake and blocks it" width="100%">
+
+14 entries, each with four requirements: symptom, root cause, fingerprint (structure / witness / detector), **guard** (which command or test watches it). No guard, no entry — an unguarded archive is just a memoir.
+
+`recall` compares fingerprints after a run: first hit prints a notice, **second hit of the same entry exits 1 and blocks**. Deepening memory is not about discipline — it is about exit codes.
+
+## Validated across three domains
+
+| Domain | Implementation | What it proved |
+|---|---|---|
+| Coffee shop ordering | Built-in memory + real Spring Boot backend | Same cases against two implementations, 100% verdict agreement; false passes caught |
+| Animal rescue tasks | Real backend + memory fixture | When correctness is entirely invariants (points, approvals, roles), is the assertion vocabulary sufficient |
+| Double-entry bookkeeping | Two custom implementations (integer cents vs two-decimal strings) | Internal representations completely different, views byte-identical; debit-credit balance invariants expressible |
+
+The third domain forced a mechanism: mutants can declare `applies_to`. A ledger-domain mutant in the coffee domain is "not applicable", not counted — otherwise the catch rate gets smashed by irrelevant mutants into a false pit.
+
+## Commands
+
+| Command | What it does |
+|---|---|
+| `selftest` | Zero-dependency self-check, one of each verdict |
+| `verify` | Run cases, produce verdicts |
+| `report` | Metrics from verdict results |
+| `accept` | Confirm a draft; unconfirmed cases produce no verdict |
+| `capabilities` | Print capability manifest with evidence levels |
+| `coverage` | Capability coverage reconciliation, `--min` sets a threshold |
+| `probe` | Probe: check whether the adapter is lying to itself |
+| `certify` | Admission test: mutant x assertion kill matrix, `--suggest` gives fixes |
+| `breed` | Auto-generate mutants from the view shape |
+| `drill` / `drill grade` | Generate questions / grade submissions, labels by mechanism |
+| `compare` | Same cases fed to multiple implementations, compare verdicts |
+| `drift` | Compare initial-state shapes across two runs |
+| `record` / `prepare` / `draft` | Reconstruct trajectories from real action logs, generate case drafts |
+| `flow` | Single-case verdict page; give a directory for a dashboard |
+| `discover` | Probe a site: read-only adapter + case drafts + work order |
+| `tap` / `learn` | Reverse-proxy records traffic, grows adapter / twin / case drafts |
+| `mutants` | Mutant directory: whose fault, how to catch, how to submit |
+| `audit` | False-green audit: use the real backend as a ruler |
+| `traps` | Trap census: how many verdicts in this batch are blind |
+| `knowledge` / `recall` | Incident archive / recidivism detection (second hit exits 1) |
+| `init` | Generate a case template |
+| `version` | Version, recent changes, whether the three version sources agree |
 
 ## Design choices
 
-**No LLM judge.** Seven structured predicates (`entity_exists`, `field_equals`, `count_delta`, `status_transition`, `unchanged`, `event_absent`, `relation`) evaluated in three-valued logic. The same input always yields the same verdict.
-
-**Adapters project observation into one canonical view.** Field mapping lives in the adapter, not in the case. Swapping an implementation changes nothing in the cases — that is the precondition for cross-implementation comparison.
-
-**"Who does it" is part of the case.** Every step says `as: customer2`, and the runner checks that the adapter really switched identity. When identities collapse into one, the verdict can still be `pass` while the evidence shows the switch never happened. That incident is `FINDING-001`.
-
-**Suggested assertions are verified on the spot.** Every assertion `--suggest` emits is evaluated on both the correct implementation and the mutant; it only appears if both come out as expected.
+- **No LLM judge.** Cannot decide? Record `unknown` and leave it in the denominator. Introducing a scoring model means bringing the problem you are trying to solve back in.
+- **The canonical view is the contract.** Cases only write fields in the view, not implementation details; mapping lives deliberately in the adapter, portability verified by `compare`.
+- **"Who does it" is part of the case.** Every step carries `as`; adapters that ignore role get called out by traps.
+- **Suggested assertions are verified on the spot.** Correct implementation true, broken implementation false — only then emitted; position-dependent suggestions get an extra warning.
+- **Three tiers never mixed.** Owed, undetermined, not applicable each have their own exit; mix them and the baseline table becomes unreadable in three days.
+- **Two grading checks never merged.** "Must answer all" prevents laziness, "answered ones must be correct" prevents sloppy work — merging them lets each excuse the other.
 
 ## What it does not do
 
-1. **Every target system needs an adapter.** The adapter is code, `load` imports it, and loading it runs it with your privileges. The CLI warns once; that is not a sandbox.
-2. **Field mapping is written by hand.** No automatic derivation.
-3. **Legality, not quality.** It can say a flow is legal, not that it is good.
-4. **Negative cases are hand-written.** `draft` lists where they are missing and refuses to invent them: the standard is "what should be allowed", so copying what actually happened admits everything.
-5. **Twelve mutants, all of them ours.** The mutant list is open precisely so others can add the ones we did not think of.
-6. **Equivalent mutants are unsolved.** They became explicit states: killable, owed, undetermined.
-7. **Limited assertion vocabulary.** Seven predicates; no composite constraints like "sorted by creation time with correct paging".
-8. **An adapter can lie.** `probe` checks six mechanical properties, not intent. What is guaranteed is "given this observation, here is how the verdict follows".
-9. **Validated in one domain only.** A coffee shop: menu, orders, state machine, two roles.
+Ordered by proximity to real use.
+
+1. **Write-operation semantics still need a human.** `tap` can record "what the app agreed to", so writes do not need to be hand-coded from scratch; but rules like "insufficient stock should reject" cannot be recorded — a human must add the assertion.
+2. **Field mapping is manual.** Cross-naming-system automatic mapping (`align`) is not built yet; the canonical view mapping is intentionally in the adapter.
+3. **Legality, not quality.** Step count, repeated reads, detour count can be tallied, but "was the flow good" requires scoring — that is a different thing.
+4. **Negative cases need a human.** `draft` lists where negatives are missing as todos; the standard for negatives is "what should be allowed", so copying what actually happened admits everything.
+5. **Mutants still have blind spots.** `breed` only generates observation-shape faults; execution-layer and business-layer faults still rely on contributions.
+6. **Equivalent mutant problem unsolved.** Just made explicit: unkillable but difference producible -> owed; cannot even produce a difference -> undetermined, proof required.
+7. **Assertion vocabulary still has gaps.** Pagination, cross-step slice invariants (the one the bookkeeping domain exposed) cannot be expressed.
+8. **An adapter can lie.** `probe` checks six mechanical properties; loading an adapter executes code with your privileges, the CLI warns once.
+9. **Concurrency done but limited.** `--jobs` parallelizes cases, not mutants; concurrency causes verdict-order drift, mitigated by the drift mechanism.
+10. **Difficulty labels are statistics only.** Drill-measured pass rates are not wired in yet.
+11. **Validated in three domains only.** A new domain will likely expose new gaps — that is exactly the point of the next domain.
 
 ## Docs
 
-| File | Contents |
-| --- | --- |
-| [docs/GUIDE.md](docs/GUIDE.md) | Full guide in Chinese |
-| [docs/SPEC.md](docs/SPEC.md) | Format spec: cases, assertions, adapter contract, verdict order |
-| [docs/FINDING-001.en.md](docs/FINDING-001.en.md) | Anatomy of one false pass |
-| [docs/museum/](docs/museum/) | Six reproducible failure exhibits |
-| [docs/mutants/](docs/mutants/) | Twelve mutants; submission rules in its README |
-| [docs/media/promo.mp4](docs/media/promo.mp4) | 42-second introduction |
+- [docs/GUIDE.md](docs/GUIDE.md) — Full guide: start from a URL, from logs to formal grading, connect your own app
+- [docs/SPEC.md](docs/SPEC.md) — Spec: case format, 12 assertion kinds and phases, verdict order table, per-mechanism rules
+- [docs/ADAPTER-GUIDE.md](docs/ADAPTER-GUIDE.md) — Connect your own app: three-tier paths, change only four places, verification order
+- [CHANGELOG.md](CHANGELOG.md) — What each version did and why
+- [docs/mutants/](docs/mutants/README.md) — Mutant directory and submission standards
+- [knowledge/](knowledge/README.md) — Incident archive and admission constitution
+- [docs/media/](docs/media/) — All images, animations and the introduction video on this page, all generated locally
 
 ## License
 
-MIT. Cases, mutants and incident entries are all open to contributions — their value is in the count.
+MIT.
