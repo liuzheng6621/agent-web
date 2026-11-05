@@ -98,9 +98,15 @@ const server = http.createServer(async (req, res) => {
   // POST /users
   if (method === 'POST' && path === '/users') {
     const u = body && body.user;
-    if (!u || !u.username || !u.email || !u.password) return errs(res, 422, { body: ['is missing'] });
-    if (db.users.has(u.email)) return errs(res, 422, { email: ['has already been taken'] });
-    if (db.byName.has(u.username)) return errs(res, 422, { username: ['has already been taken'] });
+    if (!u || typeof u !== 'object' || Array.isArray(u)) return errs(res, 422, { body: ['is missing'] });
+    const fields = {};
+    for (const key of ['username', 'email', 'password']) {
+      if (typeof u[key] !== 'string' || u[key].trim() === '') fields[key] = ["can't be blank"];
+    }
+    if (!fields.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(u.email)) fields.email = ['is invalid'];
+    if (Object.keys(fields).length) return errs(res, 422, fields);
+    if (db.users.has(u.email)) return errs(res, 409, { email: ['has already been taken'] });
+    if (db.byName.has(u.username)) return errs(res, 409, { username: ['has already been taken'] });
     const rec = { username: u.username, email: u.email, password: u.password, bio: null, image: null, token: token() };
     db.users.set(rec.email, rec);
     db.byName.set(rec.username, rec);
@@ -109,8 +115,15 @@ const server = http.createServer(async (req, res) => {
   // POST /users/login
   if (method === 'POST' && path === '/users/login') {
     const u = body && body.user;
-    const rec = u && db.users.get(u.email);
-    if (!rec || rec.password !== u.password) return errs(res, 401, { 'email or password': ['is invalid'] });
+    if (!u || typeof u !== 'object' || Array.isArray(u)) return errs(res, 422, { body: ['is missing'] });
+    const fields = {};
+    for (const key of ['email', 'password']) {
+      if (typeof u[key] !== 'string' || u[key].trim() === '') fields[key] = ["can't be blank"];
+    }
+    if (!fields.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(u.email)) fields.email = ['is invalid'];
+    if (Object.keys(fields).length) return errs(res, 422, fields);
+    const rec = db.users.get(u.email);
+    if (!rec || rec.password !== u.password) return errs(res, 401, { credentials: ['invalid'] });
     rec.token = token();
     return send(res, 200, { user: { email: rec.email, username: rec.username, bio: rec.bio, image: rec.image, token: rec.token } });
   }
@@ -120,27 +133,34 @@ const server = http.createServer(async (req, res) => {
     if (method === 'GET') return send(res, 200, { user: { email: viewer.email, username: viewer.username, bio: viewer.bio, image: viewer.image, token: viewer.token } });
     if (method === 'PUT') {
       const u = (body && body.user) || {};
-      if (u.email && u.email !== viewer.email) {
-        if (db.users.has(u.email)) return errs(res, 422, { email: ['has already been taken'] });
-        db.users.delete(viewer.email);
-        viewer.email = u.email;
-        db.users.set(u.email, viewer);
+      const fields = {};
+      if (u.username !== undefined) {
+        if (typeof u.username !== 'string' || u.username.trim() === '') fields.username = ["can't be blank"];
+        else if (u.username !== viewer.username && db.byName.has(u.username)) fields.username = ['has already been taken'];
       }
-      // RealWorld 的约定：空字符串等于清空、返回 null（不是 ""）；
-      // 传空对象等于「整份替换」，bio/image 一并清空 —— 套件的第 9 步就是这么断言的。
-      // 用户名与邮箱也允许改（套件第 19 步就改用户名）
+      if (u.email !== undefined) {
+        if (typeof u.email !== 'string' || u.email.trim() === '') fields.email = ["can't be blank"];
+        else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(u.email)) fields.email = ['is invalid'];
+        else if (u.email !== viewer.email && db.users.has(u.email)) fields.email = ['has already been taken'];
+      }
+      if (u.password !== undefined) {
+        if (typeof u.password !== 'string' || u.password === '') fields.password = ["can't be blank"];
+        else if (u.password.length < 8) fields.password = ['is too short'];
+      }
+      if (Object.keys(fields).length) return errs(res, 422, fields);
+
+      // RealWorld 的约定：空字符串等于清空、返回 null（不是 ""）。
       if (u.username !== undefined && u.username !== viewer.username) {
-        if (db.byName.has(u.username)) return errs(res, 422, { username: ['has already been taken'] });
         db.byName.delete(viewer.username);
         viewer.username = u.username;
         db.byName.set(u.username, viewer);
       }
       if (u.email !== undefined && u.email !== viewer.email) {
-        if (db.users.has(u.email)) return errs(res, 422, { email: ['has already been taken'] });
         db.users.delete(viewer.email);
         viewer.email = u.email;
         db.users.set(u.email, viewer);
       }
+      if (u.password !== undefined) viewer.password = u.password;
       if (u.bio !== undefined) viewer.bio = u.bio === '' ? null : u.bio;
       if (u.image !== undefined) viewer.image = u.image === '' ? null : u.image;
       return send(res, 200, { user: { email: viewer.email, username: viewer.username, bio: viewer.bio, image: viewer.image, token: viewer.token } });
