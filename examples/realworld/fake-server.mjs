@@ -129,7 +129,7 @@ const server = http.createServer(async (req, res) => {
   }
   // GET/PUT /user
   if (path === '/user') {
-    if (!viewer) return errs(res, 401, { user: ['is not authenticated'] });
+    if (!viewer) return errs(res, 401, { token: ['is missing'] });
     if (method === 'GET') return send(res, 200, { user: { email: viewer.email, username: viewer.username, bio: viewer.bio, image: viewer.image, token: viewer.token } });
     if (method === 'PUT') {
       const u = (body && body.user) || {};
@@ -168,6 +168,9 @@ const server = http.createServer(async (req, res) => {
   }
   // /profiles/:username[/follow]
   if (seg[0] === 'profiles' && seg[1]) {
+    if (seg[2] === 'follow' && ['POST', 'DELETE'].includes(method) && !viewer) {
+      return errs(res, 401, { token: ['is missing'] });
+    }
     const target = db.byName.get(decodeURIComponent(seg[1]));
     if (!target) return errs(res, 404, { profile: ['not found'] });
     if (seg[2] === 'follow' && method === 'POST') {
