@@ -107,3 +107,16 @@ if (application != null) {
 - **一个实现，没有孪生**：咖啡店有内存孪生可以 `compare`，这里只有真实后端，所以没有跨实现对照。
   要补的话最省事的是用 `tap` 录一段流量长出孪生（`node bin/agent-web.mjs tap --target=http://127.0.0.1:8181 ...`）。
 - **MQTT / WebSocket 链路**没有接：那部分是推送，不是「一次业务操作」，超出当前判决模型的边界。
+
+### 还没覆盖的：审批链的中间态（m-approval-autoapprove 判「说不清」）
+
+新加的 `m-approval-autoapprove`（把所有 PENDING 申请直接改成 APPROVED）在本域被判 **说不清**：
+`certify` 报「一条案例上都看不出差异——可能等价，也可能案例没走到」。
+
+不是变异体写错了，是案例不够狠：`adoption-submit-reject` 只断言「index 0 那一行是 PENDING」，
+`adoption-reject-forbidden` 只断言「越权被拒」，两条都没断言「提交之后到审批之前，这条申请必须一直是 PENDING，
+且期间没有 reviewer」。要抓住它得写一条**跨步**案例：提交 → 观察 → 越权审批（应被拒）→ 再观察，
+并用 `every_step` 套 `unchanged adoption_applications` 或 `field_equals reviewer = null`。
+
+这条记在这里而不是删掉变异体：删掉等于承认「我们永远不测审批链」，
+留着它每次 certify 都会把这个洞报出来。

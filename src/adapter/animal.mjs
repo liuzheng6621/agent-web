@@ -184,6 +184,8 @@ const MANIFEST = {
 
 export function createAnimalAdapter(options = {}) {
   const tokens = new Map();
+  // 本轮开始前最大的领养申请 id：这个后端不清理历史行，不切基线 index 0 会指到上一轮。
+  let baselineAdoptionId = 0;
   const runs = new Map();
   let seq = 0;
   let cached = readTokens();
@@ -223,9 +225,11 @@ export function createAnimalAdapter(options = {}) {
     const animals = pageOf((await httpCall('GET', '/api/v1/animals?page=1&size=200', { token })).json);
     const adoptions = pageOf((await httpCall('GET', '/api/v1/adoptions?page=1&size=200', { token })).json);
     const users = pageOf((await httpCall('GET', '/api/v1/users?page=1&size=200', { token })).json);
+    // 这个后端不会清理历史数据：不切出「本轮新增的」行，index 0 永远是上一轮的行。
+    const mine = adoptions.rows.filter((r) => Number(r.id) > Number(baselineAdoptionId || 0));
     return {
       animals: animals.rows.map(normAnimal),
-      adoption_applications: adoptions.rows.map(normAdoption),
+      adoption_applications: mine.map(normAdoption),
       users: users.rows.map(normUser),
     };
   }
@@ -239,6 +243,11 @@ export function createAnimalAdapter(options = {}) {
 
     async reset() {
       for (const role of Object.keys(ACCOUNTS)) await login(role);
+      // 记录基线：本轮开始前最大的领养申请 id（必须在登录之后、跑任何写操作之前）
+      try {
+        const snap = await httpCall('GET', '/api/v1/adoptions?page=1&size=200', { token: tokenOf(null, 'admin') });
+        baselineAdoptionId = pageOf(snap.json).rows.reduce((mx, r) => Math.max(mx, Number(r.id) || 0), 0);
+      } catch { baselineAdoptionId = 0; }
       seq += 1;
       const runId = `animal-${seq}`;
       runs.set(runId, { tokens: Object.fromEntries(Object.keys(ACCOUNTS).map((r) => [r, tokens.get(r)])) });

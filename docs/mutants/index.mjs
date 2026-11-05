@@ -18,6 +18,7 @@ import * as execDuplicateWrite from './m-exec-duplicate-write.mjs';
 import * as execDropIntermediate from './m-exec-drop-intermediate.mjs';
 import * as dupCreditEntry from './m-dup-credit-entry.mjs';
 import * as unbalancedAccepted from './m-unbalanced-accepted.mjs';
+import * as approvalAutoapprove from './m-approval-autoapprove.mjs';
 
 import * as itemCountFlattened from './m-item-count-flattened.mjs';
 import * as pickupNoOffset from './m-pickup-no-offset.mjs';
@@ -56,6 +57,7 @@ const ENTRIES = [
   ['m-exec-drop-intermediate', execDropIntermediate],
   ['m-dup-credit-entry', dupCreditEntry],
   ['m-unbalanced-accepted', unbalancedAccepted],
+  ['m-approval-autoapprove', approvalAutoapprove],
   ['m-item-count-flattened', itemCountFlattened],
   ['m-pickup-no-offset', pickupNoOffset],
   ['m-total-single-unit', totalSingleUnit],

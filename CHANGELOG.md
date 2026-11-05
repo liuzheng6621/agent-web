@@ -6,6 +6,19 @@
 CI 也在查。这条规则是买来的：这个仓库曾经同时存在 `package.json` 0.16、README 0.9、
 Gitee Release v0.6.0 三个数，谁看都是三个项目。
 
+## 0.42.0
+
+动物域补一条业务层变异体，顺带修掉一个让断言跑到「上一轮数据」上的真 bug。
+
+- `m-approval-autoapprove`（把所有 PENDING 申请直接改成 APPROVED）：本域实测被判 **说不清**——
+  两条案例都没断言「提交之后到审批之前一直是 PENDING，且没有 reviewer」。不删这个变异体：
+  留着它每次 certify 都会把这个洞报出来，补法写在 `docs/domains/animal.md`。
+- **修 `src/adapter/animal.mjs` 的陈旧索引**：这个后端不清理历史数据，`observe` 原来暴露
+  `/api/v1/adoptions` 的全部历史行，于是案例里的 `index 0` 指的是**上一轮跑出来的那一行**，
+  断言一直在别人的数据上判真。改成 reset 时记下本轮开始前的最大申请 id，`observe` 只暴露之后新增的行。
+- 顺带：`certify cases/animal` 的适用范围判定现在会给出「不适用 23 个」的准确数字，
+  而不是把咖啡店集合的变异体混进分母。
+
 ## 0.41.0
 
 L5 第二刀：账本域两条业务层变异体，其中一条当场逼出一个新算子。
