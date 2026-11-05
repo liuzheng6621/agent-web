@@ -17,6 +17,7 @@ import * as K from './kinds.mjs';
 import { relation, RELATION_OPS } from './relation.mjs';
 import { evalShape, SHAPE_KINDS, SHAPE_TYPES } from './shape.mjs';
 import { window as evalWindow, everyStep as evalEveryStep, WINDOW_INNER } from './window.mjs';
+import { pagination as evalPagination } from './pagination.mjs';
 
 export const KINDS = Object.freeze([
   'entity_exists',
@@ -30,6 +31,7 @@ export const KINDS = Object.freeze([
   ...SHAPE_KINDS,
   'window',
   'every_step',
+  'pagination',
 ]);
 
 export { WINDOW_INNER };
@@ -59,6 +61,9 @@ export const PHASE_MATRIX = Object.freeze({
   // 所以相位固定 trace，不允许被显式改成 final（那等于把窗口丢掉）。
   window: { default: 'trace', allowed: ['trace'] },
   every_step: { default: 'trace', allowed: ['trace'] },
+  // 分页读的是每一步的执行返回（payload），不是状态快照：视图是整份状态，
+  // 一条翻过页的列表在视图里和没翻页一模一样。
+  pagination: { default: 'trace', allowed: ['trace'] },
 });
 
 const SELECTOR_KINDS = new Set([
@@ -235,6 +240,8 @@ export function evalAssertion(a, ctx, depth = 0) {
       return evalWindow(a, ctx, (sub, c) => evalAssertion(sub, c, depth + 1));
     case 'every_step':
       return evalEveryStep(a, ctx, (sub, c) => evalAssertion(sub, c, depth + 1));
+    case 'pagination':
+      return evalPagination(a, ctx);
     default:
       return { status: UNKNOWN, code: 'invalid_case', message: `未知断言 ${a.kind}` };
   }

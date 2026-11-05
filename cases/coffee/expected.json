@@ -7,5 +7,6 @@
   "coffee/goal-not-reached": "fail",
   "coffee/unknown-capability": "unknown",
   "coffee/two-items": "pass",
+  "coffee/paged-orders": "pass",
   "coffee/shape": "pass"
 }

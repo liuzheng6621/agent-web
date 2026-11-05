@@ -6,6 +6,17 @@
 CI 也在查。这条规则是买来的：这个仓库曾经同时存在 `package.json` 0.16、README 0.9、
 Gitee Release v0.6.0 三个数，谁看都是三个项目。
 
+## 0.34.0
+
+分页：单看每一页都好的四种故障，终于有断言管了。
+
+- **新断言 `pagination`**：把几个翻页步的**执行返回**拼起来查四件事——跨页重复（含同一页内重复）、非末页不满页、几页加起来不等于 `total`、按页次拼接后排序字段不单调。数据来自 `trace[i].payload`，不是规范视图：视图是整份状态快照，一条翻过页的列表在视图里和没翻过一模一样。
+- **`memory` 适配器的 `order.list` 支持 `page` / `pageSize`**，并回 `page` / `pageSize` / `total` / `hasMore`。
+- **修掉一个真 bug**：`order.list` 原来在**规范视图**上按 `ownerId` 过滤，而视图里只有 `username` ⇒ 顾客的订单列表恒为空（只有店员看得见全部）。之前没有案例用过 `order.list`，所以一直没露。改成在原始状态上过滤再投影。
+- **三个新变异体**，全部只在返回体上动手、不碰状态：`m-page-duplicate`（第二页重复上一页末行）、`m-page-drop`（每页少给尾行）、`m-page-shuffle`（第一页内部倒序）。视图不变，所以只有 `pagination` 能杀——`scripts/kind-necessity.mjs` 现在验七种。
+- **两处基础设施要跟着改**：`probe` 的 ctx 现在带 `trace[i].payload`（录制适配器记下每次执行的返回，证据里的 trace 仍然不夹带业务数据）；`transformCtx` 快路径重建 trace 时只换 `stateAfter`、其余字段原样带过（早先丢了 `payload`，分页断言在快路径上恒 `unknown`，是等价性门把它抓出来的：`重放[true,true,true,true] 变换[true,true,unknown,true]`）。
+- 新案例 `coffee/paged-orders`：五单、每页两条翻三页。`certify` 现在 **22/24 = 91.7%**（27 个目录、3 个不适用），仍漏 `m-pickup-no-offset`、`m-unsorted-orders`。
+
 ## 0.33.1
 
 让需要步号的变异体说实话。

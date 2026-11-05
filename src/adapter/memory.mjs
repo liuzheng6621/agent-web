@@ -66,7 +66,13 @@ const MANIFEST = {
       args: { items: 'Array<{dishId:string, qty:number}>' },
       roles: ['customer'],
     },
-    { id: 'order.list', kind: 'read', evidence_level: 'validated', args: { status: 'string?' }, roles: ['customer', 'staff'] },
+    {
+      id: 'order.list',
+      kind: 'read',
+      evidence_level: 'validated',
+      args: { status: 'string?', page: 'number?', pageSize: 'number?' },
+      roles: ['customer', 'staff'],
+    },
     { id: 'order.get', kind: 'read', evidence_level: 'validated', args: { orderId: 'number' }, roles: ['customer', 'staff'] },
     { id: 'order.cancel', kind: 'write', evidence_level: 'validated', args: { orderId: 'number' }, roles: ['customer', 'staff'] },
     { id: 'order.pick', kind: 'write', evidence_level: 'validated', args: { orderId: 'number' }, roles: ['customer'] },
@@ -266,9 +272,32 @@ export function createMemoryAdapter() {
         }
 
         case 'order.list': {
-          let list = view(ctx.state).orders.filter((o) => o.ownerId === who.id || who.role === 'staff');
+          // 注意：规范视图里没有 ownerId（只有 username），所以「只看自己的单」
+          // 必须在原始状态上过滤完再投影 —— 在视图上过滤会把顾客的列表永远filter成空。
+          let mine = ctx.state.orders.filter((o) => o.ownerId === who.id || who.role === 'staff');
           if (action.arguments?.status) {
-            list = list.filter((o) => o.status === action.arguments.status);
+            mine = mine.filter((o) => o.status === action.arguments.status);
+          }
+          let list = view({ ...ctx.state, orders: mine }).orders;
+          // 分页是真的切，不是装样子：给了 pageSize 就按页返回，
+          // 并把 page / total / hasMore 一起报出来（分页检查会用它们）。
+          const pageSize = Number(action.arguments?.pageSize);
+          if (Number.isFinite(pageSize) && pageSize > 0) {
+            const page = Number.isFinite(Number(action.arguments?.page)) && Number(action.arguments?.page) > 0
+              ? Number(action.arguments.page)
+              : 1;
+            const start = (page - 1) * pageSize;
+            const rows = list.slice(start, start + pageSize);
+            return {
+              outcome: 'applied',
+              payload: {
+                orders: rows,
+                page,
+                pageSize,
+                total: list.length,
+                hasMore: start + pageSize < list.length,
+              },
+            };
           }
           return { outcome: 'applied', payload: { orders: list } };
         }

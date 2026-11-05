@@ -63,6 +63,23 @@ const TEMPORAL = [
   { kind: 'every_step', caseId: 'happy-path', invariant: { kind: 'every_step', of: { kind: 'unchanged', scopes: ['menu'] } } },
 ];
 
+/**
+ * 分页也一样：它读的是每一步的执行返回（payload），视图里看不到，
+ * 所以必须用一条真的翻了页的案例（cases/coffee/paged-orders.json）来测。
+ * 去掉这条断言时基线留一条 entity_exists，避免空 goal_assertions 让案例本身不合法。
+ */
+function withGoal(id, assertions) {
+  const c = fromReal(id, []);
+  return { ...c, task: { ...c.task, goal_assertions: assertions } };
+}
+
+const PAGED = {
+  kind: 'pagination',
+  caseId: 'paged-orders',
+  assertion: { kind: 'pagination', collection: 'orders', steps: [6, 7, 8], total: 5, pageSize: 2, ordered_by: 'id' },
+  baseline: [{ kind: 'entity_exists', selector: { collection: 'orders' } }],
+};
+
 const SHAPE = [
   { kind: 'entity_exists', selector: { collection: 'orders', index: 0 } },
   { kind: 'count_delta', selector: { collection: 'orders' }, delta: 2 },
@@ -115,6 +132,22 @@ async function run() {
     console.log(`      只有它能杀：${necessary.join(' ') || '—'}`);
   }
   if (failedTemporal > 0) failed += failedTemporal;
+
+  // 分页：单页永远看不出问题，所以要证明「去掉它就有变异体漏网」
+  {
+    const spec = PAGED;
+    const withIt = await certify({ cases: [withGoal(spec.caseId, [...spec.baseline, spec.assertion])], adapterFactory: factory, adapterName: 'memory', mutations: pool });
+    const without = await certify({ cases: [withGoal(spec.caseId, [...spec.baseline])], adapterFactory: factory, adapterName: 'memory', mutations: pool });
+    const kills = withIt.mutations.filter((m) => (m.killedBy ?? []).some((k) => (typeof k === 'string' ? k : k.kind) === spec.kind));
+    const caughtWith = new Set(withIt.mutations.filter((m) => m.status === 'caught').map((m) => m.id));
+    const caughtWithout = new Set(without.mutations.filter((m) => m.status === 'caught').map((m) => m.id));
+    const necessary = [...caughtWith].filter((id) => !caughtWithout.has(id));
+    const ok = kills.length > 0 && necessary.length > 0;
+    if (!ok) failed += 1;
+    console.log(`${ok ? 'PASS' : 'FAIL'}  ${spec.kind}（案例 ${spec.caseId}）`);
+    console.log(`      能杀 ${kills.length} 个：${kills.map((m) => m.id).join(' ') || '—'}`);
+    console.log(`      只有它能杀：${necessary.join(' ') || '—'}`);
+  }
   for (const kind of shapeKinds) {
     const kills = full.mutations.filter((m) =>
       (m.killedBy ?? []).some((k) => (typeof k === 'string' ? k : k.kind) === kind),

@@ -1,0 +1,171 @@
+{
+  "schema_version": "agent-web/0.1",
+  "id": "coffee/paged-orders",
+  "environment": {
+    "adapter": "memory",
+    "seed": {}
+  },
+  "task": {
+    "natural_goal": "顾客连下五单，然后店员按每页两条把订单列表翻完，三页拼起来必须正好是五条、不重不漏、顺序不乱。",
+    "goal_assertions": [
+      {
+        "kind": "entity_exists",
+        "selector": {
+          "collection": "orders"
+        }
+      },
+      {
+        "kind": "count_delta",
+        "selector": {
+          "collection": "orders"
+        },
+        "delta": 5
+      },
+      {
+        "kind": "pagination",
+        "collection": "orders",
+        "steps": [
+          6,
+          7,
+          8
+        ],
+        "total": 5,
+        "pageSize": 2,
+        "ordered_by": "id"
+      }
+    ],
+    "invariants": [
+      {
+        "kind": "count_delta",
+        "selector": {
+          "collection": "status_log",
+          "where": [
+            {
+              "field": "type",
+              "eq": "order.canceled"
+            }
+          ]
+        },
+        "delta": 0
+      }
+    ]
+  },
+  "reference_trajectory": [
+    {
+      "id": "s1",
+      "capability": "order.create",
+      "as": "customer",
+      "expected_outcome": "applied",
+      "arguments": {
+        "items": [
+          {
+            "dishName": "拿铁",
+            "qty": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "s2",
+      "capability": "order.create",
+      "as": "customer",
+      "expected_outcome": "applied",
+      "arguments": {
+        "items": [
+          {
+            "dishName": "美式咖啡",
+            "qty": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "s3",
+      "capability": "order.create",
+      "as": "customer",
+      "expected_outcome": "applied",
+      "arguments": {
+        "items": [
+          {
+            "dishName": "拿铁",
+            "qty": 2
+          }
+        ]
+      }
+    },
+    {
+      "id": "s4",
+      "capability": "order.create",
+      "as": "customer",
+      "expected_outcome": "applied",
+      "arguments": {
+        "items": [
+          {
+            "dishName": "美式咖啡",
+            "qty": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "s5",
+      "capability": "order.create",
+      "as": "customer",
+      "expected_outcome": "applied",
+      "arguments": {
+        "items": [
+          {
+            "dishName": "拿铁",
+            "qty": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "s6",
+      "capability": "order.list",
+      "as": "customer",
+      "expected_outcome": "applied",
+      "arguments": {
+        "page": 1,
+        "pageSize": 2
+      }
+    },
+    {
+      "id": "s7",
+      "capability": "order.list",
+      "as": "customer",
+      "expected_outcome": "applied",
+      "arguments": {
+        "page": 2,
+        "pageSize": 2
+      }
+    },
+    {
+      "id": "s8",
+      "capability": "order.list",
+      "as": "customer",
+      "expected_outcome": "applied",
+      "arguments": {
+        "page": 3,
+        "pageSize": 2
+      }
+    }
+  ],
+  "observability": {
+    "declared_scopes": [
+      "orders",
+      "menu",
+      "status_log"
+    ],
+    "events_complete": true,
+    "events_types": [
+      "order.created"
+    ]
+  },
+  "draft": {
+    "status": "confirmed",
+    "reviewed_by": "阿蓝",
+    "reviewed_at": "2026-11-05T12:23:57.605Z"
+  }
+}

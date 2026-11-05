@@ -675,6 +675,27 @@ agent-web certify cases/coffee --adapter=taixianglian
 在真实后端上错（后端根本不记下单事件，只有 3 条）。改成"`order.picked` 恰好 1 条"之后，
 两边都成立。**断言写具体事件类型，不写总数**——总数是实现的自由，事件类型才是业务的事实。
 
+## 分页怎么写断言
+
+分页的坑不在某一页里，在页与页之间。先让案例真的翻页：
+
+```json
+{ "id": "s6", "capability": "order.list", "as": "customer",
+  "expected_outcome": "applied", "arguments": { "page": 1, "pageSize": 2 } }
+```
+
+翻三页之后加一条断言：
+
+```json
+{ "kind": "pagination", "collection": "orders", "steps": [6, 7, 8],
+  "total": 5, "pageSize": 2, "ordered_by": "id" }
+```
+
+它依次查四件事：有没有重复行、非末页是不是满的、各页加起来是不是 `total`、
+按页次拼起来排序字段是否单调。**四种都会给出具体数字**，不是笼统的「分页不对」。
+
+要点：`steps` 是步号不是页码，写错会得到 `unknown`（轨迹里没这步），不会假装通过。
+
 ## 出题与批改：让标签由机制产出
 
 训练和评测都需要标签，而标签不能由模型来打 —— 模型打的标签，最后只能用另一个模型来审，

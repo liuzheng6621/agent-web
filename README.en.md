@@ -1,4 +1,4 @@
-# agent-web v0.33.1
+# agent-web v0.34.0
 
 <p align="center">
   <img src="docs/media/hero.png" alt="agent-web: integration tests an agent can be judged on" width="100%">
@@ -18,7 +18,7 @@
 </p>
 
 <p align="center">
-  <b>v0.33.1</b> · 14 assertion kinds · 27 commands · 24 mutants
+  <b>v0.34.0</b> · 15 assertion kinds · 27 commands · 27 mutants
 </p>
 
 <p align="center">
@@ -204,6 +204,30 @@ Side benefit: state-layer mutants only wrap observation, so certify no longer re
 `breed` generates faults from the canonical view's shape: numeric fields off-by-one / doubled / dropped, strings emptied / uppercased, arrays tail-dropped / reversed, enums swapped, nested leaves tried one by one. 10 generatable positions yield 28 mutants; 4 identity operators are skipped automatically.
 
 **Generation is not admission**: every mutant must pass certify; unkillable ones fall to "undetermined" automatically and do not pollute the catch rate. Mutants can also declare `applies_to` — a ledger-domain mutant in the coffee domain is "not applicable", not counted in the denominator.
+
+## Pagination: every page looks fine, the pages together do not
+
+The four ways paging breaks all live *between* pages: a row appearing on two pages,
+a row lost at the boundary, order flipping between pages, a `total` that disagrees
+with what you actually got. **Each page on its own looks perfect**, and per-page
+`count_delta` assertions all pass — every page really did return `pageSize` rows.
+
+```json
+{ "kind": "pagination", "collection": "orders", "steps": [6, 7, 8],
+  "total": 5, "pageSize": 2, "ordered_by": "id" }
+```
+
+It reads the **execution payloads** of those steps (`trace[i].payload`), not the
+canonical view: the view is a whole-state snapshot, and a paged list looks exactly
+the same there as an unpaged one.
+
+Three mutants that only touch the response body (the view never changes, so nothing
+else can catch them): `m-page-duplicate`, `m-page-drop`, `m-page-shuffle`.
+
+Also fixed a real bug: the `memory` adapter filtered `order.list` by `ownerId` on the
+**canonical view**, which only carries `username` — so a customer's order list was
+always empty and only staff saw everything. No case used `order.list` before, which
+is why it stayed hidden.
 
 ## Drills: labels produced by a mechanism, not a model
 

@@ -113,26 +113,21 @@ README 的「现在做不到什么」是这份清单的摘要。**两边条目�
 
 `status: mitigated`
 
-14 种 kind 覆盖了存在性、数值、状态迁移、事件、关系、形状、**时间窗**、**每步求值**。
+三种缺口补了两种（15 种 kind）：
 
-补上的两个（0.33.0）：
+- **时间窗** `window`：`unchanged` / `count_delta` / `field_equals` / `entity_exists` 只能看全程，
+  看不到「被拒之后那一段」。账本域的 `reject-unbalanced` 就是被这个卡住的。
+- **每步求值** `every_step`：终态类不变量只在结尾检查，「中途坏、结尾修好」抓不到。
+- **分页** `pagination`：跨页重复、边界丢行、翻页乱序、`total` 说谎 —— 单页永远看不出来。
 
-- `window`：把观察缩到 `[from_step, to_step)`，内层只能是 `unchanged` / `count_delta` / `field_equals` / `entity_exists`。
-  账本域的 `reject-unbalanced` 就是被这个缺口卡住的 —— 它要的是「被拒那一步之后不许留账」。
-- `every_step`：每走完一步用「起点 → 这一步之后」重跑内层断言，指出第几步坏掉。
+还缺「跨实体的时序约束」（例如「发货必须在付款后 24 小时内」），这需要时间语义而不只是步号，
+属于新的一层，不在现有 kind 里硬塞。
 
-**还缺的是分页**：跨页重复、边界丢行、翻页乱序、`total` 说谎。它需要 `observe` 带分页元信息
-（`page` / `pageSize` / `total` / `hasMore`），而适配器契约里目前没有这个概念 —— 加字段等于改五方法契约，
-不能顺手塞进断言层。这一条仍然是 `open` 的实质部分，只是从三条剩到一条。
+新增 kind 的门槛照旧：**必须能杀掉至少一个现有断言杀不掉的变异体**
+（`node scripts/kind-necessity.mjs` 逐种验），否则就是装饰，按判据准入宪法不许入库。
 
-新增 kind 的门槛照旧：**必须能杀掉至少一个现有断言杀不掉的变异体**。
-`scripts/kind-necessity.mjs` 现在验六种（形状四种 + 时序两种），跑法：
+验收：`node scripts/kind-necessity.mjs` 退出码 0。
 
-```
-node scripts/kind-necessity.mjs   # 六种都要 PASS，且「只有它能杀」一栏不许是 —
-```
-
-验收命令：`node scripts/kind-necessity.mjs` 退出码 0。
 ## L8 适配器可以撒谎
 
 `status: open`

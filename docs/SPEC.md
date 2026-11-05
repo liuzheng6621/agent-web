@@ -94,7 +94,7 @@ memory                                   内置名
 }
 ```
 
-### 4.1 十四种 kind
+### 4.1 十五种 kind
 
 | kind | 必填参数 | 相位 |
 | --- | --- | --- |
@@ -169,6 +169,34 @@ memory                                   内置名
 这样它才能只坏「中间那一步」而不碰首尾 —— 没有这个下标，上面两个故障根本造不出来。
 代价是这类变异体只能在快路径里复现（`observe` 包装拿不到步号），所以它们在 meta 里标 `requires_trace: true`，
 `scripts/state-equivalence.mjs` 会跳过并列出来。
+
+### 4.3.1 pagination：页与页之间的事
+
+时间窗管「某一段」，每步求值管「每一步」，分页管「几页拼起来对不对」。
+四种坏法（跨页重复、边界丢行、翻页乱序、`total` 说谎）全都藏在页与页之间：
+单看任何一页都是好的，逐页的 `count_delta` 也都是对的。
+
+```json
+{ "kind": "pagination", "collection": "orders", "steps": [6, 7, 8],
+  "total": 5, "pageSize": 2, "ordered_by": "id" }
+```
+
+| 参数 | 必填 | 说明 |
+|---|---|---|
+| `steps` | 是 | 翻页那几步的**步号（1 基）**，至少两个，与 `window` 同一套坐标 |
+| `collection` | 否 | 返回体里的键名。省略时要求返回体本身是数组；兼容 `{data:{orders:[…]}}` |
+| `total` | 否 | 声称的总条数。给了就要求各页加起来正好等于它 |
+| `pageSize` | 否 | 每页条数。给了就要求非末页必须是满的 |
+| `ordered_by` | 否 | 排序字段；给了就要求按页次拼接后单调不减，查重也用它当主键 |
+| `id_field` | 否 | 单独指定查重字段（缺省用 `ordered_by`） |
+
+**数据来源是 `trace[i].payload`，不是规范视图。** 视图是整份状态快照，
+一条翻过页的列表在视图里和没翻过一模一样 —— 拿视图判分页，永远判不出来。
+所以 `probe` 的 ctx 带 payload（录制适配器记下每次执行的返回），
+而证据（`verdict.evidence.trace`）仍然只留 outcome/identity/error，不夹带业务数据。
+
+返回码：`pagination_duplicate` / `pagination_size` / `pagination_total` / `pagination_order`。
+取不到返回体、步不存在、行里没有排序字段一律 `unknown`（`missing_observation`），不判假。
 
 ### 4.4 相位
 

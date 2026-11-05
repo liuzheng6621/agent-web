@@ -22,10 +22,17 @@ const TRUE_STATUS = 'pass';
 /** 记录型适配器：顺手存下每次 observe 的视图，用来还原每步的 stateAfter。 */
 function recordingAdapter(inner) {
   const observes = [];
+  const executions = [];
   const rec = {
     manifest: (...a) => inner.manifest(...a),
     reset: (...a) => inner.reset(...a),
-    execute: (...a) => inner.execute(...a),
+    // 返回体也要记：pagination 这类断言看的是「接口那一次返回了什么」，
+    // 而证据里的 trace 为了不夹带业务数据，只留了 outcome/identity/error。
+    async execute(runId, action) {
+      const res = await inner.execute(runId, action);
+      executions.push({ id: action?.id ?? null, capability: action?.capability ?? null, payload: res?.payload ?? null });
+      return res;
+    },
     async observe(runId, scopes) {
       const res = await inner.observe(runId, scopes);
       observes.push(res.state);
@@ -35,6 +42,7 @@ function recordingAdapter(inner) {
   if (typeof inner.close === 'function') rec.close = (...a) => inner.close(...a);
   if (typeof inner.toStep === 'function') rec.toStep = (...a) => inner.toStep(...a);
   rec.__observes = observes;
+  rec.__executions = executions;
   return rec;
 }
 
@@ -62,7 +70,11 @@ export async function probe(caseObj, adapterImpl, { adapterName = 'unknown', tim
   const ctx = {
     initial: ev?.initial ?? obs[0],
     final: ev?.final ?? obs[obs.length - 1],
-    trace: inner.map((state) => ({ stateAfter: state })),
+    trace: inner.map((state, i) => ({
+      stateAfter: state,
+      // 第 i 步的执行返回；步没跑满（中途 abort）时后面没有，就该是 undefined
+      payload: rec.__executions[i]?.payload ?? null,
+    })),
     missingScopes: ev?.missing_scopes ?? [],
     events: ev?.events ?? [],
     eventsComplete: ev?.events_complete === true,
@@ -94,7 +106,10 @@ function transformCtx(baseCtx, tamper) {
     ...baseCtx,
     initial: dupValue(baseCtx.initial),
     final: dupValue(baseCtx.final),
-    trace: (baseCtx.trace ?? []).map((t) => ({ stateAfter: dupValue(t.stateAfter) })),
+    // 只换 stateAfter，其余字段（尤其是 payload）原样带过去。
+    // 早先这里重建 trace 时把 payload 丢了，于是分页类断言在快路径上恒为 unknown，
+    // 等价性门把「重放 true / 变换 unknown」当成不一致抓了出来。
+    trace: (baseCtx.trace ?? []).map((t) => ({ ...t, stateAfter: dupValue(t.stateAfter) })),
   };
   // 传下标与总长：这样变异体才能只坏「中间某一步」——
   // 「中途坏掉、结尾修好」是现有断言全靠看不出来的那一类。

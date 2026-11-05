@@ -16,6 +16,9 @@ import * as totalSingleUnit from './m-total-single-unit.mjs';
 import * as subtotalStale from './m-subtotal-stale.mjs';
 import * as cancelNoop from './m-cancel-noop.mjs';
 import * as doubleCreate from './m-double-create.mjs';
+import * as pageDuplicate from './m-page-duplicate.mjs';
+import * as pageDrop from './m-page-drop.mjs';
+import * as pageShuffle from './m-page-shuffle.mjs';
 import * as duplicateRow from './m-duplicate-row.mjs';
 import * as stringlyTotal from './m-stringly-total.mjs';
 import * as statusOffEnum from './m-status-off-enum.mjs';
@@ -54,6 +57,9 @@ const ENTRIES = [
   ['m-ledger-any-balance', ledgerAnyBalance],
   ['m-transient-menu-price', transientMenuPrice],
   ['m-mid-write-leak', midWriteLeak],
+  ['m-page-duplicate', pageDuplicate],
+  ['m-page-drop', pageDrop],
+  ['m-page-shuffle', pageShuffle],
 ];
 
 const LAYERS = new Set(['state', 'execute']);
