@@ -132,9 +132,13 @@ export function pagination(a, ctx) {
     }
   }
 
-  // 4) 顺序：按页次拼接后，排序字段必须单调不减
+  // 4) 顺序：按页次拼接后必须**始终朝同一个方向**单调。
+  //    不要求升序也不要求降序 —— 升序还是降序是各实现自己的约定（内存适配器升序、
+  //    真实后端按 id 倒序），案例不该把它写死。真正的不变量是「页与页之间方向不翻」：
+  //    第一页降序、第二页升序，就是翻页丢 ORDER BY 的典型症状。
   if (a.ordered_by) {
     const flat = pages.flatMap((p) => p.rows);
+    let dir = 0; // 1 升、-1 降、0 还没定
     for (let i = 1; i < flat.length; i++) {
       const prev = flat[i - 1]?.[a.ordered_by];
       const cur = flat[i]?.[a.ordered_by];
@@ -145,19 +149,16 @@ export function pagination(a, ctx) {
           message: `行里没有 ${a.ordered_by}，无法检查跨页顺序`,
         };
       }
-      if (typeof prev === 'number' && typeof cur === 'number') {
-        if (cur < prev) {
-          return {
-            status: FALSE,
-            code: 'pagination_order',
-            message: `翻页乱序：按页次拼接后 ${a.ordered_by} 从 ${prev} 掉到 ${cur}（第 ${i} 条）`,
-          };
-        }
-      } else if (String(cur) < String(prev)) {
+      const cmp = typeof prev === 'number' && typeof cur === 'number'
+        ? (cur > prev ? 1 : cur < prev ? -1 : 0)
+        : (String(cur) > String(prev) ? 1 : String(cur) < String(prev) ? -1 : 0);
+      if (cmp === 0) continue;
+      if (dir === 0) { dir = cmp; continue; }
+      if (cmp !== dir) {
         return {
           status: FALSE,
           code: 'pagination_order',
-          message: `翻页乱序：按页次拼接后 ${a.ordered_by} 从 ${JSON.stringify(prev)} 掉到 ${JSON.stringify(cur)}`,
+          message: `翻页乱序：按页次拼接后 ${a.ordered_by} 从 ${JSON.stringify(prev)} 到 ${JSON.stringify(cur)}，方向与前面相反（前面是${dir > 0 ? '升序' : '降序'}）`,
         };
       }
     }

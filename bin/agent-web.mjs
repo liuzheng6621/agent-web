@@ -143,11 +143,15 @@ async function runOne(caseFile, adapter, opts = {}) {
 async function cmdSelftest(flags) {
   const dir = path.join(ROOT, 'cases', 'coffee');
   const expected = readExpected(dir);
-  const adapter = await makeAdapter('memory');
+  // --adapter 曾经被无视：selftest 一律用内存适配器跑。
+  // 结果是「真实后端 7/7 一致」这类结论其实从来没在真实后端上跑过 ——
+  // 一个报告出来的数字，必须真的量到它说的那个东西。
+  const adapterName = flags.adapter ? String(flags.adapter) : 'memory';
+  const adapter = await makeAdapter(adapterName);
   announceCandidateMode(flags);
   const files = collectCaseFiles(dir);
   const verdicts = [];
-  const selfOpts = { adapterName: 'memory', timeoutMs: numFlag(flags.timeout) };
+  const selfOpts = { adapterName, timeoutMs: numFlag(flags.timeout) };
   for (const f of files) {
     verdicts.push(await runOne(f, adapter, { ...selfOpts, trajectory: loadTrajectory(flags.trajectory, f) }));
   }

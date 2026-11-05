@@ -275,12 +275,32 @@ export function createTaixianglianAdapter(options = {}) {
       }
 
       if (action.capability === 'order.list') {
-        const q = args.status ? `?page=0&size=50&status=${encodeURIComponent(args.status)}` : '?page=0&size=50';
-        const r = await call('GET', `/waiter/order/list${q}`, { token: who.token });
+        // page/pageSize 必须真的转发给后端：早先这里写死 page=0&size=50，
+        // 于是同一个「翻三页」的案例在真实后端上拿到三份一样的第一页 ——
+        // 断言报 pagination_duplicate，看起来像后端坏了，其实是适配器把翻页参数吞了。
+        const wantSize = Number(args.pageSize);
+        const paged = Number.isFinite(wantSize) && wantSize > 0;
+        const page1 = paged ? Math.max(1, Number(args.page) || 1) : 1;
+        const size = paged ? Math.min(wantSize, 200) : 50;
+        const qs = new URLSearchParams();
+        qs.set('page', String(page1 - 1)); // 后端是 0 基
+        qs.set('size', String(size));
+        if (args.status) qs.set('status', String(args.status));
+        const r = await call('GET', `/waiter/order/list?${qs.toString()}`, { token: who.token });
         const c = classify(r);
-        return c.outcome === 'applied'
-          ? { outcome: 'applied', payload: { total: r.data?.total ?? 0, orders: (r.data?.list ?? []).map(normOrder) } }
-          : c;
+        if (c.outcome !== 'applied') return c;
+        const rows = (r.data?.list ?? []).map(normOrder);
+        const total = r.data?.total ?? rows.length;
+        const payload = { orders: rows };
+        if (paged) {
+          payload.page = page1;
+          payload.pageSize = size;
+          payload.total = total;
+          payload.hasMore = (page1 - 1) * size + rows.length < total;
+        } else {
+          payload.total = total;
+        }
+        return { outcome: 'applied', payload };
       }
 
       if (action.capability === 'order.get') {

@@ -6,6 +6,16 @@
 CI 也在查。这条规则是买来的：这个仓库曾经同时存在 `package.json` 0.16、README 0.9、
 Gitee Release v0.6.0 三个数，谁看都是三个项目。
 
+## 0.34.1
+
+一条命令忽略了自己的参数，报出的数字不是它说的那个东西。
+
+- **`selftest --adapter=taixianglian` 一直跑的是内存适配器**：`cmdSelftest` 写死了 `makeAdapter('memory')` 与 `adapterName: 'memory'`，`flags.adapter` 从头到尾没被读过。于是「真实后端也一致」这个结论从来没在真实后端上量过。修完后第一次跑出真实数字：10/10，与内存适配器一致 —— 但这次是真的。
+- **`taixianglian` 适配器的 `order.list` 吞掉了翻页参数**：写死 `page=0&size=50`，于是「翻三页」的案例在真实后端上拿到三份一样的第一页。现在 `page` / `pageSize` 真的转发（后端是 0 基，适配器减一），并回 `page`/`pageSize`/`total`/`hasMore`。
+- **`pagination` 的顺序检查改为「方向一致」而不是「升序」**：内存适配器升序、真实后端按 id 倒序，升降序是各实现自己的约定，案例不该写死。真正的不变量是页与页之间方向不翻 —— 第一页降序、第二页升序，正是翻页丢 `ORDER BY` 的症状。`m-page-shuffle` 照样被抓。
+- 新档案 `k-ignored-flag`（第 15 条）+ `test/cli-flags.test.mjs` 守卫：用一个「一被加载就抛错」的桩适配器证明 `--adapter` 真的改变了被加载的实现。
+- 实测：`paged-orders` 在内存适配器与真实后端**都 pass**；`certify` 22/24 = 91.7%；`npm test` 239/239。
+
 ## 0.34.0
 
 分页：单看每一页都好的四种故障，终于有断言管了。
