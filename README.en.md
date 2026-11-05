@@ -333,15 +333,20 @@ The third domain forced a mechanism: mutants can declare `applies_to`. A ledger-
 Writing cases yourself is the expensive part. `import` admits that and gives an entry that does not guess:
 it turns **someone else's API test suite** into case drafts.
 
-RealWorld is the best corpus available: one contract, **990+ implementations**, 13 bundled hurl suites.
+RealWorld is a reusable API-contract corpus with 13 official Hurl suites. The importer preserves route actions, path parameters, roles and token captures; unsupported assertions go into `.todo.md` instead of disappearing silently.
+
+<p align="center">
+  <img src="docs/media/realworld-hurl-flow.svg" alt="13 official Hurl suites flow through import, human review and fixture verification into three-valued verdicts" width="100%">
+</p>
 
 ```bash
-agent-web import hurl examples/realworld/hurl --out=cases/realworld
-#   auth        20 steps / 60 assertions
-#   pagination   7 steps /  8 assertions
-#   tags         4 steps /  6 assertions
-#   total 31 steps, 74 assertions
+node examples/realworld/fake-server.mjs 8299 --allow-reset
+node bin/agent-web.mjs import hurl examples/realworld/hurl --out=cases/realworld --as=user
+# Review every generated case and .todo.md, accept them, then run:
+node bin/agent-web.mjs verify cases/realworld --adapter=realworld --detail
 ```
+
+Walkthrough: [terminal animation](docs/media/demo.gif) · [52-second intro video](docs/media/promo.mp4)
 
 Everything it writes is an **unconfirmed draft**; no verdict until `accept`. The converter only does what it can be sure of:
 
@@ -354,9 +359,11 @@ Everything it writes is an **unconfirmed draft**; no verdict until `accept`. The
 | `[Asserts] jsonpath "$.tags" count >= 1` | a `payload` assertion (reads the response body, not the view) |
 | an assertion it cannot read | one line in `<name>.todo.md` — **nothing dropped, nothing guessed** |
 
-**What is still missing**: there is no built-in `realworld` adapter. To actually run these, first
-`discover <a real implementation>` to generate a declarative adapter, or write an `adapter.yml` from
-`specs/api/openapi.yml`. That is the only part of this corpus a human still has to do.
+**The local fixture is included**: `examples/realworld/fake-server.mjs` is a zero-dependency 19-endpoint implementation, and the adapter lives at `src/adapter/realworld.mjs`. It validates the importer and verdict pipeline; it does not prove compatibility with a real RealWorld implementation.
+
+Keep the status scopes separate: importer unit tests are **15/15**. The checked-in `cases/realworld/*.json` are historical generated artifacts (kept unchanged by design); their current run is **10 pass / 2 fail / 1 unknown**. Two old cases encode DELETE actions differently from the fixed importer. To test current conversion behavior, regenerate into a temporary directory from `examples/realworld/hurl/`, review the drafts and confirm them before verification.
+
+For compatibility with a real implementation, point `REALWORLD_BASE_URL` at that service (see `examples/realworld/README.md`).
 
 ## What it does not do
 

@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="390" viewBox="0 0 1200 390" role="img" aria-labelledby="title desc">
+  <title id="title">RealWorld Hurl suites through agent-web</title>
+  <desc id="desc">Thirteen official Hurl suites are imported as drafts, reviewed, then exercised through the RealWorld adapter and local fixture to produce pass, fail, or unknown verdicts.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#101a2d"/>
+      <stop offset="1" stop-color="#1b2941"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#43d9c5"/>
+      <stop offset="1" stop-color="#7aa8ff"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-30%" width="140%" height="170%">
+      <feDropShadow dx="0" dy="8" stdDeviation="9" flood-color="#050b16" flood-opacity=".35"/>
+    </filter>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#7f9bbd"/>
+    </marker>
+  </defs>
+  <rect width="1200" height="390" rx="28" fill="url(#bg)"/>
+  <circle cx="1080" cy="60" r="110" fill="#39527e" opacity=".12"/>
+  <circle cx="70" cy="345" r="130" fill="#35cdb4" opacity=".07"/>
+  <text x="52" y="54" fill="#eef5ff" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="22" font-weight="700">RealWorld · contract in, evidence out</text>
+  <text x="52" y="82" fill="#a9bad2" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14">A repeatable path from upstream API assertions to machine-checkable verdicts</text>
+
+  <g filter="url(#shadow)" font-family="Inter,Segoe UI,Arial,sans-serif">
+    <rect x="52" y="126" width="218" height="142" rx="18" fill="#f1f6ff"/>
+    <rect x="52" y="126" width="218" height="7" rx="4" fill="#4f8cff"/>
+    <text x="74" y="166" fill="#17263d" font-size="13" font-weight="700" letter-spacing="1">SOURCE CONTRACT</text>
+    <text x="74" y="202" fill="#17263d" font-size="24" font-weight="750">13 Hurl suites</text>
+    <text x="74" y="229" fill="#52657f" font-size="14">Official requests + assertions</text>
+    <text x="74" y="250" fill="#52657f" font-size="14">kept as the source of truth</text>
+
+    <rect x="326" y="126" width="218" height="142" rx="18" fill="#f1f6ff"/>
+    <rect x="326" y="126" width="218" height="7" rx="4" fill="url(#accent)"/>
+    <text x="348" y="166" fill="#17263d" font-size="13" font-weight="700" letter-spacing="1">IMPORTER</text>
+    <text x="348" y="202" fill="#17263d" font-size="24" font-weight="750">hurl → drafts</text>
+    <text x="348" y="229" fill="#52657f" font-size="14">Routes, roles, captures</text>
+    <text x="348" y="250" fill="#52657f" font-size="14">and supported assertions</text>
+
+    <rect x="600" y="126" width="218" height="142" rx="18" fill="#f1f6ff"/>
+    <rect x="600" y="126" width="218" height="7" rx="4" fill="#f0b44d"/>
+    <text x="622" y="166" fill="#17263d" font-size="13" font-weight="700" letter-spacing="1">REVIEW GATE</text>
+    <text x="622" y="202" fill="#17263d" font-size="24" font-weight="750">accept first</text>
+    <text x="622" y="229" fill="#52657f" font-size="14">Drafts stay unjudged</text>
+    <text x="622" y="250" fill="#52657f" font-size="14">until a reviewer confirms</text>
+
+    <rect x="874" y="126" width="274" height="142" rx="18" fill="#f1f6ff"/>
+    <rect x="874" y="126" width="274" height="7" rx="4" fill="#43c794"/>
+    <text x="896" y="166" fill="#17263d" font-size="13" font-weight="700" letter-spacing="1">ADAPTER + LOCAL FIXTURE</text>
+    <text x="896" y="202" fill="#17263d" font-size="24" font-weight="750">verify --detail</text>
+    <text x="896" y="229" fill="#52657f" font-size="14">Resettable in-memory API</text>
+    <text x="896" y="250" fill="#52657f" font-size="14">on 127.0.0.1:8299</text>
+  </g>
+
+  <path d="M 276 197 H 314" stroke="#7f9bbd" stroke-width="3" marker-end="url(#arrow)"/>
+  <path d="M 550 197 H 588" stroke="#7f9bbd" stroke-width="3" marker-end="url(#arrow)"/>
+  <path d="M 824 197 H 862" stroke="#7f9bbd" stroke-width="3" marker-end="url(#arrow)"/>
+
+  <text x="52" y="324" fill="#a9bad2" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14" font-weight="700" letter-spacing="1">THREE-VALUED VERDICT</text>
+  <g font-family="Inter,Segoe UI,Arial,sans-serif" font-weight="700" font-size="15">
+    <rect x="258" y="296" width="176" height="48" rx="14" fill="#143c37" stroke="#37c99a"/>
+    <circle cx="282" cy="320" r="6" fill="#4de0aa"/>
+    <text x="298" y="326" fill="#d9fff1">PASS · assertions hold</text>
+    <rect x="452" y="296" width="176" height="48" rx="14" fill="#48272e" stroke="#f07880"/>
+    <circle cx="476" cy="320" r="6" fill="#ff818b"/>
+    <text x="492" y="326" fill="#ffe4e6">FAIL · assertion false</text>
+    <rect x="646" y="296" width="206" height="48" rx="14" fill="#46391f" stroke="#e6b750"/>
+    <circle cx="670" cy="320" r="6" fill="#f2c45a"/>
+    <text x="686" y="326" fill="#fff2ce">UNKNOWN · evidence missing</text>
+  </g>
+  <text x="52" y="370" fill="#849ab7" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12">The checked-in cases are historical generated artifacts; regenerate from hurl/ to use the latest importer behavior.</text>
+</svg>

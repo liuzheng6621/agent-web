@@ -366,15 +366,20 @@ $ agent-web align our-view.json their-view.json --out=align.yml
   <img src="docs/media/tap.png" width="880" alt="录流量或转套件">
 </div>
 
-RealWorld 是目前最好的语料：一份契约、**990+ 个实现**、自带 13 个 hurl 套件。
+RealWorld 是一组可复用的 API 契约语料：官方仓库附带 13 个 hurl 套件。导入器会保留路由动作、路径参数、角色和 token 捕获；不支持的断言会进入 `.todo.md`，不会静默丢弃。
+
+<p align="center">
+  <img src="docs/media/realworld-hurl-flow.svg" alt="13 个官方 Hurl 套件经导入、人工确认和夹具验证后产出三值判决" width="100%">
+</p>
 
 ```bash
-agent-web import hurl examples/realworld/hurl --out=cases/realworld
-#   auth        20 步 / 60 条断言
-#   pagination   7 步 /  8 条断言
-#   tags         4 步 /  6 条断言
-#   合计 31 步、74 条断言
+node examples/realworld/fake-server.mjs 8299 --allow-reset
+node bin/agent-web.mjs import hurl examples/realworld/hurl --out=cases/realworld --as=user
+# 先逐条检查生成的案例与 .todo.md，再 accept，最后运行：
+node bin/agent-web.mjs verify cases/realworld --adapter=realworld --detail
 ```
+
+过程预览：[终端动图](docs/media/demo.gif) · [52 秒介绍视频](docs/media/promo.mp4)
 
 转出来的都是**未确认草稿**，`accept` 之后才能出判决。转换器只做能确定的事：
 
@@ -387,12 +392,11 @@ agent-web import hurl examples/realworld/hurl --out=cases/realworld
 | `[Asserts] jsonpath "$.tags" count >= 1` | `payload` 断言（读返回体，不读视图） |
 | 读不懂的断言 | 写进同名 `.todo.md`，**一条不丢，一句不猜** |
 
-**还差什么**：`adapter: 'realworld'` 没有内置适配器。要真跑，先 `discover <某个实现的地址>` 生成声明式适配器，或者照 `specs/api/openapi.yml` 写一份 `adapter.yml`。这一步是这套语料唯一要人做的地方。
+**本地夹具已经内置**：`examples/realworld/fake-server.mjs` 提供零依赖的 19 端点实现，适配器位于 `src/adapter/realworld.mjs`。它便于验证导入器与判决链路；不能替代对真实 RealWorld 实现的兼容性测试。
 
-实测（本仓库自带的内存夹具，`node examples/realworld/fake-server.mjs 8299 --allow-reset`）：
-`probe` 6/6 通过，`verify cases/realworld --adapter=realworld` **3/3 与预期一致**。
-夹具只证明「转换器 + 适配器 + 判决链路是通的」，不证明「某个 RealWorld 实现是对的」——
-要证明后者，把 `REALWORLD_BASE_URL` 指向一个真实现（详见 `examples/realworld/README.md`）。
+状态口径要分清：修复后的 importer 单测为 **15/15**；仓库里提交的 `cases/realworld/*.json` 仍是历史生成物（遵守不改案例文件的约束），当前实测 **10 pass / 2 fail / 1 unknown**。其中旧案例的 DELETE 动作映射与新导入器行为不一致。需要复测最新转换逻辑时，从 `examples/realworld/hurl/` 重新生成到临时目录并人工检查、确认；不要把旧 JSON 的判决当成最新转换器结果。
+
+夹具只证明「转换器 + 适配器 + 判决链路是通的」，不证明「某个 RealWorld 实现是对的」——要验证真实实现，把 `REALWORLD_BASE_URL` 指向目标服务（详见 `examples/realworld/README.md`）。
 
 ## 现在做不到什么
 

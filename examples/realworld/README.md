@@ -1,8 +1,18 @@
 # RealWorld 语料：13 个套件转成案例
 
-`realworld-apps/realworld`（原 `gothinkster/realworld`）是「同一份契约、上百个实现」的那个项目。
+`realworld-apps/realworld`（原 `gothinkster/realworld`）提供一份 API 契约和多种实现。
 `specs/api/` 里除了 `openapi.yml`，还有两套能直接跑的断言套件：`hurl/`（13 个文件）和 `bruno/`。
-本目录放的就是这两样东西的副本，以及我们用它造的适配器和案例。
+本目录包含 Hurl 套件副本、零依赖夹具，以及用于复核 importer 的流程图、终端动图和介绍视频。
+
+<p align="center">
+  <img src="../../docs/media/realworld-hurl-flow.svg" alt="RealWorld Hurl 套件导入与验证流程" width="100%">
+</p>
+
+<p align="center">
+  <img src="../../docs/media/demo.gif" alt="agent-web 终端工作流动图" width="100%">
+</p>
+
+[播放 52 秒介绍视频](../../docs/media/promo.mp4)
 
 ```
 openapi.yml              19 个端点的契约（留给 discover 用）
@@ -26,30 +36,28 @@ for f in cases/realworld/*.json; do node bin/agent-web.mjs accept "$f" --by=你�
 node bin/agent-web.mjs verify cases/realworld --adapter=realworld --detail
 ```
 
-## 当前状态（2026-11-05，v0.37.1）
+## 当前状态（2026-11-06，v0.43.0）
 
 | 指标 | 数字 |
 |---|---|
-| 套件 → 案例 | 13 |
-| 步 | 157 |
-| `payload` 断言 | 296 |
-| 转不成断言的待办 | 94（favorites 24、feed 11、errors_comments 3、errors_articles 1） |
-| `verify` 实测 | **pass 3 / fail 9 / unknown 1** |
+| 官方 Hurl 套件 | 13 |
+| 请求步数 / 原始 Hurl 断言 | 157 / 296 |
+| 导入器单测 | **15 / 15 pass** |
+| 仓库内历史生成案例实测 | **10 pass / 2 fail / 1 unknown** |
 
-`cases/realworld/expected.json` 里写的是**目标标签**（13 条全 `pass`），不是实测结果——
-所以这个目录现在是一条红线：它把「我们的实现还没对齐契约」明明白白摆出来。
-**因此它不进 CI**：CI 只跑 `cases/coffee` 与 `cases/animal` 的闸门。
+`cases/realworld/expected.json` 是**目标标签**，不是实测结果。按不改案例文件的约束，当前案例 JSON 保持原样；它们是修复 importer 之前生成的历史产物。最新 importer 的动作映射变更不会反向改写这些文件。重新导入后先逐条审核草稿及 `.todo.md`，再由人 `accept`，最后跑 `verify`。
 
-## 十条红的分类（都是真差异，不是工具失灵）
+该夹具用于检查 importer、适配器和判决链路，不代表真实 RealWorld 服务的兼容性。**因此语料仍不进 CI**：CI 只跑 `cases/coffee` 与 `cases/animal` 的闸门。
 
-| 类别 | 例 | 原因 |
+## 仍留在历史案例产物中的差异
+
+| 案例 | 当前判决 | 原因 |
 |---|---|---|
-| 夹具文案 | `$.errors.comment[0]` 期望 `forbidden`、实际 `is not yours` | 内存夹具的错误文案与参考实现不同 |
-| 夹具缺字段 | `$.errors.article[0]` 期望 `not found`、实际 `undefined` | 未命中路由时回的是 `{route:[…]}` |
-| 鉴权字段 | `$.errors.token[0]` 期望 `is missing`、实际 `undefined` | 部分路由没走「未登录」分支 |
-| 多身份 | `articles.update 应被拒绝，实际被执行` | 套件用两个 token 操作两个人，角色绑定还没完全对上 |
-| 计数口径 | `feed` 期望 1 条，实际 2 条 | 夹具的 `follows` 过滤与套件预期不一致 |
-| 状态回读 | `favorited` 取消后仍为 `true` | 取消收藏那一步的执行者与查询者不是同一个人 |
+| `errors_articles` | `unknown/coverage_gap` | 旧 JSON 将静态路径段 `some-slug` 写成能力 `some-slug.update`；需要从 Hurl 重新导入再审核 |
+| `favorites` | `fail/assertion_false` | 旧 JSON 把 DELETE unfavorite 留成 `articles.favorite` |
+| `profiles` | `fail/assertion_false` | 旧 JSON 把 DELETE unfollow 留成 `profiles.follow` |
+
+其余旧失败项对应的夹具/适配器问题已修：注册字段校验、tagList 更新、未认证错误体、评论越权文案与文章存在性、feed 分页和 token 身份继承。历史案例文件未被覆盖。
 
 ## 这个目录证明了什么
 
