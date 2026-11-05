@@ -162,11 +162,29 @@ export function fastProbe(caseObj, base, tamper) {
  * 编号增长当故障：真实后端上 certify 会凭空多出几条 killable，还会建议写
  * 「orders.0.id 等于 196」这种换个实现就红的断言。
  */
+/**
+ * 逐步对比每一步「执行之后的状态」。
+ *
+ * 没有这一层，只在终态上看得见的差异才叫见证，于是「中途坏、结尾修好」的变异体
+ * （m-transient-*、m-approval-*）永远被判「说不清」——它确实坏了，只是收尾时又对了。
+ */
+export function traceDiff(a, b, budget = 200) {
+  const out = [];
+  const at = a && Array.isArray(a.trace) ? a.trace : [];
+  const bt = b && Array.isArray(b.trace) ? b.trace : [];
+  const n = Math.min(at.length, bt.length);
+  for (let i = 0; i < n && out.length < budget; i += 1) {
+    diffLeaves(at[i] && at[i].stateAfter, bt[i] && bt[i].stateAfter, 'trace.' + (i + 1), out, budget);
+  }
+  return out;
+}
+
 function driftPaths(a, b) {
   const set = new Set();
   if (!a || !b) return set;
   for (const w of diffLeaves(a.final, b.final, '', [], 400)) set.add(w.path);
   for (const w of diffLeaves(a.initial, b.initial, '', [], 200)) set.add('initial.' + w.path);
+  for (const w of traceDiff(a, b, 400)) set.add(w.path);
   return set;
 }
 
@@ -210,6 +228,8 @@ export async function certifyCase(caseObj, adapterFactory, { adapterName = 'unkn
     // 有差异说明它一定杀得掉——只差一条还没写出来的断言。
     const witnesses = diffLeaves(base.ctx?.final, p.ctx?.final, '', [], 12)
       .concat(diffLeaves(base.ctx?.initial, p.ctx?.initial, 'initial.', [], 6))
+      // 中途的差异也算见证：只比终态会把「中途坏、结尾修好」的一类整批漏掉
+      .concat(traceDiff(base.ctx, p.ctx, 6))
       // 漂移路径剔除：同一实现跑两遍都会变的字段，不能拿来当「这个变异体被看见了」的证据。
       .filter((w) => !drift.has(w.path));
     const suggestions = [];
@@ -295,6 +315,9 @@ export function appliesTo(meta, manifest) {
 
 export function suggestFromWitness(witness, baseCtx) {
   if (!isPortablePath(witness.path)) return null;
+  // trace.3.xxx 是「第 3 步之后的状态」，只对这一条案例成立；要断言它得用 window/every_step，
+  // 不是把步号写进 field_equals。这类见证照实报出来，但不给建议。
+  if (String(witness.path).startsWith('trace.')) return null;
   const parts = String(witness.path).split('.');
   const collection = parts[0];
   if (!VIEW_COLLECTIONS.includes(collection)) return null;

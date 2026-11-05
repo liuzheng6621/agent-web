@@ -38,6 +38,20 @@
           "collection": "adoption_applications"
         },
         "delta": 1
+      },
+      {
+        "kind": "window",
+        "from_step": 0,
+        "to_step": 1,
+        "of": {
+          "kind": "field_equals",
+          "selector": {
+            "collection": "adoption_applications",
+            "index": 0
+          },
+          "path": "status",
+          "value": "PENDING"
+        }
       }
     ],
     "invariants": [

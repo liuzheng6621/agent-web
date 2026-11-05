@@ -244,3 +244,15 @@ test('--suggest 的产出能直接粘进案例，并交代哪些给不出', asyn
     assert.ok(text.includes('field_equals') || text.includes('count_delta'));
   }
 });
+
+test('witness 能看见中途的差异：终态一样时也要报出来', async () => {
+  const { traceDiff } = await import('../src/certify.mjs');
+  const a = { trace: [{ stateAfter: { orders: [{ id: 1, status: 'NEW' }] } }, { stateAfter: { orders: [{ id: 1, status: 'DONE' }] } }] };
+  const b = { trace: [{ stateAfter: { orders: [{ id: 1, status: 'NEW' }] } }, { stateAfter: { orders: [{ id: 1, status: 'NEW' }] } }] };
+  const diff = traceDiff(a, b);
+  assert.ok(diff.length > 0, '第 2 步状态不同，必须报出见证');
+  assert.ok(diff[0].path.startsWith('trace.2.'), '见证路径要带步号，实际是 ' + diff[0].path);
+  // 终态相同
+  const same = traceDiff({ trace: [{ stateAfter: { x: 1 } }] }, { trace: [{ stateAfter: { x: 1 } }] });
+  assert.equal(same.length, 0);
+});

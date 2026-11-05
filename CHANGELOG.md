@@ -6,6 +6,19 @@
 CI 也在查。这条规则是买来的：这个仓库曾经同时存在 `package.json` 0.16、README 0.9、
 Gitee Release v0.6.0 三个数，谁看都是三个项目。
 
+## 0.43.0
+
+`witness` 现在看每一步，不只看终态——「中途坏、结尾修好」这一类终于能被看见。
+
+- 新增 `traceDiff(a, b)`：逐步对比 `trace[i].stateAfter`，见证路径形如 `trace.3.adoption_applications.0.status`。
+- `driftPaths` 同步覆盖每一步（两次重放之间本来就会变的字段，不能拿来当见证）。
+- `trace.*` 的见证照实报出，但**不给建议**：步号只对这一条案例成立，要断言它得用 `window` / `every_step`，
+  不是把步号写进 `field_equals`。
+- 效果：`m-approval-autoapprove` 在动物域从「说不清」变成「欠账（2 处可观测差异）」，
+  补一条 `window from_step:0 to_step:1` 的断言后变成「抓到」（`adoption-submit-reject#goal[4]` 独占）。
+- 上一次失败的原因也写进文档：用 `every_step` 圈整条案例会把「本人撤回后变 REJECTED」判成违约，
+  区间要卡在提交之后、撤回之前。
+
 ## 0.42.0
 
 动物域补一条业务层变异体，顺带修掉一个让断言跑到「上一轮数据」上的真 bug。
