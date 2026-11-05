@@ -115,6 +115,7 @@ export function createRealWorldAdapter(opts = {}) {
       runs.set(runId, {
         users: { user: a, user2: b },
         tokens: { user: ra.payload.user.token, user2: rb.payload.user.token },
+        roleEmails: { user: a.email, user2: b.email },
       });
       history.push({ username: a.username, token: ra.payload.user.token });
       history.push({ username: b.username, token: rb.payload.user.token });
@@ -154,20 +155,26 @@ export function createRealWorldAdapter(opts = {}) {
         return s ? `?${s}` : '';
       };
       const call = (method, path, body) => http(method, path, { token, body });
+      const bindRoleToAccount = (role, user) => {
+        const previousEmail = run.roleEmails[role];
+        for (const [alias, email] of Object.entries(run.roleEmails)) {
+          if (alias === role || email === user.email || (previousEmail && email === previousEmail)) {
+            run.roleEmails[alias] = user.email;
+            run.tokens[alias] = user.token;
+          }
+        }
+        run.roleEmails[role] = user.email;
+        run.tokens[role] = user.token;
+      };
       let res;
       switch (id) {
         case 'users.create':
           res = await call('POST', '/users', { user: { username: a.username, email: a.email, password: a.password } });
-          if (res.status < 400 && res.payload && res.payload.user) {
-            // 案例注册的这个人，后续步骤就以他的身份执行（run.tokens 是运行级的角色→token 表）
-            run.tokens[action.as] = res.payload.user.token;
-          }
+          if (res.status < 400 && res.payload && res.payload.user) bindRoleToAccount(action.as, res.payload.user);
           return this.classify(res, { token: res.payload && res.payload.user && res.payload.user.token });
         case 'users.login':
           res = await call('POST', '/users/login', { user: { email: a.email, password: a.password } });
-          if (res.status < 400 && res.payload && res.payload.user) {
-            run.tokens[action.as] = res.payload.user.token;
-          }
+          if (res.status < 400 && res.payload && res.payload.user) bindRoleToAccount(action.as, res.payload.user);
           return this.classify(res, { token: res.payload && res.payload.user && res.payload.user.token });
         case 'user.get':
           return this.classify(await call('GET', '/user'));
