@@ -197,7 +197,12 @@ test('适用范围：声明了能力或集合的变异体，在别的域里不�
   // 而不是「漏网」——把跨域变异体混进分母，会让每个新域都把抓获率砸出个大坑。
   const coffee = await certify({ cases: all(), adapterFactory: () => createMemoryAdapter() });
   const na = coffee.mutations.filter((m) => m.status === 'not_applicable');
-  assert.equal(na.length, 3, '三个账本变异体在咖啡域应全部不适用：' + na.map((m) => m.id).join(','));
+  // 账本变异体有几个就写几个，但**不能少于三个**：这条测的是「跨域不进分母」，
+  // 不是某个具体条数。硬编条数会让每加一个业务变异体都要改测试。
+  assert.ok(na.length >= 3, '账本变异体在咖啡域应全部不适用：' + na.map((m) => m.id).join(','));
+  for (const id of ['m-ledger-sign-flip', 'm-dup-credit-entry', 'm-unbalanced-accepted']) {
+    assert.equal(coffee.mutations.find((m) => m.id === id).status, 'not_applicable', id + ' 在咖啡域应不适用');
+  }
   assert.equal(coffee.mutations.find((m) => m.id === 'm-ledger-sign-flip').status, 'not_applicable');
   assert.equal(coffee.summary.applicable + coffee.summary.notApplicable, coffee.summary.mutations);
   assert.equal(coffee.summary.survived, coffee.summary.applicable - coffee.summary.caught);

@@ -58,6 +58,18 @@
         },
         "path": "balance",
         "value": -100
+      },
+      {
+        "kind": "relation",
+        "selector": {
+          "collection": "transactions"
+        },
+        "op": "sum_by_equals",
+        "leaf": "entries",
+        "field": "amount",
+        "group_field": "direction",
+        "left": "debit",
+        "right": "credit"
       }
     ]
   },

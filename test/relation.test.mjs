@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { evalAssertion, validateAssertion, PHASE_MATRIX } from '../src/assert/index.mjs';
 import { discoverRelations } from '../src/relations.mjs';
+import { relation } from '../src/assert/relation.mjs';
 import { TRUE, FALSE, UNKNOWN } from '../src/three-valued.mjs';
 
 const state = (orders) => ({ orders, menu: [], status_log: [] });
@@ -101,4 +102,30 @@ test('发现器不会提议不成立的关系', () => {
   const broken = order({ totalAmount: 999 });
   const found = discoverRelations({ initial: state([]), final: state([broken]) });
   assert.equal(found.find((x) => x.assertion.op === 'sum_equals'), undefined);
+});
+
+test('sum_by_equals：借贷必须相等，多一条贷方就红', () => {
+  const spec = {
+    selector: { collection: 'transactions' },
+    op: 'sum_by_equals', leaf: 'entries', field: 'amount', group_field: 'direction', left: 'debit', right: 'credit',
+  };
+  const good = { final: { transactions: [{ entries: [{ direction: 'debit', amount: 100 }, { direction: 'credit', amount: 100 }] }] } };
+  assert.equal(relation(spec, good).status, 'true');
+  const bad = { final: { transactions: [{ entries: [{ direction: 'debit', amount: 100 }, { direction: 'credit', amount: 100 }, { direction: 'credit', amount: 100 }] }] } };
+  const r = relation(spec, bad);
+  assert.equal(r.status, 'false');
+  assert.equal(r.code, 'relation_violated');
+  assert.match(r.message, /debit 合计 100 ≠ credit 合计 200/);
+});
+
+test('sum_by_equals：缺参数 / 找不到对应行 都是 unknown，不判假', () => {
+  const ctx = { final: { transactions: [{ entries: [{ direction: 'debit', amount: 1 }] }] } };
+  assert.equal(relation({ selector: { collection: 'transactions' }, op: 'sum_by_equals' }, ctx).code, 'invalid_case');
+  const spec = { selector: { collection: 'transactions' }, op: 'sum_by_equals', leaf: 'entries', field: 'amount', group_field: 'direction', left: 'debit', right: 'credit' };
+  // 只有借方、没有贷方：**这就是不平**，要判假而不是「看不见」
+  const oneSide = { final: { transactions: [{ entries: [{ direction: 'debit', amount: 1 }] }] } };
+  assert.equal(relation(spec, oneSide).code, 'relation_violated');
+  // 一条方向都没匹配上，才算看不见
+  const none = { final: { transactions: [{ entries: [{ direction: 'memo', amount: 1 }] }] } };
+  assert.equal(relation(spec, none).code, 'missing_observation');
 });

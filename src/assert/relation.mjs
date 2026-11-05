@@ -23,7 +23,7 @@ import { getPath } from '../values.mjs';
 
 const ok = (status, code, message) => ({ status, code, message });
 
-export const RELATION_OPS = Object.freeze(['eq', 'sum_equals', 'product_equals', 'sorted']);
+export const RELATION_OPS = Object.freeze(['eq', 'sum_equals', 'product_equals', 'sorted', 'sum_by_equals']);
 
 const NUMERIC = (v) => typeof v === 'number' && Number.isFinite(v);
 
@@ -128,9 +128,42 @@ function fmt(v) {
   return String(v);
 }
 
+
+/**
+ * sum_by_equals：同一集合里，按 group_field 分成两组，两组 field 之和必须相等。
+ * 借贷平衡就是这条：Σ(debit.amount) == Σ(credit.amount)。
+ * 多一条贷方分录不会被「交易条数」「描述」看见，只有这个和看得见。
+ */
+function opSumByEquals(a, rows) {
+  const { leaf, field, group_field: gf, left, right } = a;
+  if (!field || !gf || !left || !right) {
+    return ok(UNKNOWN, 'invalid_case', 'sum_by_equals 需要 field / group_field / left / right');
+  }
+  let l = 0;
+  let r = 0;
+  let seen = 0;
+  let skipped = 0;
+  for (const row of rows) {
+    const items = leaf ? row[leaf] : [row];
+    if (!Array.isArray(items)) { skipped += 1; continue; }
+    for (const it of items) {
+      const g = it && it[gf];
+      const v = it && it[field];
+      if (!NUMERIC(v)) { skipped += 1; continue; }
+      if (g === left) { l += v; seen += 1; } else if (g === right) { r += v; seen += 1; }
+    }
+  }
+  if (seen === 0) return ok(UNKNOWN, 'missing_observation', `没找到 ${gf}=${left}/${right} 的行`);
+  const note = skipped > 0 ? `（跳过 ${skipped} 条读不懂的分录）` : '';
+  if (l !== r) return ok(FALSE, 'relation_violated', `${left} 合计 ${l} ≠ ${right} 合计 ${r}${note}`);
+  return ok(TRUE, 'ok', `${left} 与 ${right} 各 ${l}${note}`);
+}
+
 export function relation(a, ctx) {
   const g = guard(a.selector, ctx);
   if (g.blocked) return g.blocked;
+
+  if (a.op === 'sum_by_equals') return opSumByEquals(a, g.sel.rows);
 
   if (a.op === 'sorted') {
     // 集合级：一次判完整个集合，不做「每行都判一遍再取最坏」——

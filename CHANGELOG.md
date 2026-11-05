@@ -6,6 +6,18 @@
 CI 也在查。这条规则是买来的：这个仓库曾经同时存在 `package.json` 0.16、README 0.9、
 Gitee Release v0.6.0 三个数，谁看都是三个项目。
 
+## 0.41.0
+
+L5 第二刀：账本域两条业务层变异体，其中一条当场逼出一个新算子。
+
+- `m-dup-credit-entry`（把每笔交易的贷方分录复制一条）——**第一次跑是「欠账」**：交易条数、描述、`total` 全不变，
+  现有五条断言一条都看不见，因为账本案例只校验「各账户余额」，从不校验「分录自己平不平」。
+- 于是 `relation` 补一个算子 `sum_by_equals`：`{selector:{collection}, op:'sum_by_equals', leaf:'entries',
+  field:'amount', group_field:'direction', left:'debit', right:'credit'}` —— 同一集合里两组行的字段之和必须相等。
+  借贷平衡就是这条。加进 `ledger/post-balanced.json` 后，`#goal[5]` **只杀 `m-dup-credit-entry` 一个**。
+- `m-unbalanced-accepted`（把 `transaction.post` 的拒收改成成功）：被 `reject-unbalanced` 等负例的
+  `count_delta`/`unchanged` 以「判决级 ×3」抓住。
+
 ## 0.40.0
 
 L5 第一刀：`breed` 不再硬编码集合名，执行层变异体补三条。
