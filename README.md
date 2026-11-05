@@ -1,4 +1,4 @@
-# agent-web v0.35.0
+# agent-web v0.36.0
 
 <p align="center">
   <img src="docs/media/hero.png" alt="agent-web：给 Agent 写机器可判的集成测试" width="100%">
@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <b>当前版本 0.35.0</b> · 15 种断言 · 27 条命令 · 27 个变异体
+  <b>当前版本 0.36.0</b> · 16 种断言 · 28 条命令 · 28 个变异体
 </p>
 
 <p align="center">
@@ -340,6 +340,7 @@ $ agent-web align our-view.json their-view.json --out=align.yml
 | `record` / `prepare` / `draft` | 从真实动作日志还原轨迹、生成案例草稿 |
 | `flow` | 单案例判决页；给目录出总览页 |
 | `discover` | 探一个站点：只读适配器 + 案例草稿 + 施工单 |
+| `import hurl` | 把 hurl 套件转成案例草稿（不联网、不执行） |
 | `tap` / `learn` | 反向代理录一段流量，长出适配器 / 孪生 / 案例草稿 |
 | `mutants` | 变异体目录：谁的坏法、怎么抓、怎么投稿 |
 | `audit` | 假绿审计：拿真实后端当尺子量候选实现 |
@@ -356,6 +357,37 @@ $ agent-web align our-view.json their-view.json --out=align.yml
 - **建议断言必须当场验过。** 正确实现 true、坏实现 false 才给出来；位置相关的建议会额外警告。
 - **三档状态不混算。** 欠账、说不清、不适用各有各的出口；混在一起，基线表三天就没人看了。
 - **两条校验不混用。** 「必须答满」防偷懒，「答了就必须对」防瞎写——合成一条就会互相放水。
+
+## 现成的案例从哪来
+
+自己写案例是最贵的一步。`import` 承认这件事，给了一个不靠猜的入口：**把别人已经写好的接口测试套件转成案例草稿**。
+
+<div align="center">
+  <img src="docs/media/tap.png" width="880" alt="录流量或转套件">
+</div>
+
+RealWorld 是目前最好的语料：一份契约、**990+ 个实现**、自带 13 个 hurl 套件。
+
+```bash
+agent-web import hurl examples/realworld/hurl --out=cases/realworld
+#   auth        20 步 / 60 条断言
+#   pagination   7 步 /  8 条断言
+#   tags         4 步 /  6 条断言
+#   合计 31 步、74 条断言
+```
+
+转出来的都是**未确认草稿**，`accept` 之后才能出判决。转换器只做能确定的事：
+
+| hurl 里的东西 | 转成什么 |
+|---|---|
+| 请求 + JSON 体 | 一步，能力名按方法 + 资源推导 |
+| `HTTP 201` / `HTTP 422` | 期望结果：`applied` / `rejected`；`5xx` 整块跳过 |
+| `Authorization` 头 | 这一步用哪个角色（`--as` 指定） |
+| `[Captures] slug: jsonpath "$.article.slug"` | 该步捕获，后续 `{{slug}}` 作为路径参数回填 |
+| `[Asserts] jsonpath "$.tags" count >= 1` | `payload` 断言（读返回体，不读视图） |
+| 读不懂的断言 | 写进同名 `.todo.md`，**一条不丢，一句不猜** |
+
+**还差什么**：`adapter: 'realworld'` 没有内置适配器。要真跑，先 `discover <某个实现的地址>` 生成声明式适配器，或者照 `specs/api/openapi.yml` 写一份 `adapter.yml`。这一步是这套语料唯一要人做的地方。
 
 ## 现在做不到什么
 

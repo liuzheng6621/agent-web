@@ -23,6 +23,7 @@
  */
 
 import fs from 'node:fs';
+import { writeImport, formatImport, HURL_VERSION } from '../src/import-hurl.mjs';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
@@ -449,6 +450,40 @@ function cmdMutants(args, flags) {
     console.log('');
   }
   console.log('投稿：复制 docs/mutants/ 里任一文件，改 id 与 wrap，登记到 index.mjs 的 ENTRIES，跑 npm test。');
+  return 0;
+}
+
+async function cmdImport(args, flags) {
+  const what = args[0];
+  const target = args[1];
+  if (!what || !target) {
+    console.error('用法：agent-web import hurl <文件或目录> --out=DIR [--as=角色] [--uid=] [--json]');
+    console.error('');
+    console.error('  hurl 是纯文本的接口测试格式，RealWorld 那类语料自带一整套。');
+    console.error('  转换器只做能确定的事：请求 → 步、[Captures] → 捕获、[Asserts] → payload 断言；');
+    console.error('  读不懂的写进同名 .todo.md，不猜。');
+    return 2;
+  }
+  if (what !== 'hurl') {
+    console.error('只认 hurl：目前没有 hurl 之外的转换器。');
+    return 2;
+  }
+  if (!fs.existsSync(target)) {
+    console.error('找不到 ' + target);
+    return 2;
+  }
+  const out = String(flags.out || 'cases/imported');
+  const made = writeImport(target, out, {
+    as: flags.as ? String(flags.as) : 'user',
+    uid: flags.uid ? String(flags.uid) : '000000',
+  });
+  if (flags.json) {
+    console.log(JSON.stringify({ version: HURL_VERSION, out, suites: made }, null, 2));
+    return 0;
+  }
+  console.log(formatImport(made));
+  console.log('');
+  console.log('写到 ' + out + '，都是未确认草稿。');
   return 0;
 }
 
@@ -1666,6 +1701,7 @@ const HELP = `agent-web —— 给 Agent 写机器可判的集成测试
   agent-web draft <轨迹文件> --adapter=SPEC   回放轨迹，反推案例草稿（要人确认）
   agent-web flow <案例或目录> [--result=FILE]  单案例流程图；给目录则生成判决总览
   agent-web discover <网址> --out=DIR         探一个站点：生成只读适配器、案例草稿和施工单
+  agent-web import hurl <文件|目录> --out=DIR 把 hurl 套件转成案例草稿（不联网）
   agent-web tap --target=URL                  录五分钟：流量长出适配器、孪生与案例
   agent-web learn <traffic.jsonl> --out=DIR  把录制学成四件东西（yaml/孪生/案例/认不出的）
   agent-web mutants                           变异体目录：谁的坏法、怎么抓、怎么投稿
@@ -1704,6 +1740,8 @@ async function main() {
 
   try {
     switch (cmd) {
+    case 'import':
+      return await cmdImport(args, flags);
       case 'selftest':
         return await cmdSelftest(flags);
       case 'verify':

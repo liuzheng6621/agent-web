@@ -80,6 +80,15 @@ const PAGED = {
   baseline: [{ kind: 'entity_exists', selector: { collection: 'orders' } }],
 };
 
+const PAYLOAD_SPEC = [
+  {
+    kind: 'payload',
+    caseId: 'payload-echo',
+    assertion: { kind: 'payload', step: 3, path: '$.orders', op: 'count_gte', value: 2 },
+    baseline: [{ kind: 'count_delta', selector: { collection: 'orders' }, delta: 2 }],
+  },
+];
+
 const SHAPE = [
   { kind: 'entity_exists', selector: { collection: 'orders', index: 0 } },
   { kind: 'count_delta', selector: { collection: 'orders' }, delta: 2 },
@@ -109,6 +118,23 @@ async function run() {
       return [...caughtBefore].filter((id) => !caughtAfter.has(id));
     });
   };
+
+
+  // 响应体断言：去掉它，m-payload-truncate 就该漏网。
+  for (const spec of PAYLOAD_SPEC) {
+    const withIt = await certify({ cases: [withGoal(spec.caseId, [...spec.baseline, spec.assertion])], adapterFactory: factory, adapterName: 'memory', mutations: pool });
+    const without = await certify({ cases: [withGoal(spec.caseId, [...spec.baseline])], adapterFactory: factory, adapterName: 'memory', mutations: pool });
+    const kills = withIt.mutations.filter((m) => (m.killedBy ?? []).some((k) => (typeof k === 'string' ? k : k.kind) === spec.kind));
+    const caughtWith = new Set(withIt.mutations.filter((m) => m.status === 'caught').map((m) => m.id));
+    const caughtWithout = new Set(without.mutations.filter((m) => m.status === 'caught').map((m) => m.id));
+    const necessary = [...caughtWith].filter((id) => !caughtWithout.has(id));
+    const ok = kills.length > 0 && necessary.length > 0;
+    if (!ok) failedTemporal += 1;
+    console.log(`${ok ? 'PASS' : 'FAIL'}  ${spec.kind}（案例 ${spec.caseId}）`);
+    console.log(`      能杀 ${kills.length} 个：${kills.map((m) => m.id).join(' ') || '—'}`);
+    console.log(`      只有它能杀 ${necessary.length} 个：${necessary.join(' ') || '—'}
+`);
+  }
 
   const shapeKinds = ['unique', 'type_of', 'subset', 'sorted_by'];
 

@@ -10,6 +10,7 @@ import * as historyEmpty from './m-history-empty.mjs';
 import * as extraForeignOrder from './m-extra-foreign-order.mjs';
 import * as foreignWriteAllowed from './m-foreign-write-allowed.mjs';
 import * as noReject from './m-no-reject.mjs';
+import * as payloadTruncate from './m-payload-truncate.mjs';
 import * as itemCountFlattened from './m-item-count-flattened.mjs';
 import * as pickupNoOffset from './m-pickup-no-offset.mjs';
 import * as totalSingleUnit from './m-total-single-unit.mjs';
@@ -39,6 +40,7 @@ const ENTRIES = [
   ['m-extra-foreign-order', extraForeignOrder],
   ['m-foreign-write-allowed', foreignWriteAllowed],
   ['m-no-reject', noReject],
+  ['m-payload-truncate', payloadTruncate],
   ['m-item-count-flattened', itemCountFlattened],
   ['m-pickup-no-offset', pickupNoOffset],
   ['m-total-single-unit', totalSingleUnit],

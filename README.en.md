@@ -1,4 +1,4 @@
-# agent-web v0.35.0
+# agent-web v0.36.0
 
 <p align="center">
   <img src="docs/media/hero.png" alt="agent-web: integration tests an agent can be judged on" width="100%">
@@ -18,7 +18,7 @@
 </p>
 
 <p align="center">
-  <b>v0.35.0</b> · 15 assertion kinds · 27 commands · 27 mutants
+  <b>v0.36.0</b> · 16 assertion kinds · 28 commands · 28 mutants
 </p>
 
 <p align="center">
@@ -327,6 +327,36 @@ The third domain forced a mechanism: mutants can declare `applies_to`. A ledger-
 - **Suggested assertions are verified on the spot.** Correct implementation true, broken implementation false — only then emitted; position-dependent suggestions get an extra warning.
 - **Three tiers never mixed.** Owed, undetermined, not applicable each have their own exit; mix them and the baseline table becomes unreadable in three days.
 - **Two grading checks never merged.** "Must answer all" prevents laziness, "answered ones must be correct" prevents sloppy work — merging them lets each excuse the other.
+
+## Where ready-made cases come from
+
+Writing cases yourself is the expensive part. `import` admits that and gives an entry that does not guess:
+it turns **someone else's API test suite** into case drafts.
+
+RealWorld is the best corpus available: one contract, **990+ implementations**, 13 bundled hurl suites.
+
+```bash
+agent-web import hurl examples/realworld/hurl --out=cases/realworld
+#   auth        20 steps / 60 assertions
+#   pagination   7 steps /  8 assertions
+#   tags         4 steps /  6 assertions
+#   total 31 steps, 74 assertions
+```
+
+Everything it writes is an **unconfirmed draft**; no verdict until `accept`. The converter only does what it can be sure of:
+
+| in hurl | becomes |
+|---|---|
+| request + JSON body | one step, capability derived from method + resource |
+| `HTTP 201` / `HTTP 422` | expected outcome `applied` / `rejected`; `5xx` blocks are skipped |
+| `Authorization` header | which role runs the step (`--as`) |
+| `[Captures] slug: jsonpath "$.article.slug"` | a capture on that step, later `{{slug}}` fills the path parameter |
+| `[Asserts] jsonpath "$.tags" count >= 1` | a `payload` assertion (reads the response body, not the view) |
+| an assertion it cannot read | one line in `<name>.todo.md` — **nothing dropped, nothing guessed** |
+
+**What is still missing**: there is no built-in `realworld` adapter. To actually run these, first
+`discover <a real implementation>` to generate a declarative adapter, or write an `adapter.yml` from
+`specs/api/openapi.yml`. That is the only part of this corpus a human still has to do.
 
 ## What it does not do
 

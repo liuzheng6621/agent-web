@@ -282,6 +282,30 @@ memory 适配器          → pass
 
 这和 `m-pickup-no-offset`（取餐号偏移 100）是同一类：**能被观测到，不等于值得被断言**。
 
+### 4.3.2 payload：返回体断言
+
+前十五种断言读的都是**规范视图**（那份「此刻系统里有什么」的快照）。`payload` 读的是
+**每一步的响应体**——视图里没有 token、没有分页信封、没有请求回执，这些只能从返回体看。
+
+```json
+{"kind": "payload", "step": 3, "path": "$.orders", "op": "count_gte", "value": 2}
+```
+
+| 字段 | 说明 |
+|---|---|
+| `step` | 1 基步号，与 `window` / `pagination` 同一套坐标 |
+| `path` | 简化 JSONPath：`$.a.b[0].c`（数组下标只支持数字） |
+| `op` | `exists` / `equals` / `is_string` / `is_list` / `not_empty` / `count_gte` / `count_equals` / `contains` |
+| `value` | `exists`/`is_string`/`is_list`/`not_empty` 之外必填 |
+
+**相位只能是 `trace`**：返回体只属于某一步，拿去和终态比没有意义。
+
+**看不到返回体时是 `unknown`，不是 `fail`** —— 适配器 `execute` 必须回 `payload`，否则
+这条断言只能判「看不见」。这是有意的：把「不知道」写成「不通过」会让实现背黑锅。
+
+它的独占杀手是 `m-payload-truncate`（执行成功后把返回体里每个顶层数组砍掉一行）：
+状态完全正确，只有响应体坏。`scripts/kind-necessity.mjs` 每次都会验这一条。
+
 ## 5. 参考轨迹
 
 ```json
@@ -1490,3 +1514,44 @@ accepted: []
 - 引入任何形式的模型判定
 - 让 `drill` 只报 `asked` 而不报 `skipped` / `not_applicable` / `invisible`（四桶必须相加等于配对数）
 - 允许 `drill grade` 用提交里的文字说明代替实跑结果
+
+## 22. 从现成套件转案例（import hurl）
+
+案例写不完是这套工具最硬的墙。`import` 承认这件事，并给出一个不靠猜的入口：
+把**别人已经写好的接口测试套件**转成案例草稿。
+
+```bash
+agent-web import hurl examples/realworld/hurl --out=cases/realworld [--as=角色] [--uid=固定值]
+```
+
+### 22.1 为什么是 hurl
+
+纯文本、有 `[Captures]` 与 `[Asserts]` 段、断言词汇小（`==` / `isString` / `isList` /
+`not isEmpty` / `count >= n` / `count == n` / `contains`），每一条都能落到 `payload` 断言上。
+Postman 是 JSON 且层层嵌套，Bruno 是自有目录格式，转换成本更高、可读性更差。
+
+### 22.2 转换规则
+
+| hurl | agent-web |
+|---|---|
+| `POST {{host}}/api/users` + JSON 体 | 一步：`capability: users.create`，body 进 `arguments` |
+| `HTTP 201` / `HTTP 422` | `expected_outcome: applied` / `rejected`；`5xx` 整块跳过 |
+| `Authorization:` 头 | `as: <--as 指定的角色>`；没有该头则是 `anonymous` |
+| `[Captures] slug: jsonpath "$.article.slug"` | 该步 `captures: {slug: "$s2.slug"}`，后续 `{{slug}}` 作为路径参数回填 |
+| `[Asserts] jsonpath "$.tags" count >= 1` | `{"kind":"payload","step":3,"path":"$.tags","op":"count_gte","value":1}` |
+| `{{uid}}` 之类运行期随机量 | 换成 `--uid` 给的常量（默认 `000000`） |
+| 读不懂的断言 | 写进同名 `.todo.md`，**不猜** |
+
+### 22.3 产物与边界
+
+- 每个 `.hurl` → 一条案例，`id: realworld/<文件名>`，`draft.status: unconfirmed`
+- 有待办时同时写 `<名字>.todo.md`，一条一行，写清「第几步、哪句、为什么没转」
+- **不联网、不执行**：转换器只是文本处理，跑不跑得通取决于适配器
+- **不生成适配器**：目标系统没有 `adapter.yml` 或内置适配器时，转出来的案例只能等着
+
+### 22.4 验收口径
+
+拿 RealWorld 三套件实测：**31 步 / 74 条断言 / 0 处待办**。
+转出来的案例必须过 `validateCase`；`test/import-hurl.test.mjs` 守着十二件事
+（状态行、捕获、能力名、角色、`expected_outcome`、待办不丢、5xx 跳过、写盘、payload 六种 op、
+看不见返回体是 `unknown`、缺参在校验期报错、相位只允许 `trace`）。

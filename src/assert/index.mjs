@@ -18,6 +18,7 @@ import { relation, RELATION_OPS } from './relation.mjs';
 import { evalShape, SHAPE_KINDS, SHAPE_TYPES } from './shape.mjs';
 import { window as evalWindow, everyStep as evalEveryStep, WINDOW_INNER } from './window.mjs';
 import { pagination as evalPagination } from './pagination.mjs';
+import { payload as evalPayload, PAYLOAD_OPS } from './payload.mjs';
 
 export const KINDS = Object.freeze([
   'entity_exists',
@@ -32,6 +33,7 @@ export const KINDS = Object.freeze([
   'window',
   'every_step',
   'pagination',
+  'payload',
 ]);
 
 export { WINDOW_INNER };
@@ -64,6 +66,7 @@ export const PHASE_MATRIX = Object.freeze({
   // 分页读的是每一步的执行返回（payload），不是状态快照：视图是整份状态，
   // 一条翻过页的列表在视图里和没翻页一模一样。
   pagination: { default: 'trace', allowed: ['trace'] },
+  payload: { default: 'trace', allowed: ['trace'] },
 });
 
 const SELECTOR_KINDS = new Set([
@@ -148,6 +151,16 @@ export function validateAssertion(a, at = 'assertion') {
 
   if (a.kind === 'unchanged') {
     if (!Array.isArray(a.scopes) && !a.scope) errors.push(`${at} 需要 scopes`);
+  }
+
+  if (a.kind === 'payload') {
+    if (!Number.isInteger(a.step) || a.step < 1) errors.push(`${at}.step 必填（1 基步号，与 window/pagination 同一套坐标）`);
+    if (typeof a.path !== 'string' || !a.path.startsWith('$')) errors.push(`${at}.path 必填，形如 $.user.token`);
+    if (!PAYLOAD_OPS.includes(a.op)) {
+      errors.push(`${at}.op=${JSON.stringify(a.op)} 不在 ${PAYLOAD_OPS.join('/')}`);
+    } else if (['equals', 'count_gte', 'count_equals', 'contains'].includes(a.op) && !('value' in a)) {
+      errors.push(`${at}.value 必填（op=${a.op}）`);
+    }
   }
 
   if (a.kind === 'relation') {
@@ -242,6 +255,8 @@ export function evalAssertion(a, ctx, depth = 0) {
       return evalEveryStep(a, ctx, (sub, c) => evalAssertion(sub, c, depth + 1));
     case 'pagination':
       return evalPagination(a, ctx);
+    case 'payload':
+      return evalPayload(a, ctx);
     default:
       return { status: UNKNOWN, code: 'invalid_case', message: `未知断言 ${a.kind}` };
   }

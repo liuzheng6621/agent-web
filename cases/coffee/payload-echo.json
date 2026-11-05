@@ -1,0 +1,101 @@
+{
+  "schema_version": "agent-web/0.1",
+  "id": "coffee/payload-echo",
+  "title": "顾客自己的单子，列表接口要原样吐回来",
+  "environment": {
+    "adapter": "memory",
+    "seed": {}
+  },
+  "task": {
+    "natural_goal": "顾客连续下两单，再查自己的订单列表：返回体里的数组要有两行，total 也要说 2。",
+    "goal_assertions": [
+      {
+        "kind": "count_delta",
+        "selector": {
+          "collection": "orders"
+        },
+        "delta": 2
+      },
+      {
+        "kind": "payload",
+        "step": 3,
+        "path": "$.orders",
+        "op": "is_list"
+      },
+      {
+        "kind": "payload",
+        "step": 3,
+        "path": "$.orders",
+        "op": "count_gte",
+        "value": 2
+      },
+      {
+        "kind": "payload",
+        "step": 3,
+        "path": "$.orders[0].id",
+        "op": "exists"
+      },
+      {
+        "kind": "payload",
+        "step": 3,
+        "path": "$.total",
+        "op": "equals",
+        "value": 2
+      }
+    ],
+    "invariants": []
+  },
+  "reference_trajectory": [
+    {
+      "id": "s1",
+      "capability": "order.create",
+      "as": "customer",
+      "expected_outcome": "applied",
+      "arguments": {
+        "items": [
+          {
+            "dishName": "拿铁",
+            "qty": 2
+          }
+        ]
+      }
+    },
+    {
+      "id": "s2",
+      "capability": "order.create",
+      "as": "customer",
+      "expected_outcome": "applied",
+      "arguments": {
+        "items": [
+          {
+            "dishName": "美式咖啡",
+            "qty": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "s3",
+      "capability": "order.list",
+      "as": "customer",
+      "expected_outcome": "applied",
+      "arguments": {
+        "page": 1,
+        "pageSize": 5
+      }
+    }
+  ],
+  "observability": {
+    "declared_scopes": [
+      "orders",
+      "status_log"
+    ]
+  },
+  "draft": {
+    "status": "confirmed",
+    "generated_by": "hand",
+    "note": "响应体层面的断言：规范视图里没有 total/分页信封，只有 payload 看得见",
+    "reviewed_by": "阿蓝",
+    "reviewed_at": "2026-11-05T13:05:41.334Z"
+  }
+}

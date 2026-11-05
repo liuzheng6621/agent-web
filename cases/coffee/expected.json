@@ -8,5 +8,6 @@
   "coffee/unknown-capability": "unknown",
   "coffee/two-items": "pass",
   "coffee/paged-orders": "pass",
-  "coffee/shape": "pass"
+  "coffee/shape": "pass",
+  "coffee/payload-echo": "pass"
 }

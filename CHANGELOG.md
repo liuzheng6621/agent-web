@@ -6,6 +6,16 @@
 CI 也在查。这条规则是买来的：这个仓库曾经同时存在 `package.json` 0.16、README 0.9、
 Gitee Release v0.6.0 三个数，谁看都是三个项目。
 
+## 0.36.0
+
+「案例从哪来」这个问题，现在有一个不靠猜的答案。
+
+- **新增 `payload` 断言（第 16 种）**：读的是**返回体**，不是规范视图。`{kind:'payload', step, path, op, value}`，`op ∈ exists/equals/is_string/is_list/not_empty/count_gte/count_equals/contains`。视图里没有 token、没有分页信封，这些断句以前只能丢。
+- **新增 `m-payload-truncate`**：执行成功后把返回体里每个顶层数组砍掉一行——状态没坏，只有响应体坏。`scripts/kind-necessity.mjs` 量过：**只有 `payload` 这一种能杀它**。
+- **新增 `agent-web import hurl`**：把 hurl 套件转成案例草稿（不联网、不执行）。请求 → 步、`[Captures]` → 捕获、`[Asserts]` → `payload` 断言；**读不懂的写进同名 `.todo.md`，不猜**。
+- 拿 RealWorld 的三套件实测：**31 步 / 74 条断言 / 0 处待办**（auth 20 步 60 答、pagination 7 步 8 答、tags 4 步 6 答）。
+- 为什么是 hurl 而不是 Postman/Bruno：纯文本、有捕获与断言段、断言词汇小，正好对得上 `payload`；而且 RealWorld 这类语料自带一整套。
+
 ## 0.35.0
 
 第三个真实域：流浪动物保护追踪系统（Spring Boot 3 + MySQL），形状刻意选得跟咖啡店处处不像。
