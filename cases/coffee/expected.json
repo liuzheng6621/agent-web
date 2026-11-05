@@ -9,5 +9,6 @@
   "coffee/two-items": "pass",
   "coffee/paged-orders": "pass",
   "coffee/shape": "pass",
-  "coffee/payload-echo": "pass"
+  "coffee/payload-echo": "pass",
+  "coffee/linkage-events": "pass"
 }

@@ -19,6 +19,7 @@ import { evalShape, SHAPE_KINDS, SHAPE_TYPES } from './shape.mjs';
 import { window as evalWindow, everyStep as evalEveryStep, WINDOW_INNER } from './window.mjs';
 import { pagination as evalPagination } from './pagination.mjs';
 import { payload as evalPayload, PAYLOAD_OPS } from './payload.mjs';
+import { linkage as evalLinkage } from './linkage.mjs';
 
 export const KINDS = Object.freeze([
   'entity_exists',
@@ -34,6 +35,7 @@ export const KINDS = Object.freeze([
   'every_step',
   'pagination',
   'payload',
+  'linkage',
 ]);
 
 export { WINDOW_INNER };
@@ -67,6 +69,7 @@ export const PHASE_MATRIX = Object.freeze({
   // 一条翻过页的列表在视图里和没翻页一模一样。
   pagination: { default: 'trace', allowed: ['trace'] },
   payload: { default: 'trace', allowed: ['trace'] },
+  linkage: { default: 'final', allowed: ['final'] },
 });
 
 const SELECTOR_KINDS = new Set([
@@ -257,6 +260,8 @@ export function evalAssertion(a, ctx, depth = 0) {
       return evalPagination(a, ctx);
     case 'payload':
       return evalPayload(a, ctx);
+    case 'linkage':
+      return evalLinkage(a, ctx);
     default:
       return { status: UNKNOWN, code: 'invalid_case', message: `未知断言 ${a.kind}` };
   }

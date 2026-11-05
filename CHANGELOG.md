@@ -6,6 +6,21 @@
 CI 也在查。这条规则是买来的：这个仓库曾经同时存在 `package.json` 0.16、README 0.9、
 Gitee Release v0.6.0 三个数，谁看都是三个项目。
 
+## 0.38.0
+
+补上 L7 最后一项：跨实体约束。
+
+- 新增第 17 种断言 `linkage`：`凡是 A 里的行，B 里都必须有对应的那条，且它的某个字段必须是什么`。
+  参数是 `from{collection,where}` + `to{collection,on{from_field,to_field}}` + `expect{field,op,value}`，**只能终态**。
+- 边界写死：对侧缺那一行是**违反**（`linkage_missing`）而不是「看不见」——两个集合都读到了，
+  只是对应关系不存在，记成 unknown 会让这个断言永远抓不到故障。看不到集合、一行都没匹配上、
+  参数不全才判 `unknown`。
+- 新变异体 `m-drop-create-event`：订单建了，但审计流水里那条「已下单」被删掉。
+  只有 `linkage` 抓得住它，同时它也顺手抓掉 `m-history-empty` 与 `m-extra-foreign-order`——
+  以前这三条得靠三条不同断言，现在一条跨实体约束全包。
+- 新案例 `coffee/linkage-events`。踩坑记录：`wrapState` 的 tamper **必须原地改 state**，
+  写成 `const s = clone(state); return s;` 等于什么都没做（包装器不看返回值），第一次跑出来是「说不清」。
+
 ## 0.37.1
 
 把 RealWorld 的 13 个 hurl 套件全量转进来，并把「转得动」与「跑得绿」分开说。

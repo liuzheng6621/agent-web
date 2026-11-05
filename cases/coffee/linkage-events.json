@@ -1,0 +1,68 @@
+{
+  "schema_version": "agent-web/0.1",
+  "id": "coffee/linkage-events",
+  "environment": {
+    "adapter": "memory",
+    "seed": {}
+  },
+  "task": {
+    "natural_goal": "下单之后，审计流水里必须留下「已下单」这条记录",
+    "goal_assertions": [
+      {
+        "kind": "count_delta",
+        "selector": {
+          "collection": "orders"
+        },
+        "delta": 1
+      },
+      {
+        "kind": "linkage",
+        "from": {
+          "collection": "orders"
+        },
+        "to": {
+          "collection": "status_log",
+          "on": {
+            "from_field": "id",
+            "to_field": "orderId"
+          }
+        },
+        "expect": {
+          "field": "type",
+          "value": "order.created"
+        }
+      }
+    ],
+    "invariants": []
+  },
+  "reference_trajectory": [
+    {
+      "id": "s1",
+      "capability": "order.create",
+      "as": "customer",
+      "expected_outcome": "applied",
+      "arguments": {
+        "items": [
+          {
+            "dishName": "拿铁",
+            "qty": 1
+          }
+        ]
+      }
+    }
+  ],
+  "observability": {
+    "declared_scopes": [
+      "menu",
+      "orders",
+      "status_log"
+    ]
+  },
+  "title": "建了单，流水里必须有那条事件",
+  "draft": {
+    "status": "confirmed",
+    "created_by": "agent-web link",
+    "reviewed_by": "阿蓝",
+    "reviewed_at": "2026-11-05T14:18:16.747Z"
+  }
+}
