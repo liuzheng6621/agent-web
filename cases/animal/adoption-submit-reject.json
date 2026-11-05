@@ -1,0 +1,101 @@
+{
+  "schema_version": "agent-web/0.1",
+  "id": "animal/adoption-submit-reject",
+  "environment": {
+    "adapter": "animal",
+    "seed": {}
+  },
+  "task": {
+    "natural_goal": "用户给一只动物提交领养申请，管理员驳回，申请变成 REJECTED，动物档案不受影响。",
+    "goal_assertions": [
+      {
+        "kind": "entity_exists",
+        "selector": {
+          "collection": "adoption_applications"
+        }
+      },
+      {
+        "kind": "field_equals",
+        "selector": {
+          "collection": "adoption_applications",
+          "index": 0
+        },
+        "path": "status",
+        "value": "REJECTED"
+      },
+      {
+        "kind": "field_equals",
+        "selector": {
+          "collection": "adoption_applications",
+          "index": 0
+        },
+        "path": "reviewer",
+        "value": "admin"
+      },
+      {
+        "kind": "count_delta",
+        "selector": {
+          "collection": "adoption_applications"
+        },
+        "delta": 1
+      }
+    ],
+    "invariants": [
+      {
+        "kind": "unchanged",
+        "scopes": [
+          "animals"
+        ],
+        "why": "驳回一个申请不该改动任何动物档案"
+      },
+      {
+        "kind": "unchanged",
+        "scopes": [
+          "users"
+        ],
+        "why": "审批不该改动账号"
+      }
+    ]
+  },
+  "reference_trajectory": [
+    {
+      "id": "s1",
+      "capability": "adoptions.create",
+      "as": "user",
+      "expected_outcome": "applied",
+      "arguments": {
+        "animalId": 379,
+        "applicantName": "案例-小蓝",
+        "reason": "家里有院子"
+      }
+    },
+    {
+      "id": "s2",
+      "capability": "adoptions.reject",
+      "as": "admin",
+      "expected_outcome": "applied",
+      "bindings": {
+        "applicationId": "$s1.applicationId"
+      },
+      "arguments": {
+        "comment": "住址不稳定"
+      }
+    },
+    {
+      "id": "s3",
+      "capability": "adoptions.get",
+      "as": "admin",
+      "expected_outcome": "applied",
+      "bindings": {
+        "applicationId": "$s1.applicationId"
+      }
+    }
+  ],
+  "observability": {
+    "declared_scopes": [
+      "animals",
+      "adoption_applications",
+      "users"
+    ]
+  }
+}

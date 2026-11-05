@@ -40,6 +40,12 @@ const BUILTINS = {
     const m = await import('./taixianglian.mjs');
     return m.createTaixianglianAdapter();
   },
+  // 第三个域的真实后端（Spring Boot 3 + MySQL）：形状与咖啡店完全不同 ——
+  // Spring Page 信封、大写状态、三角色、审批链。它自己的缺陷也写成了案例。
+  animal: async () => {
+    const m = await import('./animal.mjs');
+    return m.createAnimalAdapter();
+  },
 };
 
 export function listBuiltins() {

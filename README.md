@@ -1,4 +1,4 @@
-# agent-web v0.34.1
+# agent-web v0.35.0
 
 <p align="center">
   <img src="docs/media/hero.png" alt="agent-web：给 Agent 写机器可判的集成测试" width="100%">
@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <b>当前版本 0.34.1</b> · 15 种断言 · 27 条命令 · 27 个变异体
+  <b>当前版本 0.35.0</b> · 15 种断言 · 27 条命令 · 27 个变异体
 </p>
 
 <p align="center">
@@ -315,7 +315,7 @@ $ agent-web align our-view.json their-view.json --out=align.yml
 | 域 | 实现 | 它证明了什么 |
 |---|---|---|
 | 咖啡店点单 | 内置内存 + 真实 Spring Boot 后端 | 同一份案例打两个实现，判决一致率 100%；假通过能被抓出来 |
-| 动物救助任务 | 真实后端 + 内存夹具 | 正确性全是不变量（积分、审批、角色）时，断言词汇够不够用 |
+| 流浪动物追踪 `cases/animal` | Spring Boot 3 + MySQL 真实后端（第三方项目） | Spring Page 信封、大写状态、三角色；**审批接口没有角色检查**——案例判 fail，[细节](docs/domains/animal.md) |
 | 复式记账 | 两个自造实现（整数分 vs 两位小数字符串） | 内部表示完全不同，视图逐字相同；借贷平衡这类不变式能表达 |
 
 第三个域还逼出了一个机制：变异体可以声明 `applies_to`。

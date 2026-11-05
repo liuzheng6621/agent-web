@@ -1,0 +1,71 @@
+{
+  "schema_version": "agent-web/0.1",
+  "id": "animal/adoption-reject-forbidden",
+  "environment": {
+    "adapter": "animal",
+    "seed": {}
+  },
+  "task": {
+    "natural_goal": "普通用户不能驳回领养申请：这条业务只允许管理员做。用户自己点驳回必须被拒绝，申请停在 PENDING。",
+    "goal_assertions": [
+      {
+        "kind": "field_equals",
+        "selector": {
+          "collection": "adoption_applications",
+          "index": 0
+        },
+        "path": "status",
+        "value": "PENDING"
+      }
+    ],
+    "invariants": [
+      {
+        "kind": "unchanged",
+        "scopes": [
+          "animals"
+        ],
+        "why": "被拒绝的越权操作不该改动任何动物"
+      },
+      {
+        "kind": "count_delta",
+        "selector": {
+          "collection": "adoption_applications"
+        },
+        "delta": 1,
+        "why": "本案例只应新增一条申请；如果多出来，说明越权操作真的写进去了"
+      }
+    ]
+  },
+  "reference_trajectory": [
+    {
+      "id": "s1",
+      "capability": "adoptions.create",
+      "as": "user",
+      "expected_outcome": "applied",
+      "arguments": {
+        "animalId": 377,
+        "applicantName": "案例-越权",
+        "reason": "试试看"
+      }
+    },
+    {
+      "id": "s2",
+      "capability": "adoptions.reject",
+      "as": "user",
+      "expected_outcome": "rejected",
+      "bindings": {
+        "applicationId": "$s1.applicationId"
+      },
+      "arguments": {
+        "comment": "我自己批我自己"
+      }
+    }
+  ],
+  "observability": {
+    "declared_scopes": [
+      "animals",
+      "adoption_applications",
+      "users"
+    ]
+  }
+}

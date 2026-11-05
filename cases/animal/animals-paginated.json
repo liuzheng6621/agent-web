@@ -1,0 +1,78 @@
+{
+  "schema_version": "agent-web/0.1",
+  "id": "animal/animals-paginated",
+  "environment": {
+    "adapter": "animal",
+    "seed": {}
+  },
+  "task": {
+    "natural_goal": "动物档案列表按页翻完，行不重、不丢、方向不翻。",
+    "goal_assertions": [
+      {
+        "kind": "entity_exists",
+        "selector": {
+          "collection": "animals"
+        }
+      },
+      {
+        "kind": "pagination",
+        "collection": "animals",
+        "steps": [
+          1,
+          2,
+          3
+        ],
+        "pageSize": 3,
+        "ordered_by": "id"
+      }
+    ],
+    "invariants": [
+      {
+        "kind": "unchanged",
+        "scopes": [
+          "adoption_applications"
+        ],
+        "why": "只读翻页不该改动申请"
+      }
+    ]
+  },
+  "reference_trajectory": [
+    {
+      "id": "s1",
+      "capability": "animals.list",
+      "as": "user",
+      "expected_outcome": "applied",
+      "arguments": {
+        "page": 1,
+        "pageSize": 3
+      }
+    },
+    {
+      "id": "s2",
+      "capability": "animals.list",
+      "as": "user",
+      "expected_outcome": "applied",
+      "arguments": {
+        "page": 2,
+        "pageSize": 3
+      }
+    },
+    {
+      "id": "s3",
+      "capability": "animals.list",
+      "as": "user",
+      "expected_outcome": "applied",
+      "arguments": {
+        "page": 3,
+        "pageSize": 3
+      }
+    }
+  ],
+  "observability": {
+    "declared_scopes": [
+      "animals",
+      "adoption_applications",
+      "users"
+    ]
+  }
+}

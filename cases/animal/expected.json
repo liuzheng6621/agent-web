@@ -1,0 +1,6 @@
+{
+  "animal/adoption-submit-reject": "pass",
+  "animal/animals-paginated": "pass",
+  "animal/animal-device-and-notfound": "pass",
+  "animal/adoption-reject-forbidden": "fail"
+}

@@ -6,6 +6,17 @@
 CI 也在查。这条规则是买来的：这个仓库曾经同时存在 `package.json` 0.16、README 0.9、
 Gitee Release v0.6.0 三个数，谁看都是三个项目。
 
+## 0.35.0
+
+第三个真实域：流浪动物保护追踪系统（Spring Boot 3 + MySQL），形状刻意选得跟咖啡店处处不像。
+
+- 新增 `src/adapter/animal.mjs`（内置名 `animal`）：Spring Page 信封摊平成规范视图，大写状态，三个真实账号（admin/volunteer/user），token 缓存在 `.agent-web/animal-tokens.json` 绕开登录限流（登录每分钟限流一次）。
+- 新增 `cases/animal/` 四条案例：领养申请提交→驳回、越权驳回必须被拒、动物列表翻页、设备号查询与不存在的动物。
+- **域内第一个 fail 是真的**：`PUT /api/v1/adoptions/{id}/approve|reject` 只要求「已登录」，任何用户都能审批。实测用 `user` 的 token 批准了一条自己的申请，库里那一行 `reviewer=user`。案例判 `fail expected_rejection`「adoptions.reject 应被拒绝，实际被执行」。
+- `certify cases/animal`：抓到 1、欠账 1、**不适用 23**（变异体声明的是咖啡店的集合，不进分母）。跑完约 90 秒。
+- 新增 `test/domain-animal.test.mjs` 五道离线门：案例合法、案例与预期标签一一对应、三角色互不相同且 `events_complete=false`、越权案例必须用非管理员身份、不允许出现 `approve`（这个后端没有把 `status` 改回去的接口，用一次案例就变一次性）。
+- 新增 `docs/domains/animal.md`：跑法、四个缺陷（F1 无角色检查 / F2 驳回无状态护栏 / F3 status 过滤没生效 / F4 points 500）、以及「为什么 23 个变异体不适用」。
+
 ## 0.34.1
 
 一条命令忽略了自己的参数，报出的数字不是它说的那个东西。

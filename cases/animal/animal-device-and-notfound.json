@@ -1,0 +1,64 @@
+{
+  "schema_version": "agent-web/0.1",
+  "id": "animal/animal-device-and-notfound",
+  "environment": {
+    "adapter": "animal",
+    "seed": {}
+  },
+  "task": {
+    "natural_goal": "按设备号能查到动物；查不存在的动物要拒绝，不是返回空对象。",
+    "goal_assertions": [
+      {
+        "kind": "entity_exists",
+        "selector": {
+          "collection": "animals"
+        }
+      }
+    ],
+    "invariants": [
+      {
+        "kind": "unchanged",
+        "scopes": [
+          "animals"
+        ],
+        "why": "只读查询不该改动任何动物档案"
+      }
+    ]
+  },
+  "reference_trajectory": [
+    {
+      "id": "s1",
+      "capability": "animals.by_device",
+      "as": "user",
+      "expected_outcome": "applied",
+      "arguments": {
+        "deviceId": "DEV001"
+      }
+    },
+    {
+      "id": "s2",
+      "capability": "animals.get",
+      "as": "user",
+      "expected_outcome": "rejected",
+      "arguments": {
+        "id": 99999
+      }
+    },
+    {
+      "id": "s3",
+      "capability": "animals.by_device",
+      "as": "user",
+      "expected_outcome": "rejected",
+      "arguments": {
+        "deviceId": "NOPE-X"
+      }
+    }
+  ],
+  "observability": {
+    "declared_scopes": [
+      "animals",
+      "adoption_applications",
+      "users"
+    ]
+  }
+}
