@@ -265,7 +265,8 @@ const server = http.createServer(async (req, res) => {
       if (!viewer) return errs(res, 401, { token: ['is missing'] });
       if (art.author !== viewer.username) return errs(res, 403, { article: ['forbidden'] });
       const a = (body && body.article) || {};
-      for (const k of ['title', 'description', 'body']) if (a[k] !== undefined) art[k] = a[k];
+      if (a.tagList !== undefined && !Array.isArray(a.tagList)) return errs(res, 422, { tagList: ['is invalid'] });
+      for (const k of ['title', 'description', 'body', 'tagList']) if (a[k] !== undefined) art[k] = a[k];
       art.updatedAt = new Date().toISOString();
       return send(res, 200, { article: articleOf(art, viewer) });
     }

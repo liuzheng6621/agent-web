@@ -52,7 +52,7 @@ export function createRealWorldAdapter(opts = {}) {
     { id: 'articles.feed', kind: 'read', args: { limit: 'number?', offset: 'number?' }, roles: ['user', 'user2'] },
     { id: 'articles.get', kind: 'read', args: { slug: 'string' }, roles: ['anonymous', 'user', 'user2'] },
     { id: 'articles.create', kind: 'write', args: { title: 'string', description: 'string', body: 'string', tagList: 'array?' }, roles: ['user', 'user2'] },
-    { id: 'articles.update', kind: 'write', args: { slug: 'string', title: 'string?', description: 'string?', body: 'string?' }, roles: ['user', 'user2'] },
+    { id: 'articles.update', kind: 'write', args: { slug: 'string', title: 'string?', description: 'string?', body: 'string?', tagList: 'array?' }, roles: ['user', 'user2'] },
     { id: 'articles.delete', kind: 'write', args: { slug: 'string' }, roles: ['user', 'user2'] },
     { id: 'articles.favorite', kind: 'write', args: { slug: 'string' }, roles: ['user', 'user2'] },
     { id: 'articles.unfavorite', kind: 'write', args: { slug: 'string' }, roles: ['user', 'user2'] },
@@ -198,7 +198,7 @@ export function createRealWorldAdapter(opts = {}) {
         }
         case 'articles.update': {
           const article = {};
-          for (const k of ['title', 'description', 'body']) if (a[k] !== undefined) article[k] = a[k];
+          for (const k of ['title', 'description', 'body', 'tagList']) if (a[k] !== undefined) article[k] = a[k];
           res = await call('PUT', `/articles/${encodeURIComponent(a.slug)}`, { article });
           return this.classify(res, { slug: res.payload && res.payload.article && res.payload.article.slug });
         }
