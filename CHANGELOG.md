@@ -6,6 +6,15 @@
 CI 也在查。这条规则是买来的：这个仓库曾经同时存在 `package.json` 0.16、README 0.9、
 Gitee Release v0.6.0 三个数，谁看都是三个项目。
 
+## 0.33.1
+
+让需要步号的变异体说实话。
+
+- CI 的「快路径必须与重放逐格相同」红了：`m-transient-menu-price` / `m-mid-write-leak` 靠 `tamper(state, index)` 里的下标下药，
+  而 `wrapState` 的 `observe` 包装拿不到步号 —— 慢路径根本没注入故障，于是重放看到正确实现、变换看到坏实现。
+- 处理：这两个变异体标 `requires_trace: true`，`scripts/state-equivalence.mjs` 跳过它们并**把跳过的数量与名字打出来**。
+  不是把门关掉，是把边界说出来。
+
 ## 0.33.0
 
 断言从 12 种到 14 种：补上「时间窗」和「每步求值」——这两种不是更严格，是换个观察口。
