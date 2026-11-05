@@ -22,6 +22,7 @@ const zh = `当前版本 ${version}</b> · ${KINDS.length} 种断言 · ${comman
 const en = `<b>v${version}</b> · ${KINDS.length} assertion kinds · ${commands} commands · ${mutants.length} mutants`;
 
 const problems = [];
+const warnings = [];
 for (const [file, want] of [['README.md', zh], ['README.en.md', en]]) {
   const text = read(file);
   // 允许 "<b>" 在中文版里包住版本号，比较时统一去掉标签
@@ -62,9 +63,17 @@ const tags = inPullRequest ? null : (() => {
     return null;
   }
 })();
+// 缺当前版本的 tag 只在发版时算错：正常的顺序是先推 main、CI 绿了再打 tag，
+// 这个中间态如果判红，每次发版都会先红一次（真发生过：三次提交连续红在 CI 上）。
+// 发版流程用 --require-tag 把它变成硬错。
+const requireTag = process.argv.includes('--require-tag');
 if (tags && tags.length > 0 && !tags.includes(`v${version}`)) {
-  problems.push({ file: '.git', want: `tag v${version}（当前 tag：${tags.join(' ')}）` });
+  const want = `tag v${version}（当前 tag：${tags.join(' ')}）`;
+  if (requireTag) problems.push({ file: '.git', want });
+  else warnings.push({ file: '.git', want });
 }
+
+for (const w of warnings) console.error(`提醒（不算错）：${w.file} → ${w.want}`);
 
 if (problems.length === 0) {
   console.log(`状态行一致：${version} / ${KINDS.length} 种断言 / ${commands} 条命令 / ${mutants.length} 个变异体。`);
