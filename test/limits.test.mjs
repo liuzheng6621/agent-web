@@ -42,7 +42,7 @@ test('限制清单：README 中英各 11 条，与 docs/LIMITS.md 的条目数�
 
 test('限制清单：每条都必须有 status，且 status 只取五种', () => {
   const { raw, ids } = limitsEntries();
-  const ok = new Set(['open', 'mitigated', 'by-design', 'withdrawn', 'continuous']);
+  const ok = new Set(['open', 'mitigated', 'by-design', 'withdrawn', 'ongoing']);
   for (const id of ids) {
     const i = raw.indexOf('## ' + id + ' ');
     const next = raw.indexOf('\n## ', i + 4);

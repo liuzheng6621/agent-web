@@ -1,6 +1,6 @@
 {
   "name": "agent-web",
-  "version": "0.30.0",
+  "version": "0.31.0",
   "description": "给 Agent 写机器可判的集成测试：一份案例，多个实现，判决必须一致。",
   "type": "module",
   "bin": {
@@ -33,10 +33,11 @@
     "./tap": "./src/tap.mjs",
     "./learn": "./src/learn.mjs",
     "./adapter/decl": "./src/adapter/decl.mjs",
-    "./adapter/twin": "./src/adapter/twin.mjs"
+    "./adapter/twin": "./src/adapter/twin.mjs",
+    "./drill-ledger": "./src/drill-ledger.mjs"
   },
   "scripts": {
-    "test": "node --test test/engine.test.mjs test/traps.test.mjs test/museum.test.mjs test/certify.test.mjs test/drill.test.mjs test/relation.test.mjs test/probe.test.mjs test/recall.test.mjs test/discover.test.mjs test/breed.test.mjs test/shape.test.mjs test/animal-tracking.test.mjs test/help.test.mjs test/tap-learn.test.mjs test/limits.test.mjs",
+    "test": "node --test test/engine.test.mjs test/traps.test.mjs test/museum.test.mjs test/certify.test.mjs test/drill.test.mjs test/relation.test.mjs test/probe.test.mjs test/recall.test.mjs test/discover.test.mjs test/breed.test.mjs test/shape.test.mjs test/animal-tracking.test.mjs test/help.test.mjs test/tap-learn.test.mjs test/limits.test.mjs test/drill-ledger.test.mjs",
     "selftest": "node bin/agent-web.mjs selftest",
     "compare": "node bin/agent-web.mjs compare cases/coffee --adapters=memory,taixianglian",
     "gh-proxy": "node scripts/gh-proxy.mjs",

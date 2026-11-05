@@ -1,4 +1,4 @@
-# agent-web v0.30.0
+# agent-web v0.31.0
 
 <p align="center">
   <img src="docs/media/hero.png" alt="agent-web：给 Agent 写机器可判的集成测试" width="100%">
@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <b>当前版本 0.30.0</b> · 12 种断言 · 26 条命令 · 22 个变异体
+  <b>当前版本 0.31.0</b> · 12 种断言 · 26 条命令 · 22 个变异体
 </p>
 
 <p align="center">
@@ -227,6 +227,12 @@ FAIL todo/recorded   assertion_false
 整实体替换与集合外差异表达不了。剩下 11 道得人写答案。于是拆成两条校验：
 默认「必须答满」（漏一题就 exit 1），`--allow-missed` 是「答了就必须对」（没答的照实报，
 答错或交不上来的仍然失败）。CI 用后者——防瞎写和防偷懒是两件事，不能混成一件。
+
+`drill grade --record` 把每次批改记进台账，`drill stats` 出统计。
+台账只存题号、状态、每个断言的判定、提交指纹——不存提交内容。
+所以 11/11 会显示成 `100.0% [74.1%, 100.0%]`，而不是「100% 稳了」；
+每题至少 5 次批改才分层，不够就记 `insufficient_data`。
+`drill --order=empirical` 按台账里的经验难度出题，难的在前。
 
 ## 判决长什么样：一个能打开的页面
 

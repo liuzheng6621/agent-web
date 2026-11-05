@@ -45,6 +45,7 @@ import { breedMutants, formatBreed, loadBredMutants, BREED_VERSION } from '../sr
 import { MUTATIONS, describeMutations } from '../src/mutate.mjs';
 import { KINDS } from '../src/assert/index.mjs';
 import { buildDrills, gradeDrills, writeDrills, readDrills, readSubmissions, formatGrade, gradeExit } from '../src/drill.mjs';
+import { appendLedger, computeStats, formatStats, rankItems, readLedger, statsExit, toRecord } from '../src/drill-ledger.mjs';
 import { collectUsage, summarizeCoverage, formatCoverage, coverageVerdict } from '../src/coverage.mjs';
 import { probeAdapter, formatProbe, probeExit } from '../src/probe.mjs';
 import { discover, formatDiscover } from '../src/discover.mjs';
@@ -250,11 +251,14 @@ function drillMutations(flags) {
 
 async function cmdDrill(args, flags) {
   if (args[0] === 'grade') return await cmdDrillGrade(args.slice(1), flags);
+  if (args[0] === 'stats') return await cmdDrillStats(args.slice(1), flags);
 
   if (args.length < 1) {
     console.error('用法：agent-web drill <案例目录> [--adapter=memory] [--mutations=id,id] [--out=DIR] [--json]');
     console.error('      agent-web drill grade <题目目录> --submissions=DIR [--min=0.8] [--detail] [--json]');
     console.error('      --allow-missed：答了就必须对，没答的照实报（默认要求答满）');
+    console.error('      agent-web drill stats [--ledger=FILE] [--detail] [--json]');
+    console.error('      --record[=FILE]：把这次批改记进台账（默认 .agent-web/drills.jsonl）');
     console.error('  出题：对"整套断言都没抓住"的案例出题，题面不含答案。');
     console.error('  批改：不看提交说了什么，只看它跑出来什么——在正确实现上为真、在坏实现上为假才算抓到。');
     return 2;
@@ -279,6 +283,30 @@ async function cmdDrill(args, flags) {
     timeoutMs: flags.timeout ? Number(flags.timeout) : 5000,
     mutations: used,
   });
+
+  if (flags.order === 'empirical') {
+    const ledgerFile = flags.ledger ?? path.join(ROOT, '.agent-web', 'drills.jsonl');
+    const led = await readLedger(ledgerFile);
+    if (led.records.length > 0) {
+      const rank = rankItems(computeStats(led.records));
+      const before = report.items.map((i) => i.id);
+      report.items.sort((a, b) => {
+        const ra = rank.has(a.id) ? rank.get(a.id) : Number.MAX_SAFE_INTEGER;
+        const rb = rank.has(b.id) ? rank.get(b.id) : Number.MAX_SAFE_INTEGER;
+        if (ra !== rb) return ra - rb;
+        return before.indexOf(a.id) - before.indexOf(b.id);
+      });
+      const measured = report.items.filter((i) => rank.has(i.id)).length;
+      if (!flags.json) {
+        console.log('按经验难度排序：' + measured + ' 道有台账记录（难的在前），' +
+          (report.items.length - measured) + ' 道没测过（排在后面）');
+        console.log('');
+      }
+    } else if (!flags.json) {
+      console.log('台账里还没有记录，本次按原顺序出题');
+      console.log('');
+    }
+  }
 
   const outDir = path.resolve(flags.out ?? 'drills');
   const index = flags.json ? null : await writeDrills(outDir, report);
@@ -326,6 +354,16 @@ async function cmdDrillGrade(args, flags) {
     timeoutMs: flags.timeout ? Number(flags.timeout) : 5000,
   });
 
+  if (flags.record !== undefined) {
+    const ledgerFile = typeof flags.record === 'string' ? flags.record : path.join(ROOT, '.agent-web', 'drills.jsonl');
+    const record = toRecord(report, { submission: flags.submission ?? null });
+    await appendLedger(ledgerFile, record);
+    if (!flags.json) {
+      console.log('');
+      console.log('已记账：' + path.relative(process.cwd(), ledgerFile) + ' · ' + record.rows.length + ' 条');
+    }
+  }
+
   if (flags.json) console.log(JSON.stringify(report, null, 2));
   else console.log(formatGrade(report, { detail: flags.detail === true }));
 
@@ -334,6 +372,30 @@ async function cmdDrillGrade(args, flags) {
     allowMissed: flags['allow-missed'] === true,
   });
 }
+
+async function cmdDrillStats(args, flags) {
+  const ledgerFile = flags.ledger ?? path.join(ROOT, '.agent-web', 'drills.jsonl');
+  const { records, bad_lines, missing } = await readLedger(ledgerFile);
+  if (missing) {
+    console.error('没有台账：' + ledgerFile);
+    console.error('先跑一次带 --record 的批改，例如：');
+    console.error('  agent-web drill grade drills/ --submissions=examples/drills/good --allow-missed --record');
+    return 2;
+  }
+  const stats = computeStats(records, { includeUngraded: flags['include-ungraded'] === true });
+  if (flags.json) console.log(JSON.stringify(stats, null, 2));
+  else {
+    console.log(formatStats(stats, { detail: flags.detail === true }));
+    if (bad_lines > 0) {
+      console.log('');
+      console.log('提醒：台账里有 ' + bad_lines + ' 行读不懂（版本不符或损坏），已跳过，没算进统计。');
+    }
+  }
+  return statsExit(stats, {
+    minAttempts: flags['min-attempts'] !== undefined ? Number(flags['min-attempts']) : null,
+  });
+}
+
 
 function cmdMutants(args, flags) {
   const list = describeMutations();

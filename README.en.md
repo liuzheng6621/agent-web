@@ -1,4 +1,4 @@
-# agent-web v0.30.0
+# agent-web v0.31.0
 
 <p align="center">
   <img src="docs/media/hero.png" alt="agent-web: integration tests an agent can be judged on" width="100%">
@@ -18,7 +18,7 @@
 </p>
 
 <p align="center">
-  <b>v0.30.0</b> · 12 assertion kinds · 26 commands · 22 mutants
+  <b>v0.31.0</b> · 12 assertion kinds · 26 commands · 22 mutants
 </p>
 
 <p align="center">
@@ -214,6 +214,10 @@ One mutant plus one case makes one question. The question gives symptoms and exi
 Same questions, two submissions: carefully written 11/11, exit 0; the one that copies the case's original assertions 0/11, exit 1 — every assertion it submits is genuinely true, indistinguishable from reading the code, only runnable. That is what "labels do not need a human to assign" means.
 
 Why good has only 11 answers but there are 22 questions: suggested assertions can only express "a field value difference within a collection"; whole-entity replacement and cross-collection differences cannot be expressed. The remaining 11 need human-written answers. So grading splits into two checks: default "must answer all" (miss one, exit 1), `--allow-missed` means "answered ones must be correct" (unanswered reported honestly, wrong or ungradable still fail). CI uses the latter — preventing sloppy work and preventing laziness are two different things, do not merge them into one.
+
+`drill grade --record` appends every grading run to a ledger, `drill stats` summarises it.
+The ledger stores the item id, status, per-assertion cells and a submission fingerprint — never the submitted assertions.
+So 11/11 reads `100.0% [74.1%, 100.0%]` instead of "100%"; a task needs 5 gradings before it earns a difficulty band, and `drill --order=empirical` serves the hard ones first.
 
 ## What a verdict looks like: a page you can open
 

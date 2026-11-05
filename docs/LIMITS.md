@@ -140,19 +140,20 @@ Node 权限模型，默认禁 fs/网络/子进程），并且文档必须写清�
 
 ## L10 难度标签只是统计
 
-`status: open`
+`status: mitigated`
 
-`drill` 现在能出题、能批改、能给通过率，但：
-- 结果不落 ledger，跨批次无法比较；
-- 通过率没有区间（3/3 和 30/30 被当成同一件事）；
-- 题面过去只列 7 种断言（已修，现在从 `KINDS` 插值，`test/drill.test.mjs` 有守卫）。
+原先三个缺口都已收口：
+- **跨批次可比**：`drill grade --record` 追加 `.agent-web/drills.jsonl`，只存题号、状态、每格的判定、提交指纹——不存提交内容；
+- **区间**：`drill stats` 给 Wilson 95% 区间，`n < 5` 一律 `insufficient_data`，不给一个看起来像结论的百分比；
+- **题面**：从 `KINDS` 插值（12 种），`test/drill.test.mjs` 有守卫。
 
-要补齐的是：`drill grade --record` 落 ledger（只存 item/状态/cells/提交 hash）、
-Wilson 区间、`n < 5` 记 `insufficient_data`、按经验难度排序。
+仍不解决的是：样本量依赖人跑。没有外部提交，台账里只有自己的答案，难度标签是「自测难度」。
+
+验收：`node bin/agent-web.mjs drill stats --min-attempts=5`。
 
 ## L11 只在三个域上验过
 
-`status: continuous`
+`status: ongoing`
 
 咖啡点单（内存 + 真实 Spring Boot）、动物救助（真实后端 + 内存夹具）、复式记账（整数分 vs 两位小数）。
 三个域逼出的机制是 `applies_to`：账本域的变异体在咖啡域记「不适用」，不进分母。
