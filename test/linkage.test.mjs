@@ -38,3 +38,21 @@ test('linkage：集合看不见 / 一行都没匹配上 / 参数不对，一律�
   assert.equal(linkage(empty, ctx({ orders: [{ id: 1, status: 'PENDING' }], status_log: [] })).status, 'unknown');
   assert.equal(linkage({ ...spec, to: { collection: 'status_log' } }, ctx({ orders: [], status_log: [] })).code, 'invalid_case');
 });
+
+test('linkage count：条数正好几条才算成立，多了少了都是违反', () => {
+  const spec2 = { ...spec, expect: { count: 1 } };
+  const one = ctx({ orders: [{ id: 1 }], status_log: [{ orderId: 1, type: 'order.created' }] });
+  assert.equal(linkage(spec2, one).status, 'true');
+  const two = ctx({ orders: [{ id: 1 }], status_log: [{ orderId: 1, type: 'order.created' }, { orderId: 1, type: 'order.created' }] });
+  const r = linkage(spec2, two);
+  assert.equal(r.status, 'false');
+  assert.equal(r.code, 'linkage_count_violated');
+  assert.match(r.message, /有 2 条，必须正好 1 条/);
+});
+
+test('linkage count：at_least / at_most 与未知 op', () => {
+  const two = ctx({ orders: [{ id: 1 }], status_log: [{ orderId: 1 }, { orderId: 1 }] });
+  assert.equal(linkage({ ...spec, expect: { count: 2, count_op: 'at_least' } }, two).status, 'true');
+  assert.equal(linkage({ ...spec, expect: { count: 1, count_op: 'at_most' } }, two).status, 'false');
+  assert.equal(linkage({ ...spec, expect: { count: 1, count_op: 'nope' } }, two).code, 'invalid_case');
+});

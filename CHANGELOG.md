@@ -6,6 +6,15 @@
 CI 也在查。这条规则是买来的：这个仓库曾经同时存在 `package.json` 0.16、README 0.9、
 Gitee Release v0.6.0 三个数，谁看都是三个项目。
 
+## 0.39.0
+
+`linkage` 补上数量关系：存在性说得清「有没有」，说不清「多了几条」。
+
+- `expect.count` + `expect.count_op`（`equals` / `at_least` / `at_most`）：一行 A 对应的 B 行必须正好 / 至少 / 至多几条。
+  违反时报 `linkage_count_violated`，消息里写实际条数与期望。
+- 新变异体 `m-duplicate-event`：把第一条 `order.created` 复制一份塞回去。**存在性断言照样通过**，
+  只有 `coffee/linkage-events#goal[2]` 这条数量断言抓得住（顺带也抓到 `m-double-effect`）。
+
 ## 0.38.0
 
 补上 L7 最后一项：跨实体约束。

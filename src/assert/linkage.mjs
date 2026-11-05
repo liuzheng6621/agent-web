@@ -6,6 +6,9 @@
 // 缺了它，这类故障只能靠人眼，或者靠一条绑死具体数字的 count_delta 冒充。
 
 const OPS = new Set(['equals', 'not_equals', 'exists']);
+// 数量关系：一行 A 对应的 B 行**有几条**。
+// 存在性说得清「有没有」，说不清「多了几条」——重复写事件这类故障就藏在中间。
+const COUNT_OPS = new Set(['equals', 'at_least', 'at_most']);
 
 function whereMatch(row, where) {
   if (!Array.isArray(where)) return true;
@@ -40,7 +43,8 @@ export function linkage(a, ctx) {
     const row = rowsFrom[i];
     if (!whereMatch(row, a.from.where)) continue;
     const key = get(row, on.from_field);
-    const hit = rowsTo.find((r) => get(r, on.to_field) === key);
+    const matches = rowsTo.filter((r) => get(r, on.to_field) === key);
+    const hit = matches[0];
     checked.push({ row, key, hit });
     if (!hit) {
       // 「A 有、B 没有」是**违反**，不是看不见：两个集合都读到了，
@@ -50,6 +54,25 @@ export function linkage(a, ctx) {
         code: 'linkage_missing',
         message: `${fromCol}[${i}] 的 ${on.from_field}=${key} 在 ${toCol} 里找不到对应的 ${on.to_field}`,
       };
+    }
+    // 数一遍：给出 expect.count 时只查条数，不再看字段
+    if (expect.count !== undefined) {
+      const want = Number(expect.count);
+      const op = expect.count_op || 'equals';
+      if (!COUNT_OPS.has(op)) {
+        return { status: 'unknown', code: 'invalid_case', message: `linkage 不认识 expect.count_op=${op}` };
+      }
+      const n = matches.length;
+      const ok = op === 'equals' ? n === want : (op === 'at_least' ? n >= want : n <= want);
+      if (!ok) {
+        const word = op === 'equals' ? '必须正好' : (op === 'at_least' ? '至少' : '至多');
+        return {
+          status: 'false',
+          code: 'linkage_count_violated',
+          message: `${fromCol}[${i}]（${on.from_field}=${key}）对应的 ${toCol} 有 ${n} 条，${word} ${want} 条`,
+        };
+      }
+      continue;
     }
     const actual = expect.field ? get(hit, expect.field) : hit;
     if (!OPS.has(expect.op || 'equals')) {

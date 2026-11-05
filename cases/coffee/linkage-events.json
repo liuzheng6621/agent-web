@@ -31,6 +31,22 @@
           "field": "type",
           "value": "order.created"
         }
+      },
+      {
+        "kind": "linkage",
+        "from": {
+          "collection": "orders"
+        },
+        "to": {
+          "collection": "status_log",
+          "on": {
+            "from_field": "id",
+            "to_field": "orderId"
+          }
+        },
+        "expect": {
+          "count": 1
+        }
       }
     ],
     "invariants": []
