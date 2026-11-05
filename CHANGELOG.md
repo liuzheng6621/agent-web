@@ -6,6 +6,21 @@
 CI 也在查。这条规则是买来的：这个仓库曾经同时存在 `package.json` 0.16、README 0.9、
 Gitee Release v0.6.0 三个数，谁看都是三个项目。
 
+## 0.40.0
+
+L5 第一刀：`breed` 不再硬编码集合名，执行层变异体补三条。
+
+- `src/breed.mjs` 导出 `collectionsOf(manifest)`；`breedMutants` 未显式指定集合时先问适配器要
+  （`manifest.view.collections` 的键），读不到才退回 `orders/menu/status_log`。
+  realworld → `articles,tags,comments`，animal → `animals,adoption_applications,…`。
+- 三条执行层变异体：`m-exec-role-ignore`（把 `action.as` 换成 manifest 第一个角色）、
+  `m-exec-duplicate-write`（写成功后同参再写一遍）、`m-exec-drop-intermediate`（第一次迁移类调用改成空操作）。
+- **第一次写它们时全被判「抓到」是假阳性**：`wrapExecute(inner, patch)` 的 `patch` 收的是 **action**、
+  返回打补丁后的 action，我按「收 (result, runId, action) 返回结果」写，结果把整条流水打断，
+  于是每条断言都「抓到」——那种抓到毫无信息量。改成自己实现 `{...inner, execute}` 之后，
+  命中点变具体：`m-exec-duplicate-write` 只被 `count_delta` / `linkage` 抓到
+  （`happy-path#goal[3]`、`linkage-events#goal[0]`、`paged-orders#goal[1]`）。
+
 ## 0.39.0
 
 `linkage` 补上数量关系：存在性说得清「有没有」，说不清「多了几条」。

@@ -13,6 +13,10 @@ import * as noReject from './m-no-reject.mjs';
 import * as payloadTruncate from './m-payload-truncate.mjs';
 import * as dropCreateEvent from './m-drop-create-event.mjs';
 import * as duplicateEvent from './m-duplicate-event.mjs';
+import * as execRoleIgnore from './m-exec-role-ignore.mjs';
+import * as execDuplicateWrite from './m-exec-duplicate-write.mjs';
+import * as execDropIntermediate from './m-exec-drop-intermediate.mjs';
+
 import * as itemCountFlattened from './m-item-count-flattened.mjs';
 import * as pickupNoOffset from './m-pickup-no-offset.mjs';
 import * as totalSingleUnit from './m-total-single-unit.mjs';
@@ -45,6 +49,9 @@ const ENTRIES = [
   ['m-payload-truncate', payloadTruncate],
   ['m-drop-create-event', dropCreateEvent],
   ['m-duplicate-event', duplicateEvent],
+  ['m-exec-role-ignore', execRoleIgnore],
+  ['m-exec-duplicate-write', execDuplicateWrite],
+  ['m-exec-drop-intermediate', execDropIntermediate],
   ['m-item-count-flattened', itemCountFlattened],
   ['m-pickup-no-offset', pickupNoOffset],
   ['m-total-single-unit', totalSingleUnit],

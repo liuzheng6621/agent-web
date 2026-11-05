@@ -19,6 +19,16 @@ export const BREED_VERSION = 'agent-web/breed-1';
 /** 只在这几个集合里造故障：它们本来就是规范视图的公共部分。 */
 const COLLECTIONS = ['orders', 'menu', 'status_log'];
 
+// 集合名不该硬编码：不同应用的视图完全不一样（realworld 是 articles/tags/comments，
+// animal 是 animals/adoptions/users）。有适配器就从 manifest 读，读不到才退回上面那三个。
+export function collectionsOf(manifest) {
+  const view = manifest && manifest.view;
+  const cols = view && view.collections;
+  if (!cols || typeof cols !== 'object') return null;
+  const names = Object.keys(cols);
+  return names.length > 0 ? names : null;
+}
+
 /** 每个集合最多看几个元素。第 3 个之后的元素和第一个同构，造出来的变异体重复。 */
 const ENTITY_DEPTH = 2;
 
@@ -256,7 +266,14 @@ export async function sampleState(adapter, { timeoutMs = 8000, caseObj = null } 
   return { runId, state: res?.state ?? null, missingScopes: res?.missingScopes ?? [], replayed: Boolean(caseObj) };
 }
 
-export async function breedMutants({ adapter, adapterName = 'unknown', out, max = 24, collections = COLLECTIONS, caseObj = null } = {}) {
+export async function breedMutants({ adapter, adapterName = 'unknown', out, max = 24, collections = null, caseObj = null } = {}) {
+  // 没显式指定集合时，先问适配器的 manifest 要
+  if (!collections && adapter && typeof adapter.manifest === 'function') {
+    let man = null;
+    try { man = adapter.manifest(); if (man && typeof man.then === 'function') man = await man; } catch { man = null; }
+    collections = collectionsOf(man) || COLLECTIONS;
+  }
+  if (!collections) collections = COLLECTIONS;
   if (!out) throw new Error('breed 需要一个输出目录 --out=');
   const sample = await sampleState(adapter, { caseObj });
   if (!sample.state) {
