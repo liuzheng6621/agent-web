@@ -151,7 +151,7 @@ FAIL todo/recorded   assertion_false
 
 ## 断言能说的，比「第 0 行等于 56」多
 
-12 种 kind，全部机器可判，没有一种是「让模型看看对不对」：
+17 种 kind，全部机器可判，没有一种是「让模型看看对不对」：
 
 | kind | 说什么 |
 |---|---|
@@ -163,6 +163,10 @@ FAIL todo/recorded   assertion_false
 | `relation` | 字段之间的关系：合计等于明细之和、单价乘数量等于小计、列表有序 |
 | `sorted_by` / `unique` / `type_of` / `subset` | 形状：有序、不重、类型对、取值在集合内 |
 | `composite` | 与 / 或 / 非 |
+| `window` / `every_step` | 圈定步骤区间 / 每一步都检查不变量 |
+| `pagination` | 跨页检查重复、漏行、顺序与 total |
+| `payload` | 检查某一步的 HTTP 响应体 |
+| `linkage` | 检查跨集合实体关联与对应数量 |
 
 关系式比写死具体值更耐移植：`totalAmount == Σ items.subTotal` 在哪个实现上都该成立，
 而 `totalAmount == 56` 只在菜单价格不变时成立。形状断言同理——「列表不重」不依赖任何具体编号。
@@ -417,7 +421,7 @@ node bin/agent-web.mjs verify cases/realworld --adapter=realworld --detail
 ## 文档
 
 - [docs/GUIDE.md](docs/GUIDE.md) —— 完整使用指南：从一个网址开始、从日志到正式判分、接入自己的应用
-- [docs/SPEC.md](docs/SPEC.md) —— 规范：案例格式、12 种断言与相位、判决顺序表、各机制的判定规则
+- [docs/SPEC.md](docs/SPEC.md) —— 规范：案例格式、17 种断言与相位、判决顺序表、各机制的判定规则
 - [docs/ADAPTER-GUIDE.md](docs/ADAPTER-GUIDE.md) —— 接自己的应用：三档路径、只改四处、验收顺序
 - [CHANGELOG.md](CHANGELOG.md) —— 每个版本做了什么、因为什么
 - [docs/LIMITS.md](docs/LIMITS.md) —— 11 条限制的台账：状态、验收命令、为什么这条不解决

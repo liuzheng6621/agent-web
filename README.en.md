@@ -152,7 +152,7 @@ Three things it does not do: guess business rules (recording a successful delist
 
 ## Assertions say more than "row 0 equals 56"
 
-12 kinds, all machine-judgable, none of them "let the model eyeball it":
+17 kinds, all machine-judgable, none of them "let the model eyeball it":
 
 | kind | What it says |
 |---|---|
@@ -164,6 +164,10 @@ Three things it does not do: guess business rules (recording a successful delist
 | `relation` | Relationships between fields: total equals sum of line items, unit price times quantity equals subtotal, list is sorted |
 | `sorted_by` / `unique` / `type_of` / `subset` | Shape: ordered, no duplicates, correct type, values within a set |
 | `composite` | And / or / not |
+| `window` / `every_step` | Scope an interval / check an invariant after every step |
+| `pagination` | Check duplicates, omissions, order and total across pages |
+| `payload` | Assert a step's HTTP response body |
+| `linkage` | Check entity links and cardinality across collections |
 
 Relations are more portable than hardcoded values: `totalAmount == Σ items.subTotal` should hold on any implementation, while `totalAmount == 56` only holds when menu prices have not changed. Shape assertions work the same way — "no duplicates" does not depend on any specific id.
 
@@ -181,8 +185,7 @@ Catch rate evolution, each step backed by a mechanism going live:
 
 | Phase | Caught | How |
 |---|---|---|
-| 12 hand-written mutants | 8 / 12 | Basic assertio
-ns |
+| 12 hand-written mutants | 8 / 12 | Basic assertions |
 | + relations | 11 / 12 | `relation` |
 | + shape assertions | 14 / 16 | `sorted_by` / `unique` / `type_of` / `subset` |
 | + machine-generated | 38 / 40 | `breed` generates mutants from the view shape |
@@ -384,7 +387,7 @@ Ordered by proximity to real use.
 ## Docs
 
 - [docs/GUIDE.md](docs/GUIDE.md) — Full guide: start from a URL, from logs to formal grading, connect your own app
-- [docs/SPEC.md](docs/SPEC.md) — Spec: case format, 12 assertion kinds and phases, verdict order table, per-mechanism rules
+- [docs/SPEC.md](docs/SPEC.md) — Spec: case format, 17 assertion kinds and phases, verdict order table, per-mechanism rules
 - [docs/ADAPTER-GUIDE.md](docs/ADAPTER-GUIDE.md) — Connect your own app: three-tier paths, change only four places, verification order
 - [CHANGELOG.md](CHANGELOG.md) — What each version did and why
 - [docs/LIMITS.md](docs/LIMITS.md) — Ledger of the 11 limits: status, acceptance command, why it stays
