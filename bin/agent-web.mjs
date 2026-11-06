@@ -1935,4 +1935,13 @@ async function main() {
   }
 }
 
-main().then((code) => process.exit(code));
+// 用 process.exitCode 而不是 process.exit()：
+// stdout 是管道时（CI 里就是），console.log 是异步写入的，process.exit() 会**截断**还没写出去的内容。
+// 一份 143KB 的 --json 输出在 CI 上被切成 143204 字节的半截 JSON，本地却一切正常，
+// 根因就在这里。设 exitCode 让进程自己等 stdout 排空再退出。
+main().then((code) => {
+  process.exitCode = code;
+}).catch((e) => {
+  console.error(`未捕获：${e && e.stack ? e.stack : e}`);
+  process.exitCode = 2;
+});

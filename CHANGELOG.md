@@ -6,6 +6,17 @@
 CI 也在查。这条规则是买来的：这个仓库曾经同时存在 `package.json` 0.16、README 0.9、
 Gitee Release v0.6.0 三个数，谁看都是三个项目。
 
+## 0.52.2
+
+CI 连续两轮红的真根因找到了，是**输出被截断**，不是断言写错。
+
+- **现象**：`certify --json` 的输出在 CI 上永远只有 143204 字节，结尾停在 `"coffee/happy-path#goal[7`。本地同样的命令输出 162972 字节、JSON 完整。
+- **根因**：`bin/agent-web.mjs` 结尾是 `main().then((code) => process.exit(code))`。stdout 是管道时（CI 里就是），`console.log` 是**异步写入**的，`process.exit()` 会截断还没写出去的内容。本地是 TTY，走同步写，所以永远看不到这个问题。
+- **修法**：`process.exit(code)` → `process.exitCode = code`，让进程自己等 stdout 排空再退出；顺带补 `.catch` 打未捕获异常的 stack（原来 `.then` 没有 catch，异步抛错会变成静默的 unhandled rejection）。
+- **顺带**：`scripts/certify-baseline.mjs` 上一版改成 `spawnSync` 是对的（`execFileSync` 在有漏网时会抛异常），但真正的病根在输出端，不在读的那端。现在两层都修了，解析失败还会打出拿到多少字节 + 结尾 120 字节。
+
+这一轮的教训值得单说：**TTY 与管道的写入语义不同**。所有在本地「跑得好好的」输出型脚本，在 CI 上都可能是另一套行为。
+
 ## 0.52.1
 
 CI run #82 红在「单元测试」——不是断言写错，是**脚本本身在 CI 上拿不到完整数据**。
