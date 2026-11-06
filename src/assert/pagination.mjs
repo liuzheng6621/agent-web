@@ -35,6 +35,22 @@ export function rowsOfPayload(payload, collection) {
 const label = (a) => a.collection ?? 'items';
 
 /**
+ * 实现自己在返回体里报的 total。
+ *
+ * 分页的第四种坏法是「total 说谎」：命中 30 条却报 900，前端据此算出 90 页，
+ * 用户翻到第 4 页就是空的。这种坏法在**每一页的返回体**里都看得见，
+ * 而把各页条数加起来永远等于 30 —— 所以必须单独读这个字段，不能只数行。
+ * 兼容 {total} 与 {data:{total}} 两种常见包裹；没有这个字段就跳过（不是所有实现都报）。
+ */
+function reportedTotalOf(payload, collection) {
+  const pick = (o) => (o && typeof o === 'object' && typeof o.total === 'number' ? o.total : undefined);
+  const direct = pick(payload);
+  if (direct !== undefined) return direct;
+  if (payload && typeof payload === 'object') return pick(payload.data);
+  return undefined;
+}
+
+/**
  * @param a { steps:number[], collection?:string, total?:number, pageSize?:number, ordered_by?:string, id_field?:string }
  *   steps 是 1 基步号，与 window 的 from_step/to_step 同一套坐标。
  */
@@ -71,7 +87,7 @@ export function pagination(a, ctx) {
         message: `第 ${n} 步的返回里没有 ${a.collection ?? '数组'}，分页无从检查（适配器把结果放在别处，或这一步不是列表）`,
       };
     }
-    pages.push({ step: n, rows });
+    pages.push({ step: n, rows, reportedTotal: reportedTotalOf(t.payload, a.collection) });
   }
 
   // 1) 跨页重复：同一行出现在两页里
@@ -120,7 +136,22 @@ export function pagination(a, ctx) {
     }
   }
 
-  // 3) 覆盖：几页加起来必须正好是 total
+  // 3) 实现自己报的 total 必须与案例声称的一致。
+  //    放在「数行数」之前：行数对、报数错，是最常见的一种假绿 ——
+  //    每页都满、拼起来也正好 30 条，只有 total 写着 900。
+  if (a.total !== undefined) {
+    for (const p of pages) {
+      if (p.reportedTotal !== undefined && p.reportedTotal !== a.total) {
+        return {
+          status: FALSE,
+          code: 'pagination_total_reported',
+          message: `第 ${p.step} 步返回的 total 是 ${p.reportedTotal}，案例声称 ${a.total} —— 报的命中数与实际不符`,
+        };
+      }
+    }
+  }
+
+  // 3b) 覆盖：几页加起来必须正好是 total
   if (a.total !== undefined) {
     const got = pages.reduce((n, p) => n + p.rows.length, 0);
     if (got !== a.total) {

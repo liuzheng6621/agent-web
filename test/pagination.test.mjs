@@ -4,6 +4,14 @@ import { pagination, rowsOfPayload } from '../src/assert/pagination.mjs';
 
 const ctxOf = (pages) => ({ trace: pages.map((rows) => ({ stateAfter: {}, payload: { orders: rows } })) });
 
+/** 每页返回体里额外带上实现自己报的 total。 */
+const ctxWithTotal = (pages, total, wrap = false) => ({
+  trace: pages.map((rows) => ({
+    stateAfter: {},
+    payload: wrap ? { data: { orders: rows, total } } : { orders: rows, total },
+  })),
+});
+
 test('分页：正常翻完三页判真', () => {
   const r = pagination({ kind: 'pagination', collection: 'orders', steps: [1, 2, 3], total: 5, pageSize: 2, ordered_by: 'id' }, ctxOf([[{ id: 1 }, { id: 2 }], [{ id: 3 }, { id: 4 }], [{ id: 5 }]]));
   assert.equal(r.status, 'true', r.message);
@@ -32,6 +40,52 @@ test('分页：条数加起来不等于 total 判假', () => {
   const r = pagination({ kind: 'pagination', collection: 'orders', steps: [1, 2], total: 5, pageSize: 2 }, ctxOf([[{ id: 1 }, { id: 2 }], [{ id: 3 }, { id: 4 }]]));
   assert.equal(r.code, 'pagination_total');
   assert.match(r.message, /只拿到 4 条/);
+});
+
+test('分页：行数全对、但实现自己报的 total 说谎，也要判假', () => {
+  // 每页都满、拼起来正好 4 条，只有返回体里的 total 写着 900 ——
+  // 只数行数的检查在这里全是绿的，是典型假绿。
+  const r = pagination(
+    { kind: 'pagination', collection: 'orders', steps: [1, 2], total: 4, pageSize: 2 },
+    ctxWithTotal([[{ id: 1 }, { id: 2 }], [{ id: 3 }, { id: 4 }]], 900),
+  );
+  assert.equal(r.status, 'false');
+  assert.equal(r.code, 'pagination_total_reported');
+  assert.match(r.message, /total 是 900/);
+  assert.match(r.message, /案例声称 4/);
+});
+
+test('分页：报数说谎优先于丢行报告（先指出报数，不误报成丢行）', () => {
+  const r = pagination(
+    { kind: 'pagination', collection: 'orders', steps: [1, 2], total: 5, pageSize: 2 },
+    ctxWithTotal([[{ id: 1 }, { id: 2 }], [{ id: 3 }, { id: 4 }]], 5),
+  );
+  // 报数对得上，剩下的问题才是真的丢行
+  assert.equal(r.code, 'pagination_total');
+});
+
+test('分页：{data:{total}} 包裹里的报数也能读到', () => {
+  const ok = pagination(
+    { kind: 'pagination', collection: 'orders', steps: [1, 2], total: 4, pageSize: 2 },
+    ctxWithTotal([[{ id: 1 }, { id: 2 }], [{ id: 3 }, { id: 4 }]], 4, true),
+  );
+  assert.equal(ok.status, 'true', ok.message);
+  const bad = pagination(
+    { kind: 'pagination', collection: 'orders', steps: [1, 2], total: 4, pageSize: 2 },
+    ctxWithTotal([[{ id: 1 }, { id: 2 }], [{ id: 3 }, { id: 4 }]], 7, true),
+  );
+  assert.equal(bad.code, 'pagination_total_reported');
+});
+
+test('分页：返回体没报 total 时跳过报数检查，不误判', () => {
+  const r = pagination({ kind: 'pagination', collection: 'orders', steps: [1, 2], total: 4, pageSize: 2 }, ctxOf([[{ id: 1 }, { id: 2 }], [{ id: 3 }, { id: 4 }]]));
+  assert.equal(r.status, 'true', r.message);
+});
+
+test('分页：total 不是数字（字符串/空）时不当作报数，跳过', () => {
+  const ctx = { trace: [{ payload: { orders: [{ id: 1 }, { id: 2 }], total: '4' } }, { payload: { orders: [{ id: 3 }, { id: 4 }], total: null } }] };
+  const r = pagination({ kind: 'pagination', collection: 'orders', steps: [1, 2], total: 4, pageSize: 2 }, ctx);
+  assert.equal(r.status, 'true', r.message);
 });
 
 test('分页：翻页乱序判假', () => {
