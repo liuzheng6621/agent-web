@@ -1,4 +1,4 @@
-# agent-web v0.46.0
+# agent-web v0.47.0
 
 <p align="center">
   <img src="docs/media/hero.png" alt="agent-web: integration tests an agent can be judged on" width="100%">
@@ -18,7 +18,7 @@
 </p>
 
 <p align="center">
-  <b>v0.46.0</b> · 17 assertion kinds · 30 commands · 45 mutants
+  <b>v0.47.0</b> · 17 assertion kinds · 30 commands · 45 mutants
 </p>
 
 <p align="center">
@@ -391,7 +391,7 @@ The remaining boundaries are numbered to match L1–L11 in [docs/LIMITS.md](docs
 5. **Mutant coverage is incomplete (L5).** `breed` mainly generates view-shape faults; execution- and business-layer mutants still need domain-specific examples and distinguishability evidence.
 6. **Arbitrary mutant equivalence is undecidable in general (L6).** Finite-state or bounded scenarios can be proved or exhaustively checked; otherwise report "not distinguished within budget," never "equivalent."
 7. **Real-time semantics are still missing (L7).** "Ship within 24 hours after payment" needs explicit timestamps, clock and timezone semantics; step indices cannot express wall-clock time.
-8. **Adapters need process isolation (L8).** `probe` is not a security sandbox; use a read-only filesystem, resource/time limits and restricted network egress.
+8. **Adapters can still lie (L8).** `probe` now checks nine mechanical properties (including "declared but missing", "role ignored", "reads that write"), but it cannot catch a liar that watches the prober; isolation is still not implemented and `probe` is not a sandbox.
 9. **Parallel execution stays disabled for now (L9).** There is no parallel executor; re-enabling it requires byte-identical verdicts, failure causes and per-step receipts between serial and parallel runs.
 10. **Difficulty estimates depend on sample sources (L10).** Multiple independent submitters/batches are needed to interpret the result as external difficulty rather than self-test performance.
 11. **Real-backend validation covers only four domains (L11).** Add domains using two implementations, positive/negative cases, domain mutants, `compare` agreement and a passing `probe`.

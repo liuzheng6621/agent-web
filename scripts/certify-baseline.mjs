@@ -42,6 +42,21 @@ try {
   report = JSON.parse(e.stdout);
 }
 
+// --emit-limits：把实测口径输出成 LIMITS.md 该贴的那一行。
+// 手写数字必然漂（L5 曾写着「22 个变异体、抓到 17」，实际 45/28），所以让脚本生成。
+if (process.argv.includes('--emit-limits')) {
+  const total = report.mutations.length;
+  const applicable = total - report.mutations.filter((m) => m.status === 'not_applicable').length;
+  const caught = report.mutations.filter((m) => m.caught).length;
+  const left = report.mutations.filter((m) => !m.caught && m.status !== 'not_applicable').length;
+  const cases = new Set(report.cases.map((c) => c.caseId)).size;
+  const rate = applicable > 0 ? ((caught / applicable) * 100).toFixed(1) : '—';
+  console.log(
+    `当前口径：${total} 个变异体，${cases} 条案例，适用 ${applicable}，抓到 ${caught}（${rate}%），欠账 ${left}，不适用 ${total - applicable}。`,
+  );
+  process.exit(0);
+}
+
 const survivors = report.mutations.filter((m) => !m.caught && m.status !== 'not_applicable').map((m) => m.id).sort();
 const known = [...KNOWN_SURVIVORS].sort();
 const grew = survivors.filter((id) => !known.includes(id));

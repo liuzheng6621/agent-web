@@ -3,6 +3,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
+
+const require = createRequire(import.meta.url);
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..');
@@ -232,5 +235,39 @@ test('限制清单：下层只写没解决的部分，不许复述上层已经�
       assert.ok(!low.includes(w),
         `boundary item restates what already works ("${w.trim()}") — that belongs in the upper list:/n  ${line}`);
     }
+  }
+});
+
+test('限制清单：L5 的口径必须与实测一致（手写数字必然漂）', () => {
+  const { raw } = limitsEntries();
+  const i = raw.indexOf('## L5 ');
+  const next = raw.indexOf('\n## ', i + 4);
+  const block = raw.slice(i, next > 0 ? next : raw.length);
+  const m = block.match(/当前口径：(\d+) 个变异体，(\d+) 条案例，适用 (\d+)，抓到 (\d+)/);
+  assert.ok(m, 'L5 里没有「当前口径」这一行');
+  const { execFileSync } = require('node:child_process');
+  const measured = execFileSync(process.execPath, ['scripts/certify-baseline.mjs', '--emit-limits'], {
+    cwd: ROOT,
+    encoding: 'utf8',
+    maxBuffer: 32 * 1024 * 1024,
+  });
+  const mm = measured.match(/当前口径：(\d+) 个变异体，(\d+) 条案例，适用 (\d+)，抓到 (\d+)/);
+  assert.ok(mm, '脚本没输出「当前口径」');
+  assert.deepEqual(m.slice(1, 5), mm.slice(1, 5), 'L5 的数字与实测不符：' + measured.trim());
+});
+
+test('限制清单：每条给的验收命令都得是真命令', () => {
+  const { raw } = limitsEntries();
+  const cmds = [...raw.matchAll(/node bin\/agent-web\.mjs ([a-z-]+)/g)].map((m) => m[1]);
+  assert.ok(cmds.length >= 8, '验收命令太少，台账大概被删薄了');
+  const help = require('node:child_process').execFileSync(process.execPath, ['bin/agent-web.mjs', '--help'], {
+    cwd: ROOT,
+    encoding: 'utf8',
+    maxBuffer: 4 * 1024 * 1024,
+  });
+  for (const cmd of new Set(cmds)) {
+    // 不用正则边界符：补丁脚本里的反斜杠会被 heredoc 吃掉，落盘变成退格字符。
+    const re = new RegExp('([^a-z-]|^)' + cmd + '([^a-z-]|$)');
+    assert.ok(re.test(help), `台账里的验收命令 ${cmd} 不在 --help 里`);
   }
 });

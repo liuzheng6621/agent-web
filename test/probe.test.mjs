@@ -96,8 +96,12 @@ test('探针：写了声明成功但视图毫无变化只报警不判死', async
     observe: (runId) => inner.observe(runId),
     async execute(runId, action) {
       const r = await inner.execute(runId, action);
-      // 假执行：什么都不做，但声称成功
-      if (action.capability === 'order.create') return { outcome: 'applied', payload: { orderId: 1 } };
+      // 假执行：什么都不做，但声称成功。
+      // 只对合法角色假成功——否则会顺带制造「角色被绕过」的第二处谎，
+      // 那条由 role-effective 抓，不该混进这条测试的结论里。
+      if (action.capability === 'order.create' && action.as === 'customer') {
+        return { outcome: 'applied', payload: { orderId: 1 } };
+      }
       return r;
     },
   };
@@ -140,4 +144,38 @@ test('探针：manifest 不合法时立刻停，不去跑后面的检查', async
   assert.equal(r.summary.failed >= 1, true);
   assert.equal(r.checks.some((c) => c.id === 'manifest'), true);
   assert.equal(r.checks.some((c) => c.id === 'reset-idempotent'), false);
+});
+
+
+test('探针：声明了却不存在的能力必须被抓', async () => {
+  const { createAdapter } = await import('./fixtures/lying-adapter.mjs');
+  const r = await probeAdapter({ adapter: createAdapter() });
+  const c = r.checks.find((x) => x.id === 'declared-vs-behavior');
+  assert.equal(c.status, 'fail');
+  assert.match(c.detail, /note\.vanish/);
+});
+
+test('探针：忽略角色的适配器必须被抓', async () => {
+  const { createAdapter } = await import('./fixtures/lying-adapter.mjs');
+  const r = await probeAdapter({ adapter: createAdapter() });
+  const c = r.checks.find((x) => x.id === 'role-effective');
+  assert.equal(c.status, 'fail');
+  assert.match(c.detail, /note\.create/);
+});
+
+test('探针：读偷偷写必须被抓', async () => {
+  const { createAdapter } = await import('./fixtures/lying-adapter.mjs');
+  const r = await probeAdapter({ adapter: createAdapter() });
+  const c = r.checks.find((x) => x.id === 'read-no-side-effect');
+  assert.equal(c.status, 'fail');
+  assert.match(c.detail, /note\.list/);
+});
+
+test('探针：内置适配器九项全过', async () => {
+  const { createMemoryAdapter } = await import('../src/adapter/memory.mjs');
+  const r = await probeAdapter({ adapter: createMemoryAdapter() });
+  assert.equal(r.summary.failed, 0);
+  for (const id of ['declared-vs-behavior', 'role-effective', 'read-no-side-effect']) {
+    assert.ok(r.checks.some((c) => c.id === id), `缺检查项 ${id}`);
+  }
 });

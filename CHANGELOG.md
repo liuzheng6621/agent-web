@@ -6,6 +6,16 @@
 CI 也在查。这条规则是买来的：这个仓库曾经同时存在 `package.json` 0.16、README 0.9、
 Gitee Release v0.6.0 三个数，谁看都是三个项目。
 
+## 0.47.0
+
+P0：把台账里「说的是不是真的」修掉，并把探针从六项补到九项。
+
+- **L5 的数字由脚本生成**：`scripts/certify-baseline.mjs --emit-limits` 输出「45 个变异体，12 条案例，适用 30，抓到 28（93.3%）」。台账里原来写着「22 个变异体、抓到 17（89.5%）」——**那是漂掉的**，`test/limits.test.mjs` 现在比对这一行与实测，手写的数字再也混不过去。
+- **探针补三项**：`declared-vs-behavior`（声明了却回 unsupported）、`role-effective`（忽略 `as` 就能绕过）、`read-no-side-effect`（读偷偷写）。反向验证用 `test/fixtures/lying-adapter.mjs`：三处谎同时犯，三项全红、退出码 1；内置适配器九项全过。
+- **台账每条验收命令都要是真命令**：`test/limits.test.mjs` 扫 LIMITS 里的 `node bin/agent-web.mjs <子命令>`，必须在 `--help` 里存在。
+- **L11 写清计数判据**：`cases/realworld` 只有一份实现，没有 `compare`，因此不计入四个域——这样「几个域」不再靠人数。
+- **L8 的措辞改准**：不是「需要进程隔离」，而是「仍可撒谎，隔离未做」。
+
 ## 0.46.0
 
 RealWorld 的 13 个官方 hurl 套件转出的案例，从 **pass 3 / fail 9 / unknown 1** 变成 **13/13 全绿**，并进 CI。

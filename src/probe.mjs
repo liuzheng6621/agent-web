@@ -193,6 +193,121 @@ export async function probeAdapter({ adapter, adapterName = 'unknown', timeoutMs
       add('no-leak', '无状态泄漏', FAIL, FAIL, String(e && e.message));
     }
 
+    // ---- 7：声明了的能力必须真的存在 ----
+    // 覆盖率统计信的是 manifest 的声明。声明了、实现却回 unsupported，
+    // 覆盖率会把它算成「已声明未使用」，而案例永远拿不到证据。
+    try {
+      const roles = manifest.roles ?? [];
+      const caps = (manifest.capabilities ?? []).slice(0, 6);
+      const role = roles[0];
+      const missing = [];
+      for (const cap of caps) {
+        runId = (await withTimeout(adapter.reset({}))).runId;
+        const res = await withTimeout(adapter.execute(runId, { as: role, capability: cap.id, arguments: {} }));
+        const code = res && res.error && res.error.code;
+        if ((res && res.outcome === 'unsupported') || code === 'unsupported_capability') missing.push(cap.id);
+      }
+      add(
+        'declared-vs-behavior',
+        '声明了的能力真的存在',
+        missing.length > 0 ? FAIL : PASS,
+        FAIL,
+        missing.length > 0
+          ? `manifest 声明了但实现说没有：${missing.join('、')} —— 声明与行为对不上，覆盖率会跟着错`
+          : `抽查 ${caps.length} 条能力，没有「声明了却回 unsupported」的`,
+      );
+    } catch (e) {
+      add('declared-vs-behavior', '声明了的能力真的存在', FAIL, FAIL, String(e && e.message));
+    }
+
+    // ---- 8：角色必须真的生效 ----
+    // 越权案例的全部价值在于「换个身份就做不成」。适配器若忽略 as，
+    // 越权案例会稳定地 pass，而实际测的是同一个人的行为。
+    try {
+      const roles = manifest.roles ?? [];
+      const restricted = (manifest.capabilities ?? []).find(
+        (c) => c.kind === 'write' && Array.isArray(c.roles) && c.roles.length > 0 && roles.some((r) => !c.roles.includes(r)),
+      );
+      if (!restricted) {
+        add('role-effective', '角色真的生效', 'skipped', WARN, '没有「只允许部分角色」的写能力，无从验证角色是否生效');
+      } else {
+        // 一条能力被「业务原因」拒绝（缺参数、状态不对）证明不了角色生效，
+        // 所以把所有「只允许部分角色」的写能力都试一遍，只看角色类拒绝码。
+        const restrictedCaps = (manifest.capabilities ?? []).filter(
+          (c) => c.kind === 'write' && Array.isArray(c.roles) && c.roles.length > 0 && roles.some((r) => !c.roles.includes(r)),
+        );
+        const outsider = roles.find((r) => !restricted.roles.includes(r));
+        const applied = [];
+        const forbidden = [];
+        const other = [];
+        for (const cap of restrictedCaps.slice(0, 6)) {
+          runId = (await withTimeout(adapter.reset({}))).runId;
+          const res = await withTimeout(adapter.execute(runId, { as: outsider, capability: cap.id, arguments: {} }));
+          const code = res && res.error && res.error.code;
+          if (res && res.outcome === 'applied') applied.push(cap.id);
+          else if (code === 'forbidden' || code === 'not_owner' || code === 'unknown_role') forbidden.push(`${cap.id}(${code})`);
+          else other.push(`${cap.id}(${code || (res && res.outcome) || '?'})`);
+        }
+        if (applied.length > 0) {
+          add(
+            'role-effective',
+            '角色真的生效',
+            FAIL,
+            FAIL,
+            `角色 ${outsider} 不在允许角色里，却能执行：${applied.join('、')} —— 换个身份就能绕过，越权案例全部无效`,
+          );
+        } else if (forbidden.length > 0) {
+          add('role-effective', '角色真的生效', PASS, FAIL, `${outsider} 被角色挡住：${forbidden.join('、')}`);
+        } else {
+          add(
+            'role-effective',
+            '角色真的生效',
+            'skipped',
+            WARN,
+            `试了 ${restrictedCaps.slice(0, 6).length} 条受限写能力，全是业务拒绝：${other.join('、')} —— 空参下证明不了角色生效`,
+          );
+        }
+      }
+    } catch (e) {
+      add('role-effective', '角色真的生效', FAIL, FAIL, String(e && e.message));
+    }
+
+    // ---- 9：读操作不许偷偷写 ----
+    // 「读」声明了 kind: read。读却改了状态，count_delta 会莫名其妙地漂，
+    // 而且它是最容易伪造的谎：观测看起来永远正常。
+    try {
+      const read = (manifest.capabilities ?? []).find(
+        (c) => c.kind === 'read' && (!c.args || Object.keys(c.args).every((k) => String(c.args[k]).endsWith('?'))),
+      );
+      if (!read) {
+        add('read-no-side-effect', '读操作不改状态', 'skipped', WARN, '没有「参数全可选」的读能力，无从在空参下验证副作用');
+      } else {
+        runId = (await withTimeout(adapter.reset({}))).runId;
+        const before = await snapshot(adapter, runId);
+        const res = await withTimeout(adapter.execute(runId, { as: (manifest.roles ?? [])[0], capability: read.id, arguments: {} }));
+        const after = await snapshot(adapter, runId);
+        if (res && res.outcome === 'applied' && before.fingerprint !== after.fingerprint) {
+          add(
+            'read-no-side-effect',
+            '读操作不改状态',
+            FAIL,
+            FAIL,
+            `读能力 ${read.id} 执行后视图从 ${before.fingerprint} 变成 ${after.fingerprint} —— 读偷偷写了东西`,
+          );
+        } else {
+          add(
+            'read-no-side-effect',
+            '读操作不改状态',
+            PASS,
+            FAIL,
+            `${read.id} 执行后视图不变（${before.fingerprint}）`,
+          );
+        }
+      }
+    } catch (e) {
+      add('read-no-side-effect', '读操作不改状态', FAIL, FAIL, String(e && e.message));
+    }
+
     try {
       if (runId) await adapter.close(runId);
     } catch {
