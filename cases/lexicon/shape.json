@@ -1,0 +1,45 @@
+{
+  "schema_version": "agent-web/0.1",
+  "id": "lexicon/shape",
+  "environment": {
+    "adapter": "lexicon-a",
+    "seed": {}
+  },
+  "task": {
+    "natural_goal": "词库本身的结构：id 不重复、笔画是整数、类别只在那五个值里、按 rank 升序。",
+    "goal_assertions": [
+      {
+        "kind": "unique",
+        "selector": { "collection": "entries" },
+        "path": "id"
+      },
+      {
+        "kind": "type_of",
+        "selector": { "collection": "entries" },
+        "path": "strokes",
+        "type": "integer"
+      },
+      {
+        "kind": "subset",
+        "selector": { "collection": "entries" },
+        "path": "category",
+        "values": ["nature", "place", "body", "object", "abstract"]
+      },
+      {
+        "kind": "sorted_by",
+        "selector": { "collection": "entries" },
+        "path": "rank",
+        "order": "asc"
+      }
+    ]
+  },
+  "reference_trajectory": [
+    {
+      "id": "s1",
+      "capability": "lexicon.list",
+      "as": "reader",
+      "expected_outcome": "applied",
+      "arguments": { "prefix": "chang", "page": 1, "pageSize": 100 }
+    }
+  ]
+}

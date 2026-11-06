@@ -1,0 +1,34 @@
+{
+  "schema_version": "agent-web/0.1",
+  "id": "lexicon/lookup-miss",
+  "environment": {
+    "adapter": "lexicon-a",
+    "seed": {}
+  },
+  "task": {
+    "natural_goal": "查一个词库里不存在的词。应该被明确拒绝，而不是返回一个空对象让调用方以为查到了。",
+    "goal_assertions": [
+      {
+        "kind": "count_delta",
+        "selector": { "collection": "segments" },
+        "delta": 0
+      }
+    ],
+    "invariants": [
+      {
+        "kind": "count_delta",
+        "selector": { "collection": "entries" },
+        "delta": 0
+      }
+    ]
+  },
+  "reference_trajectory": [
+    {
+      "id": "s1",
+      "capability": "lexicon.lookup",
+      "as": "reader",
+      "expected_outcome": "rejected",
+      "arguments": { "word": "不存在的词" }
+    }
+  ]
+}

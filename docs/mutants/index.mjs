@@ -41,6 +41,15 @@ import * as ledgerTotalLies from './m-ledger-total-lies.mjs';
 import * as ledgerAnyBalance from './m-ledger-any-balance.mjs';
 import * as transientMenuPrice from './m-transient-menu-price.mjs';
 import * as midWriteLeak from './m-mid-write-leak.mjs';
+import * as lexiconPageDrop from './m-lexicon-page-drop.mjs';
+import * as lexiconTotalLies from './m-lexicon-total-lies.mjs';
+import * as lexiconDuplicateId from './m-lexicon-duplicate-id.mjs';
+import * as lexiconStrokesAsText from './m-lexicon-strokes-as-text.mjs';
+import * as lexiconUnsorted from './m-lexicon-unsorted.mjs';
+import * as lexiconCategoryOutOfEnum from './m-lexicon-category-out-of-enum.mjs';
+import * as lexiconSegmentTruncate from './m-lexicon-segment-truncate.mjs';
+import * as lexiconLookupEmptyObject from './m-lexicon-lookup-empty-object.mjs';
+import * as lexiconSegmentEcho from './m-lexicon-segment-echo.mjs';
 
 const ENTRIES = [
   ['m-money-off-by-cent', moneyOffByCent],
@@ -79,6 +88,16 @@ const ENTRIES = [
   ['m-page-duplicate', pageDuplicate],
   ['m-page-drop', pageDrop],
   ['m-page-shuffle', pageShuffle],
+  // 词库域：900 条合成词条，分页/唯一性/类型这三类断言在这里才真的有活干。
+  ['m-lexicon-page-drop', lexiconPageDrop],
+  ['m-lexicon-total-lies', lexiconTotalLies],
+  ['m-lexicon-duplicate-id', lexiconDuplicateId],
+  ['m-lexicon-strokes-as-text', lexiconStrokesAsText],
+  ['m-lexicon-unsorted', lexiconUnsorted],
+  ['m-lexicon-category-out-of-enum', lexiconCategoryOutOfEnum],
+  ['m-lexicon-segment-truncate', lexiconSegmentTruncate],
+  ['m-lexicon-lookup-empty-object', lexiconLookupEmptyObject],
+  ['m-lexicon-segment-echo', lexiconSegmentEcho],
 ];
 
 const LAYERS = new Set(['state', 'execute']);

@@ -1,0 +1,62 @@
+{
+  "schema_version": "agent-web/0.1",
+  "id": "lexicon/paged-prefix",
+  "environment": {
+    "adapter": "lexicon-a",
+    "seed": {}
+  },
+  "task": {
+    "natural_goal": "按拼音前缀 chang 查词，每页 10 条翻三页；三页拼起来正好 30 条，不重、不漏、不乱序。",
+    "goal_assertions": [
+      {
+        "kind": "pagination",
+        "collection": "entries",
+        "steps": [1, 2, 3],
+        "total": 30,
+        "pageSize": 10,
+        "ordered_by": "rank"
+      },
+      {
+        "kind": "sorted_by",
+        "selector": { "collection": "entries" },
+        "path": "rank",
+        "order": "asc"
+      },
+      {
+        "kind": "unique",
+        "selector": { "collection": "entries" },
+        "path": "id"
+      }
+    ],
+    "invariants": [
+      {
+        "kind": "count_delta",
+        "selector": { "collection": "entries" },
+        "delta": 0
+      }
+    ]
+  },
+  "reference_trajectory": [
+    {
+      "id": "s1",
+      "capability": "lexicon.list",
+      "as": "reader",
+      "expected_outcome": "applied",
+      "arguments": { "prefix": "chang", "page": 1, "pageSize": 10 }
+    },
+    {
+      "id": "s2",
+      "capability": "lexicon.list",
+      "as": "reader",
+      "expected_outcome": "applied",
+      "arguments": { "prefix": "chang", "page": 2, "pageSize": 10 }
+    },
+    {
+      "id": "s3",
+      "capability": "lexicon.list",
+      "as": "reader",
+      "expected_outcome": "applied",
+      "arguments": { "prefix": "chang", "page": 3, "pageSize": 10 }
+    }
+  ]
+}

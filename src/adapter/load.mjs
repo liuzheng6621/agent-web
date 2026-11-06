@@ -36,6 +36,16 @@ const BUILTINS = {
     const m = await import('./memory.mjs');
     return m.createMemoryAdapter();
   },
+  // 词库域：900 条合成词条，用来验分页/排序/唯一性在大结果集上的行为。
+  // 两个实现的内部结构不同（字典树 vs 二分区间，贪心 vs 反向 DP），必须判决一致。
+  'lexicon-a': async () => {
+    const m = await import('../../examples/lexicon/adapter-a.mjs');
+    return m.createLexiconA();
+  },
+  'lexicon-b': async () => {
+    const m = await import('../../examples/lexicon/adapter-b.mjs');
+    return m.createLexiconB();
+  },
   taixianglian: async () => {
     const m = await import('./taixianglian.mjs');
     return m.createTaixianglianAdapter();

@@ -30,7 +30,7 @@ README 的「边界：已实现与仍未解决」是这份清单的摘要。**�
 | L8 | 适配器可以撒谎 | `open` | `node bin/agent-web.mjs probe cases/coffee --adapter=FILE` |
 | L9 | 并发被撤回了 | `withdrawn` | `npm run determinism`；开关守卫见 `test/limits.test.mjs` |
 | L10 | 难度标签只是统计 | `mitigated` | `node bin/agent-web.mjs drill stats --min-attempts=5` |
-| L11 | 只在三个域上验过 | `continuous` | `node bin/agent-web.mjs compare cases/<域> --adapters=A,B` |
+| L11 | 只在四个域上验过 | `ongoing` | `node bin/agent-web.mjs compare cases/<域> --adapters=A,B` |
 
 ## L1 写操作的语义仍然要人给
 
@@ -183,12 +183,21 @@ npm run determinism:check    # 与基线比 —— 这才是串行 vs 并行的�
 
 验收：`node bin/agent-web.mjs drill stats --min-attempts=5`。
 
-## L11 只在三个域上验过
+## L11 只在四个域上验过
 
 `status: ongoing`
 
-咖啡点单（内存 + 真实 Spring Boot）、动物救助（真实后端 + 内存夹具）、复式记账（整数分 vs 两位小数）。
-三个域逼出的机制是 `applies_to`：账本域的变异体在咖啡域记「不适用」，不进分母。
+咖啡点单（内存 + 真实 Spring Boot）、动物救助（真实后端 + 内存夹具）、复式记账（整数分 vs 两位小数）、
+词库检索（字典树 + 贪心分词 vs 二分 + 反向 DP，900 条合成数据）。
+
+前三个域逼出的机制是 `applies_to`：账本域的变异体在咖啡域记「不适用」，不进分母。
+第四个域逼出的是**数据规模**：前三个域的分页断言只在小结果集上跑过，
+「`total` 说谎」「边界丢行」这类坏法在小数据上每一页都是满的，看着全绿。
+词库域还暴露了 `pagination` 的一个真盲区——它只数各页行数，从不读实现自己报的 `total`
+（补了 `pagination_total_reported`，见 `src/assert/pagination.mjs`）。
+
+**仍然只有四个。** 缺的是「长事务」「多租户」「异步回调」这三种形状，
+它们不是再加一个 CRUD 域就能覆盖的，需要新的断言 kind（L7 的时间语义是其中一条）。
 
 每加一个域的验收标准是：两个实现（或一个真实 + 一个孪生）、四类案例、三个域变异体、
 `compare` 判决一致率 100%、`probe` 通过、`certify` 基线不倒退。做不到就说明词汇还缺，

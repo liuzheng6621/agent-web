@@ -1,0 +1,6 @@
+{
+  "lexicon/paged-prefix": "pass",
+  "lexicon/lookup-miss": "pass",
+  "lexicon/segment": "pass",
+  "lexicon/shape": "pass"
+}

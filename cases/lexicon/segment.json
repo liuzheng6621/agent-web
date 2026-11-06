@@ -1,0 +1,41 @@
+{
+  "schema_version": "agent-web/0.1",
+  "id": "lexicon/segment",
+  "environment": {
+    "adapter": "lexicon-a",
+    "seed": {}
+  },
+  "task": {
+    "natural_goal": "把「长江大桥」切成两个词。两种实现内部算法不同，切出来的 token 必须一样。",
+    "goal_assertions": [
+      {
+        "kind": "field_equals",
+        "selector": { "collection": "segments", "index": 0 },
+        "path": "tokens",
+        "value": ["长江", "大桥"]
+      },
+      {
+        "kind": "field_equals",
+        "selector": { "collection": "segments", "index": 0 },
+        "path": "text",
+        "value": "长江大桥"
+      }
+    ],
+    "invariants": [
+      {
+        "kind": "count_delta",
+        "selector": { "collection": "entries" },
+        "delta": 0
+      }
+    ]
+  },
+  "reference_trajectory": [
+    {
+      "id": "s1",
+      "capability": "lexicon.segment",
+      "as": "reader",
+      "expected_outcome": "applied",
+      "arguments": { "text": "长江大桥" }
+    }
+  ]
+}

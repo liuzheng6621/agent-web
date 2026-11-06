@@ -6,6 +6,34 @@
 CI 也在查。这条规则是买来的：这个仓库曾经同时存在 `package.json` 0.16、README 0.9、
 Gitee Release v0.6.0 三个数，谁看都是三个项目。
 
+## 0.45.0
+
+第四个验证域：词库检索。加它不是为了「再一个业务」，是为了补一个前三个域都没有的**数据形状**——
+900 条结果、每页 10 条翻三页。它当场抓出了分页断言自己的一个盲区。
+
+- 新增 `cases/lexicon/` 四条案例：翻页（`pagination` + `sorted_by` + `unique`）、
+  查不到应被拒绝、分词结果逐字相等、结构约束（`unique` / `type_of` / `subset` / `sorted_by`）。
+- 新增两个实现 `examples/lexicon/adapter-a.mjs` 与 `adapter-b.mjs`：
+  A 用字典树 + 正向最长匹配，B 用排序数组二分 + 反向 DP。**算法真的不同**，
+  否则 `compare` 的一致率是自证而不是契约。`src/adapter/load.mjs` 注册为 `lexicon-a` / `lexicon-b`。
+- 数据是合成的（`examples/lexicon/dataset.mjs`）：30 个音节两两组合 900 条，
+  每个字段由下标决定。不从公开词库搬数据——那些多半没有明确许可证，搬进来等于把授权问题
+  写进本仓库的 LICENSE。合成数据是纯函数产物，判决指纹不漂。
+- **修了 `pagination` 的一个真盲区**：它只把各页行数加起来跟案例声称的 `total` 比，
+  从不读实现自己报的 `total`。于是「命中 30 条、每页 10 条翻三页正好 30 条、但 `total` 写着 900」
+  在每一页都满的情况下全绿——而这正是分页最常见、后果最直接的坏法。
+  新增 `pagination_total_reported`，在数行数**之前**先比报数（先指出报数错，才不会误报成丢行）。
+  兼容 `{total}` 与 `{data:{total}}`；实现没报这个字段就跳过。
+- 新增 9 个词库域变异体：`m-lexicon-page-drop` / `-total-lies` / `-duplicate-id` /
+  `-strokes-as-text` / `-unsorted` / `-category-out-of-enum` / `-segment-truncate` /
+  `-lookup-empty-object` / `-segment-echo`。目录总数 36 → 45。
+  词库域适用 16 个，抓住 10 个（62.5%），最小充分集 6 条断言。
+- 新增 `test/lexicon.test.mjs`（17 条）：不只校验案例合法性，还**守住这个形状本身**——
+  数据集少于 500 条、翻页案例不足三页、`total` 不够三页，都要红。
+- 限制 L11 从「三个域」改为「四个域」，并写清仍然缺的三种形状（长事务、多租户、异步回调）。
+  顺手修掉一个既存漂移：总表 L11 写 `continuous`、正文写 `ongoing`，而 `continuous` 根本不在
+  五值词表里。`test/limits.test.mjs` 新增守卫：总表与正文的 status 必须逐条一致。
+
 ## 0.44.0
 
 负例不再只留一句「得人来补」：`negatives` 从声明派生候选，但不替你决定期望。

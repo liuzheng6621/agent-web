@@ -1,4 +1,4 @@
-# agent-web v0.44.0
+# agent-web v0.45.0
 
 <p align="center">
   <img src="docs/media/hero.png" alt="agent-web: integration tests an agent can be judged on" width="100%">
@@ -18,7 +18,7 @@
 </p>
 
 <p align="center">
-  <b>v0.44.0</b> · 17 assertion kinds · 30 commands · 36 mutants
+  <b>v0.45.0</b> · 17 assertion kinds · 30 commands · 45 mutants
 </p>
 
 <p align="center">
@@ -285,7 +285,7 @@ value multiset agreement (survives shuffled rows), enum overlap, cardinality. Di
 The renamed fixture recovers 17/17 with zero mismatches; after shuffling rows, renaming `totalAmount`
 to `x9` and deleting `pickupNo` it recovers 15/17 and **still zero mismatches** — the other two are
 reported as needing a human signature. A wrong mapping makes a case pass on a field that only looks right.
-## Validated across three domains
+## Validated across four domains
 
 | Domain | Implementation | What it proved |
 |---|---|---|
@@ -390,7 +390,7 @@ The remaining boundaries are numbered to match L1–L11 in [docs/LIMITS.md](docs
 8. **Adapters need process isolation (L8).** `probe` is not a security sandbox; use a read-only filesystem, resource/time limits and restricted network egress.
 9. **Parallel execution stays disabled for now (L9).** The verdict-fingerprint gate exists (`npm run determinism`), but there is no parallel executor; re-enabling it requires byte-identical verdicts, failure causes and per-step receipts between serial and parallel runs.
 10. **Difficulty estimates depend on sample sources (L10).** The ledger and statistics work; multiple independent submitters/batches are needed to interpret the result as external difficulty rather than self-test performance.
-11. **Real-backend validation covers only three domains (L11).** Add domains using two implementations, positive/negative cases, domain mutants, `compare` agreement and a passing `probe`.
+11. **Real-backend validation covers only four domains (L11).** Add domains using two implementations, positive/negative cases, domain mutants, `compare` agreement and a passing `probe`.
 <!-- limits:end -->
 
 ## Docs

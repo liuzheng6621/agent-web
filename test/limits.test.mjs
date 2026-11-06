@@ -56,6 +56,31 @@ test('限制清单：每条都必须有 status，且 status 只取五种', () =>
   }
 });
 
+// 总表和正文各写一次 status，两处会漂：早先 L11 表格写 `continuous`、正文写 `ongoing`，
+// 而 `continuous` 根本不在词表里 —— 两处都「看着有」，谁也没发现。
+// 守卫要求：表格里每条的 status 必须在五值集合内，且与正文逐字相同。
+test('限制清单：总表的 status 与正文逐条一致（两处都写，就会漂）', () => {
+  const { raw, ids } = limitsEntries();
+  const ok = new Set(['open', 'mitigated', 'by-design', 'withdrawn', 'ongoing']);
+  const table = new Map();
+  for (const line of raw.split('\n')) {
+    const m = line.match(/^\|\s*(L\d+)\s*\|[^|]*\|\s*`([a-z-]+)`\s*\|/);
+    if (m) table.set(m[1], m[2]);
+  }
+  assert.equal(table.size, ids.length, `总表里只有 ${table.size} 行，正文有 ${ids.length} 条：${[...table.keys()]}`);
+  for (const id of ids) {
+    const want = table.get(id);
+    assert.ok(want, `${id} 在总表里缺一行`);
+    assert.ok(ok.has(want), `${id} 总表里的 status 不在允许集合里：${want}`);
+    const i = raw.indexOf('## ' + id + ' ');
+    const next = raw.indexOf('\n## ', i + 4);
+    const block = raw.slice(i, next > 0 ? next : raw.length);
+    const m = block.match(/`status:\s*([a-z-]+)`/);
+    assert.ok(m, id + ' 正文缺 status');
+    assert.equal(m[1], want, `${id}：总表写 ${want}，正文写 ${m[1]} —— 两处必须一致`);
+  }
+});
+
 // 这条守卫查的是「有没有真的提供这个开关」，不是「有没有提到这个词」。
 // 早先按裸词匹配，于是注释里写一句「k04 撤回了并发开关」也会判红 ——
 // 那是把文档说成代码。现在先把注释剥掉，只在剩下的代码里找开关：
