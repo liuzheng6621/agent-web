@@ -171,18 +171,20 @@ test('域表格：标题里的域数、表格行数、中英两版必须三者�
   const zh = read('README.md');
   const en = read('README.en.md');
 
-  const zhHead = zh.match(/^## 在(.)个域上验过$/m);
+  // 标题可以带一个括号说明（例如「（另有一个契约验证，不计入域数）」），
+  // 但数字必须还在开头，否则域数就藏起来了。
+  const zhHead = zh.match(/^## 在(.)个域上验过/m);
   assert.ok(zhHead, '中文 README 找不到「## 在N个域上验过」章节');
   const zhWant = NUM_ZH[zhHead[1]];
   assert.ok(zhWant, `中文标题里的数字认不出来：${zhHead[1]}`);
 
-  const enHead = en.match(/^## Validated across (\w+) domains?$/m);
+  const enHead = en.match(/^## Validated across (\w+) domains?/m);
   assert.ok(enHead, '英文 README 找不到「## Validated across N domains」章节');
   const enWant = NUM_EN[enHead[1].toLowerCase()];
   assert.ok(enWant, `英文标题里的数字认不出来：${enHead[1]}`);
 
-  const zhRows = tableRows(zh, /^## 在.个域上验过$/m);
-  const enRows = tableRows(en, /^## Validated across \w+ domains?$/m);
+  const zhRows = tableRows(zh, /^## 在.个域上验过/m);
+  const enRows = tableRows(en, /^## Validated across \w+ domains?/m);
   assert.ok(zhRows && zhRows.length > 0, '中文域表格没有数据行');
   assert.ok(enRows && enRows.length > 0, '英文域表格没有数据行');
 

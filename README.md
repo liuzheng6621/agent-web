@@ -1,4 +1,4 @@
-# agent-web v0.54.0
+# agent-web v0.54.1
 
 <p align="center">
   <img src="docs/media/hero.png" alt="agent-web：给 Agent 写机器可判的集成测试" width="100%">
@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <b>当前版本 0.54.0</b> · 19 种断言 · 31 条命令 · 56 个变异体
+  <b>当前版本 0.54.1</b> · 19 种断言 · 31 条命令 · 56 个变异体
 </p>
 
 <p align="center">
@@ -316,7 +316,7 @@ $ agent-web align our-view.json their-view.json --out=align.yml
 `recall` 在跑批后比对指纹：第一次命中只提醒，**第二次犯同一条就 exit 1 拦下**。
 加深记忆不是靠自觉，是靠退出码。
 
-## 在四个域上验过
+## 在四个域上验过（另有一个契约验证，不计入域数）
 
 | 域 | 实现 | 它证明了什么 |
 |---|---|---|
@@ -332,6 +332,24 @@ $ agent-web align our-view.json their-view.json --out=align.yml
 `total` 说谎、边界丢行这类坏法在小数据上看着全绿。
 词库域还顺手补上了一个断言盲区——`pagination` 原先只数各页行数，
 从不读实现自己报的 `total`，于是「30 条报成 900」在每一页都满的情况下全绿。
+
+### 第五个目录 `cases/realworld`：契约验证，不计入域数
+
+RealWorld（84k star，一份 OpenAPI 契约，990+ 个实现）的官方 13 个 hurl 套件已经转成了 13 条案例，
+`verify cases/realworld --adapter=realworld` **13/13 pass**，并且进了 CI。
+
+它**不计入上面那四个**，理由是一条门槛，不是谦虚：
+
+> 域的门槛要求**两个独立实现**。`cases/realworld` 现在只有一个
+> （`examples/realworld/fake-server.mjs`），没有第二个实现可对照，
+> 而 `compare` 比的是「同一份案例在两个实现上判决是否一致」——
+> 只有一份实现，这个域最核心的那件事就验不了。
+
+它验的是另一件事：**转换器 + 适配器 + 夹具三者是否自洽**（hurl 的断言原样保留、不许手改）。
+这有价值，但不是「跨实现一致性」，所以不往域数里凑。
+
+补齐的办法写在 [docs/ROADMAP.md](docs/ROADMAP.md)：给同一份 `openapi.yml` 写第二个实现，
+`compare --adapters=realworld,realworld-b` 一致率 100% 之后它才算第五个域。
 
 ## 命令一览
 

@@ -1,4 +1,4 @@
-# agent-web v0.54.0
+# agent-web v0.54.1
 
 <p align="center">
   <img src="docs/media/hero.png" alt="agent-web: integration tests an agent can be judged on" width="100%">
@@ -18,7 +18,7 @@
 </p>
 
 <p align="center">
-  <b>v0.54.0</b> · 19 assertion kinds · 31 commands · 56 mutants
+  <b>v0.54.1</b> · 19 assertion kinds · 31 commands · 56 mutants
 </p>
 
 <p align="center">
@@ -287,7 +287,7 @@ value multiset agreement (survives shuffled rows), enum overlap, cardinality. Di
 The renamed fixture recovers 17/17 with zero mismatches; after shuffling rows, renaming `totalAmount`
 to `x9` and deleting `pickupNo` it recovers 15/17 and **still zero mismatches** — the other two are
 reported as needing a human signature. A wrong mapping makes a case pass on a field that only looks right.
-## Validated across four domains
+## Validated across four domains (plus one contract check that does not count)
 
 | Domain | Implementation | What it proved |
 |---|---|---|
@@ -299,6 +299,24 @@ reported as needing a human signature. A wrong mapping makes a case pass on a fi
 The third domain forced a mechanism: mutants can declare `applies_to`. A ledger-domain mutant in the coffee domain is "not applicable", not counted — otherwise the catch rate gets smashed by irrelevant mutants into a false pit.
 
 The fourth domain (lexicon) adds a **data-scale** dimension: the first three domains only ever ran pagination assertions over single-digit result sets, where a lying `total` or a dropped boundary row looks green. It also exposed a blind spot in the `pagination` assertion itself — it summed page sizes and never read the `total` the implementation reported, so "30 rows reported as 900" passed as long as every page was full.
+
+### The fifth directory, `cases/realworld`: a contract check, not a domain
+
+RealWorld (84k stars, one OpenAPI contract, 990+ implementations) — its 13 official hurl suites are now
+13 cases, and `verify cases/realworld --adapter=realworld` is **13/13 pass**, wired into CI.
+
+It does **not** count toward the four above, and that is a threshold, not modesty:
+
+> A domain requires **two independent implementations**. `cases/realworld` has one
+> (`examples/realworld/fake-server.mjs`). `compare` asks whether the same cases produce the same
+> verdicts on two implementations — with only one, the thing a domain is *for* cannot be checked.
+
+What it does check is that **the converter, the adapter and the fixture agree with each other**
+(the hurl assertions are kept verbatim, never hand-edited). That is worth something, but it is not
+cross-implementation agreement, so it does not pad the domain count.
+
+How to close it is in [docs/ROADMAP.md](docs/ROADMAP.md): write a second implementation against the same
+`openapi.yml`; once `compare --adapters=realworld,realworld-b` agrees 100%, it becomes the fifth domain.
 
 ## Commands
 
@@ -397,7 +415,7 @@ The remaining boundaries are numbered to match L1–L11 in [docs/LIMITS.md](docs
 8. **Adapters can still lie (L8).** `probe` now checks nine mechanical properties (including "declared but missing", "role ignored", "reads that write"), but it cannot catch a liar that watches the prober; isolation is still not implemented and `probe` is not a sandbox.
 9. **Parallel execution stays disabled for now (L9).** There is no parallel executor; re-enabling it requires byte-identical verdicts, failure causes and per-step receipts between serial and parallel runs.
 10. **Difficulty estimates depend on sample sources (L10).** Multiple independent submitters/batches are needed to interpret the result as external difficulty rather than self-test performance.
-11. **Real-backend validation covers only four domains (L11).** Add domains using two implementations, positive/negative cases, domain mutants, `compare` agreement and a passing `probe`.
+11. **Real-backend validation covers only four domains (L11).** `cases/realworld` is verified 13/13 but has a single implementation, so cross-implementation agreement cannot be checked and it is not counted. A domain needs two implementations, positive/negative cases, domain mutants, `compare` agreement and a passing `probe`.
 <!-- limits:end -->
 
 ## Docs

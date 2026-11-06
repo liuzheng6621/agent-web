@@ -1,4 +1,4 @@
-# 路线图：从 v0.54.0 到 v0.60
+# 路线图：从 v0.54.1 到 v0.60
 
 这份文档回答一个问题：**接下来该做什么，按什么顺序，做到什么程度算完成。**
 
@@ -7,11 +7,11 @@
 
 ---
 
-## 0. 现在的实际状态（v0.54.0，全部实测）
+## 0. 现在的实际状态（v0.54.1，全部实测）
 
 | 项 | 数字 | 怎么核 |
 |---|---|---|
-| 版本 | 0.54.0 | `node bin/agent-web.mjs version` |
+| 版本 | 0.54.1 | `node bin/agent-web.mjs version` |
 | 断言 | 19 种 | `--help` 里的断言表 |
 | 命令 | 31 条 | 同上 |
 | 变异体 | 56 个 | `node bin/agent-web.mjs mutants` |
@@ -107,20 +107,33 @@ agent-web crosscheck --adapter=memory
 
 ---
 
-## 3. P7 — 清掉 RealWorld 的十条红（L11）
+## 3. P7 — 给 RealWorld 补第二个实现（L11）
 
 **目标**：域数 4 → 5，L11 从 `ongoing` 变成「已验五域」。
 
-### 3.1 现状（实测，不是记忆）
+### 3.0 前提：十条红**已经清完了**（v0.46.0，commit `d001436`）
 
-`agent-web verify cases/realworld --adapter=realworld` = **pass 3 / fail 9 / unknown 1**。
+`agent-web verify cases/realworld --adapter=realworld` = **13/13 pass**（实测，2026-11-06 复核）。
+`examples/realworld/FIX-PLAN.md` 顶部已标记「已完成」。这一节原来写的是「清十条红」，
+现在改成「补第二个实现」——因为红没了，域数没涨，卡的是另一个门槛。
+
+### 3.1 现状
 
 施工单已在 `examples/realworld/FIX-PLAN.md`（138 行），分四类十条：
 
-- **A 转换器/适配器**：`some-slug.update` 能力名丢失参数信息；`updated_token` 身份继承
-- **B 夹具缺业务语义**：`favorited`/`following`/feed 未按当前用户算
-- **C 夹具错误文案与 hurl 不符**：401 的 `token` 字段、越权删评论的 `forbidden`
-- **D 夹具缺唯一性/鉴权**：重复注册要 422、`articles.update` 作者比对
+（这四类已全部修完，保留在此作为记录：A 转换器/适配器、B 夹具缺业务语义、C 夹具错误文案、D 夹具缺唯一性/鉴权。）
+
+### 3.1.1 真正卡住的是「只有一份实现」
+
+`cases/` 有五个目录，但 `realworld` 只有一个实现（`examples/realworld/fake-server.mjs`）。
+域的门槛要求两个独立实现 + `compare` 一致率 100%——只有一份，「跨实现一致性」就验不了。
+
+补法：拿同一份 `openapi.yml` 写第二个实现（换个写法：`decl` 的 YAML 声明式适配器打同一个夹具，
+或者真打 Postgres）。然后：
+
+```bash
+agent-web compare cases/realworld --adapters=realworld,realworld-b   # 期望 100% 一致
+```
 
 ### 3.2 铁律（施工单里已写，这里再强调）
 
