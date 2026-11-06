@@ -56,6 +56,45 @@ test('限制清单：每条都必须有 status，且 status 只取五种', () =>
   }
 });
 
+// 这条守卫查的是「有没有真的提供这个开关」，不是「有没有提到这个词」。
+// 早先按裸词匹配，于是注释里写一句「k04 撤回了并发开关」也会判红 ——
+// 那是把文档说成代码。现在先把注释剥掉，只在剩下的代码里找开关：
+// 字符串字面量里出现 `--jobs`，或者有人读 flags['jobs']。
+function codeOnly(src) {
+  let out = '';
+  let i = 0;
+  let state = 'code';
+  let quote = '';
+  while (i < src.length) {
+    const c = src[i];
+    const d = src[i + 1];
+    if (state === 'code') {
+      if (c === '/' && d === '/') { state = 'line'; i += 2; continue; }
+      if (c === '/' && d === '*') { state = 'block'; i += 2; continue; }
+      if (c === '"' || c === "'" || c === '`') { state = 'string'; quote = c; out += c; i += 1; continue; }
+      out += c; i += 1; continue;
+    }
+    if (state === 'line') {
+      if (c === '\n') { state = 'code'; out += c; }
+      i += 1; continue;
+    }
+    if (state === 'block') {
+      if (c === '*' && d === '/') { state = 'code'; i += 2; } else i += 1;
+      continue;
+    }
+    out += c;
+    if (c === '\\') { out += src[i + 1] ?? ''; i += 2; continue; }
+    if (c === quote) state = 'code';
+    i += 1;
+  }
+  return out;
+}
+
+function offersJobsFlag(src) {
+  const code = codeOnly(src);
+  return code.includes('--jobs') || /flags\s*\[\s*['"]jobs['"]\s*\]/.test(code);
+}
+
 test('限制清单：撤回的那条不许再出现在代码里（k04 的教训）', () => {
   const { raw } = limitsEntries();
   assert.ok(/L9[^]*withdrawn/.test(raw), 'L9 应该标 withdrawn');
@@ -66,10 +105,19 @@ test('限制清单：撤回的那条不许再出现在代码里（k04 的教训�
         const rel = path.join(d, name);
         const abs = path.join(ROOT, rel);
         if (fs.statSync(abs).isDirectory()) walk(rel);
-        else if (rel.endsWith('.mjs') && read(rel).includes('--jobs')) hits.push(rel);
+        else if (rel.endsWith('.mjs') && offersJobsFlag(read(rel))) hits.push(rel);
       }
     };
     walk(dir);
   }
-  assert.deepEqual(hits, [], 'L9 说并发已撤回，但代码里又出现了 --jobs：' + hits.join(', '));
+  assert.deepEqual(hits, [], 'L9 说并发已撤回，但代码里又提供了这个开关：' + hits.join(', '));
+});
+
+test('限制清单：注释里提到并发开关不算「提供」，字符串字面量才算', () => {
+  assert.equal(offersJobsFlag('// k04 撤回了 --jobs，别再加回来'), false);
+  assert.equal(offersJobsFlag('/* 不要加 --jobs */\nconst a = 1;'), false);
+  assert.equal(offersJobsFlag("flags['jobs'] = 4"), true);
+  assert.equal(offersJobsFlag("console.error('用法：--jobs=N')"), true);
+  assert.equal(offersJobsFlag('const a = "--jobs";'), true);
+  assert.equal(offersJobsFlag("const url = 'https://x/y'; // --jobs 只在这里提过"), false);
 });

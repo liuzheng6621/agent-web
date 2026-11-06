@@ -388,7 +388,7 @@ The remaining boundaries are numbered to match L1–L11 in [docs/LIMITS.md](docs
 6. **Arbitrary mutant equivalence is undecidable in general (L6).** Finite-state or bounded scenarios can be proved or exhaustively checked; otherwise report "not distinguished within budget," never "equivalent."
 7. **Real-time semantics are still missing (L7).** Step windows, per-step checks, pagination and linkage exist; "ship within 24 hours after payment" needs explicit timestamps, clock and timezone semantics.
 8. **Adapters need process isolation (L8).** `probe` is not a security sandbox; use a read-only filesystem, resource/time limits and restricted network egress.
-9. **Parallel execution stays disabled for now (L9).** Parallelize pure calculations first. Consider adapter concurrency only with isolated data spaces and byte-identical serial/parallel verdicts and evidence.
+9. **Parallel execution stays disabled for now (L9).** The verdict-fingerprint gate exists (`npm run determinism`), but there is no parallel executor; re-enabling it requires byte-identical verdicts, failure causes and per-step receipts between serial and parallel runs.
 10. **Difficulty estimates depend on sample sources (L10).** The ledger and statistics work; multiple independent submitters/batches are needed to interpret the result as external difficulty rather than self-test performance.
 11. **Real-backend validation covers only three domains (L11).** Add domains using two implementations, positive/negative cases, domain mutants, `compare` agreement and a passing `probe`.
 <!-- limits:end -->

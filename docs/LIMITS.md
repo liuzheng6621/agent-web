@@ -28,7 +28,7 @@ README 的「边界：已实现与仍未解决」是这份清单的摘要。**�
 | L6 | 等价变异体问题没有解决 | `by-design` | `node bin/agent-web.mjs certify cases/coffee --adapter=memory` |
 | L7 | 断言表达能力仍有缺口 | `mitigated` | `node scripts/kind-necessity.mjs` |
 | L8 | 适配器可以撒谎 | `open` | `node bin/agent-web.mjs probe cases/coffee --adapter=FILE` |
-| L9 | 并发被撤回了 | `withdrawn` | `grep -rn -- "--jobs" bin src` 必须为空 |
+| L9 | 并发被撤回了 | `withdrawn` | `npm run determinism`；开关守卫见 `test/limits.test.mjs` |
 | L10 | 难度标签只是统计 | `mitigated` | `node bin/agent-web.mjs drill stats --min-attempts=5` |
 | L11 | 只在三个域上验过 | `continuous` | `node bin/agent-web.mjs compare cases/<域> --adapters=A,B` |
 
@@ -149,7 +149,25 @@ Node 权限模型，默认禁 fs/网络/子进程），并且文档必须写清�
 快 9 倍但答案会变的评估器，比慢的那个更没用。代码已撤，**不提供 `--jobs`**，
 原始记录见 `knowledge/k04-parallel-verdict-drift.mjs` 与 `docs/SPEC.md` 12.9.2。
 
-恢复前的验收门槛：建立可重复的串行/并行对照测试，要求 `--jobs=1` 与 `--jobs=N` 的 verdict、失败断言和证据逐字一致；先只并行纯计算。执行层必须等每个任务拥有独立状态命名空间、夹具和资源配额后，再由适配器显式声明并发安全。
+恢复前的验收门槛已经做成了脚本，不再只是一句散文：
+
+```bash
+npm run determinism          # 同进程连跑两遍，比第 1 遍与第 N 遍
+npm run determinism:baseline # 存一份指纹基线
+npm run determinism:check    # 与基线比 —— 这才是串行 vs 并行的门
+```
+
+指纹取的是**判决相关的投影**：`status`、`reason_code`、`stage`、每条断言的
+（序号, kind, 三值, 代码）、每一步的（capability, 身份, 期望结局, 实际结局, 错误码）。
+默认不把 `createTime` 这类时间戳算进去，否则真实后端上这扇门永远是红的、人就会去关它；
+要更严用 `--strict`，它额外比 `detail` 与去掉易变字段后的 evidence 摘要。
+
+这个形状借的是 DeepInfer 的批次不变性测试（`tests/models/test_batch_invariant.py`）：
+他们不比「两次输出文本一样」，而比 token_ids + logprobs + top-k 逐位相同 ——
+**结论一致不等于过程一致**。这里同理：都 pass 了不算一致，死在哪条断言、每一步怎么走都得一样。
+
+仍然撤回的部分：没有并行执行器，也没有适配器的 `concurrency.safe` 声明。
+执行层要恢复并发，前提是每个任务有独立状态命名空间、夹具和资源配额。
 
 ## L10 难度标签只是统计
 

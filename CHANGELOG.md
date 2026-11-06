@@ -23,6 +23,42 @@ Gitee Release v0.6.0 三个数，谁看都是三个项目。
   非法状态迁移需要状态机声明，候选转正仍要人署名 `accept`。
 - 顺手修掉 `docs/GUIDE.md` 里写死的旧版本号与缺失的 `align` 命令条目。
 
+### 判决确定性门（L9 的可运行那一半）
+
+L9 一直只有一句散文「恢复前要证明串行与并行逐字一致」，没有机器门。补上：
+
+- 新增 `src/determinism.mjs` + `scripts/verdict-determinism.mjs`：把判决压成指纹
+  （`status` / `reason_code` / `stage` / 每条断言的序号·kind·三值·代码 /
+  每一步的 capability·身份·期望结局·实际结局·错误码），逐条比对并指出差异路径。
+- `npm run determinism` 同进程连跑两遍；`determinism:baseline` 存基线，
+  `determinism:check` 与基线比 —— 后者才是串行 vs 并行的门。
+- 默认不比时间戳（真实后端每次都不一样，比了这扇门永远是红的、人就会去关它）；
+  `--strict` 额外比 `detail` 与 evidence 摘要。
+- 形状借自 DeepInfer 的 `tests/models/test_batch_invariant.py`：不比「输出文本一样」，
+  比 token_ids + logprobs + top-k 逐位相同。结论一致不等于过程一致。
+- `test/limits.test.mjs` 的开关守卫从「裸词匹配」改成「剥掉注释后再找」：
+  注释里提一句 k04 不再判红，字符串里真写了开关仍然判红。
+- 反向验证：篡改基线里一条 `status` 后 `determinism:check` 退出码 1 并指出
+  `reason_code` / `status` 两处漂移；恢复后退出码 0。
+
+### 判决确定性门（L9 的可运行那一半）
+
+L9 一直只有一句散文「恢复前要证明串行与并行逐字一致」，没有机器门。补上：
+
+- 新增 `src/determinism.mjs` + `scripts/verdict-determinism.mjs`：把判决压成指纹
+  （`status` / `reason_code` / `stage` / 每条断言的序号·kind·三值·代码 /
+  每一步的 capability·身份·期望结局·实际结局·错误码），逐条比对并指出差异路径。
+- `npm run determinism` 同进程连跑两遍；`determinism:baseline` 存基线，
+  `determinism:check` 与基线比 —— 后者才是串行 vs 并行的门。
+- 默认不比时间戳（真实后端每次都不一样，比了这扇门永远是红的、人就会去关它）；
+  `--strict` 额外比 `detail` 与 evidence 摘要。
+- 形状借自 DeepInfer 的 `tests/models/test_batch_invariant.py`：不比「输出文本一样」，
+  比 token_ids + logprobs + top-k 逐位相同。结论一致不等于过程一致。
+- `test/limits.test.mjs` 的开关守卫从「裸词匹配」改成「剥掉注释后再找」：
+  注释里提一句 k04 不再判红，字符串里真写了开关仍然判红。
+- 反向验证：篡改基线里一条 `status` 后 `determinism:check` 退出码 1 并指出
+  `reason_code` / `status` 两处漂移；恢复后退出码 0。
+
 ## 0.43.0
 
 `witness` 现在看每一步，不只看终态——「中途坏、结尾修好」这一类终于能被看见。
