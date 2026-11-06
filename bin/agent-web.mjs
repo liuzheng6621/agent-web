@@ -14,7 +14,8 @@
  *   agent-web prepare <动作日志>       一次生成轨迹、案例草稿与流程预览
  *   agent-web draft <轨迹文件>          回放一条轨迹，反推案例草稿
  *   agent-web flow <案例或目录>           生成单个流程图或判决总览 HTML
-  agent-web discover <网址>                 输入一个网址：探测接口、生成适配器与案例
+ *   agent-web crosscheck --adapter=SPEC       交叉复核：不经过适配器自己的 fetch 再发一遍，比对响应
+ *   agent-web discover <网址>                 输入一个网址：探测接口、生成适配器与案例
  *   agent-web init <目录>              生成一份案例模板
  *
  *   agent-web --version              打印版本（唯一来源：package.json）
@@ -55,6 +56,8 @@ import { startTap } from '../src/tap.mjs';
 import { readTraffic, learnTraffic, writeLearnOut } from '../src/learn.mjs';
 import { deriveNegatives, renderNegativeSheet, formatNegativeSummary, writeNegatives, classifyObserved, formatObservedSummary } from '../src/negatives.mjs';
 import { preflightAll, formatPreflight, preflightExit } from '../src/preflight.mjs';
+import { crosscheck } from '../src/crosscheck.mjs';
+import { formatCrosscheck } from '../src/assert/crosscheck.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..');
@@ -751,6 +754,32 @@ function cmdLearn(args, flags) {
   console.log(`  3 agent-web verify ${path.join(out, 'cases')} --adapter=${path.join(out, 'twin.json')}   # 孪生对照`);
   if (!flags.accept) console.log('  案例默认是草稿：agent-web accept <id> --by=<名字> 之后才出判决');
   return 0;
+}
+
+async function cmdCrosscheck(args, flags) {
+  const spec = flags.adapter ?? null;
+  if (!spec) {
+    console.error('用法：agent-web crosscheck --adapter=SPEC [--base=URL] [--timeout=8000] [--json]');
+    console.error('  走 HTTP 的适配器：用不经过适配器自己的 fetch 的通道再发一遍同样的请求，比对响应。');
+    console.error('  三类结论：consistent / divergent / uncheckable。');
+    console.error('  uncheckable 不算通过——把「查不了」记成「没问题」是这类工具最容易犯的错。');
+    console.error('  退出码：有 divergent → 1；全部一致 → 0；其余（含全部查不了）→ 2。');
+    return 2;
+  }
+  const adapter = await loadAdapter(spec, {}, process.cwd());
+  const report = await crosscheck({
+    adapter,
+    adapterName: spec,
+    baseUrl: flags.base ? String(flags.base) : undefined,
+    timeoutMs: flags.timeout ? Number(flags.timeout) : 8000,
+  });
+  if (flags.json) console.log(JSON.stringify(report, null, 2));
+  else if (report.reason) {
+    console.log('交叉复核 · 适配器 ' + report.adapter + ' · 一条都没复核');
+    console.log('');
+    console.log('  ' + report.reason);
+  } else console.log(formatCrosscheck(report));
+  return report.exitCode;
 }
 
 async function cmdDiscover(args, flags) {
@@ -1822,6 +1851,7 @@ const HELP = `agent-web —— 给 Agent 写机器可判的集成测试
   agent-web prepare <动作日志> --adapter=SPEC  一次生成步骤、案例草稿和流程预览
   agent-web draft <轨迹文件> --adapter=SPEC   回放轨迹，反推案例草稿（要人确认）
   agent-web flow <案例或目录> [--result=FILE]  单案例流程图；给目录则生成判决总览
+  agent-web crosscheck --adapter=SPEC         交叉复核：不经过适配器自己的 fetch 再发一遍，比对响应
   agent-web discover <网址> --out=DIR         探一个站点：生成只读适配器、案例草稿和施工单
   agent-web import hurl <文件|目录> --out=DIR 把 hurl 套件转成案例草稿（不联网）
   agent-web tap --target=URL                  录五分钟：流量长出适配器、孪生与案例
@@ -1912,6 +1942,8 @@ async function main() {
       return cmdKnowledge(flags);
     case 'recall':
       return cmdRecall(args, flags);
+    case 'crosscheck':
+        return await cmdCrosscheck(args, flags);
     case 'discover':
         return await cmdDiscover(args, flags);
     case 'tap':

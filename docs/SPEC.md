@@ -1515,6 +1515,50 @@ accepted: []
 - 让 `drill` 只报 `asked` 而不报 `skipped` / `not_applicable` / `invisible`（四桶必须相加等于配对数）
 - 允许 `drill grade` 用提交里的文字说明代替实跑结果
 
+## 25. 交叉复核（crosscheck）
+
+`probe` 查的是「适配器自己说的对不对」。但适配器知道自己被探测，所以它骗得过探针。
+`crosscheck` 换一个问法：**同一时刻，两个通道看到的东西一样吗？**
+
+### 25.1 独立通道是什么
+
+不经过适配器自己的 `fetch`，用 `globalThis.fetch` 直连 `manifest.baseUrl` + 能力声明的
+HTTP 路径，再比两边响应的指纹。
+
+**它挡的是「适配器在返回体里做手脚」，挡不住「适配器把整个 `globalThis.fetch` 换掉」。**
+这条边界写在 LIMITS 里，不改口。
+
+### 25.2 指纹：只比形状与关键值
+
+每次都变的字段必须剔掉，否则正确实现也会判 `divergent`，检测器就成了噪声源：
+
+```
+at, time, timestamp, createdAt, updatedAt, createTime, updateTime,
+id, key, token, nonce, requestId, traceId, etag, date
+```
+
+键顺序不影响（稳定序列化）；数组顺序与长度影响（顺序是数据的一部分，砍掉一条是最常见的谎）。
+
+### 25.3 三类结论与退出码
+
+| 结论 | 触发 | 退出码 |
+|---|---|---|
+| `consistent` | 两边指纹相同 | 0（仅当全部一致且至少一条） |
+| `divergent` | 指纹不同 | 1 |
+| `uncheckable` | 不走 HTTP / 没声明路径 / 连不上 / 有一个通道没响应 | 2 |
+
+**「连不上」记 `uncheckable` 不记 `divergent`**：分不清「说谎」与「网络不通」时，
+宁可说查不了，也不冤枉实现。
+
+**`uncheckable` 不进分母。** 一条都查不了时 `rate` 是 `null`，不是 `0`——
+「没有证据」和「0% 一致」是两件事。
+
+### 25.4 只复核只读、无参的能力
+
+写能力会改状态，两个通道顺序调用必然不同；需要参数的读能力，独立通道不知道该填什么
+（适配器可能会填它自己编的值）。所以 `pickReadCapabilities` 只挑 `kind==='read'` 且
+`args` 为空的能力。
+
 ## 24. 字段映射的下钻与歧义（align）
 
 `align` 先配集合、再配字段。配字段这一层原来只看顶层，于是「容器配上了，里面全靠人肉」——

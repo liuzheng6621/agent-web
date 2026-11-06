@@ -27,7 +27,7 @@ README 的「边界：已实现与仍未解决」是这份清单的摘要。**�
 | L5 | 变异体仍有盲区 | `mitigated` | `node bin/agent-web.mjs breed cases/coffee --adapter=memory` |
 | L6 | 等价变异体问题没有解决 | `by-design` | `node bin/agent-web.mjs certify cases/coffee --adapter=memory` |
 | L7 | 断言表达能力仍有缺口 | `mitigated` | `node scripts/kind-necessity.mjs` |
-| L8 | 适配器可以撒谎 | `open` | `node bin/agent-web.mjs probe cases/coffee --adapter=FILE` |
+| L8 | 适配器可以撒谎 | `mitigated` | `node bin/agent-web.mjs probe cases/coffee --adapter=FILE` |
 | L9 | 并发被撤回了 | `withdrawn` | `npm run determinism`；开关守卫见 `test/limits.test.mjs` |
 | L10 | 难度标签只是统计 | `mitigated` | `node bin/agent-web.mjs drill stats --min-attempts=5` |
 | L11 | 只在四个域上验过 | `ongoing` | `node bin/agent-web.mjs compare cases/<域> --adapters=A,B` |
@@ -161,19 +161,36 @@ v0.52.0 采纳 9 个生成物进正式目录（47 → 56），但**采纳前补�
 
 ## L8 适配器可以撒谎
 
-`status: open`
+`status: mitigated`
 
 `probe` 查九项机械性质：五方法契约、manifest、复位幂等、观测稳定、空参不炸、无状态泄漏、
-**声明了的能力真的存在**、**角色真的生效**、**读操作不改状态**。
+**声明了的能力真的存在**、**角色真的生效**、**读操作不改状态**（后三项 v0.47.0 补的）。
 
-后三项是补上的（v0.47.0）。它们抓的是三种最容易伪造的谎：声明一个没实现的能力（覆盖率会跟着错）、
-忽略 `as`（越权案例会稳定地 pass，实际测的是同一个人的行为）、读偷偷写（`count_delta` 会莫名漂移）。
-反向验证：`test/fixtures/lying-adapter.mjs` 同时犯这三处，探针三项全红、退出码 1。
-加载适配器等于以你的身份执行代码——`load.mjs` 直接 `import`，CLI 会提示一次，但那不是沙箱。
+**v0.54.0 补上的 `crosscheck`**：走 HTTP 的适配器，用**不经过它自己的 `fetch`** 的通道
+再发一遍同样的请求，比对响应指纹。这是唯一能机检「适配器在返回体里做手脚」的手段——
+它知道自己在被探测，所以探针骗得过；但它骗不过「同一时刻两个通道看到的不一样」。
 
-分得出的是「诚实但受限」与「机械上可查的谎」，分不出「会看探测器的骗子」。
-收窄的方向是走 HTTP 的适配器用独立 `fetch` 交叉复核，以及进程级隔离（子进程 +
-Node 权限模型，默认禁 fs/网络/子进程），并且文档必须写清：进程隔离不是安全边界。
+三类结论，缺一不可：
+
+| 结论 | 含义 | 退出码 |
+|---|---|---|
+| `consistent` | 两个通道同一个响应 | 0（全部一致时） |
+| `divergent` | 两边不一样 → 在撒谎，或中间有缓存 | 1 |
+| `uncheckable` | 适配器不走 HTTP | 2 |
+
+**`uncheckable` 单列且不算通过。** 把「查不了」记成「没问题」是这类工具最容易犯的错；
+一条都查不了时报告写的是「这不是没问题，是没有证据」，`rate` 是 `null` 而不是 `0`。
+
+反向验证两件都做了：`test/fixtures/lying-http-adapter.mjs`（改标题又砍一条 → `divergent`，
+而同一适配器里原样转发的 `tags.list` 必须 `consistent`，证明检测器不是见谁咬谁）；
+诚实适配器全部 `consistent`（证明它不是恒红）。
+
+**边界，不改口**：进程隔离**不是**安全边界。适配器可以起子进程、读文件、发网络，
+Node 权限模型也拦不住铁了心的适配器。`crosscheck` 还挡不住「适配器把整个 `globalThis.fetch` 换掉」——
+它挡的是「在返回体里做手脚」。加载适配器仍然等于以你的身份执行代码。
+
+验收：`node bin/agent-web.mjs crosscheck --adapter=test/fixtures/lying-http-adapter.mjs`（期望 exit 1）。
+
 
 ## L9 并发被撤回了
 

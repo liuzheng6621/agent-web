@@ -6,6 +6,28 @@
 CI 也在查。这条规则是买来的：这个仓库曾经同时存在 `package.json` 0.16、README 0.9、
 Gitee Release v0.6.0 三个数，谁看都是三个项目。
 
+## 0.54.0
+
+P6 交叉复核：L8 从 `open` 降到 **`mitigated`**。这是台账上最后一条 `open`。
+
+新命令 `agent-web crosscheck --adapter=SPEC`：走 HTTP 的适配器，用**不经过它自己的 `fetch`**
+的通道再发一遍同样的请求，比对响应指纹。
+
+- **三类结论**：`consistent` / `divergent` / `uncheckable`。**`uncheckable` 单列且不算通过**——把「查不了」记成「没问题」是这类工具最容易犯的错。一条都查不了时 `rate` 是 `null` 而不是 `0`（「没有证据」与「0% 一致」是两件事）。
+- **指纹剔掉每次都变的字段**（`at`/`id`/`token`/`createdAt`…），否则正确实现也会判 `divergent`，检测器就成了噪声源。键顺序不影响，数组顺序与长度影响（砍掉一条是最常见的谎）。
+- **连不上记 `uncheckable` 不记 `divergent`**：分不清「说谎」与「网络不通」时，宁可说查不了，也不冤枉实现。
+- **只复核只读且无参的能力**：写能力会改状态，两个通道顺序调用必然不同；需要参数的读能力，独立通道不知道该填什么。
+
+反向验证两件都做了，缺一件这检测器就不可信：
+- `test/fixtures/lying-http-adapter.mjs` 改标题又砍一条 → `divergent`；**同一适配器里原样转发的 `tags.list` 必须 `consistent`**——证明不是见谁咬谁。
+- 诚实适配器全部 `consistent`——证明不是恒红。
+
+**边界，不改口**：进程隔离不是安全边界。适配器可以起子进程、读文件、发网络。`crosscheck`
+还挡不住「适配器把整个 `globalThis.fetch` 换掉」——它挡的是「在返回体里做手脚」。
+
+新增 `test/crosscheck.test.mjs` 16 条；`docs/SPEC.md` 第 25 章；`docs/LIMITS.md` 的 L8 正文与总表同步
+（`test/limits.test.mjs` 会比对两处，漂了就红）。
+
 ## 0.53.0
 
 新增 `docs/ROADMAP.md`：从 v0.52.2 到 v0.60 的施工单，每条带验收命令与「怎么证明它没做到」。

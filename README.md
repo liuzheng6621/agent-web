@@ -1,4 +1,4 @@
-# agent-web v0.53.0
+# agent-web v0.54.0
 
 <p align="center">
   <img src="docs/media/hero.png" alt="agent-web：给 Agent 写机器可判的集成测试" width="100%">
@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <b>当前版本 0.53.0</b> · 19 种断言 · 30 条命令 · 56 个变异体
+  <b>当前版本 0.54.0</b> · 19 种断言 · 31 条命令 · 56 个变异体
 </p>
 
 <p align="center">
@@ -352,6 +352,7 @@ $ agent-web align our-view.json their-view.json --out=align.yml
 | `record` / `prepare` / `draft` | 从真实动作日志还原轨迹、生成案例草稿 |
 | `flow` | 单案例判决页；给目录出总览页 |
 | `discover` | 探一个站点：只读适配器 + 案例草稿 + 施工单 |
+| `crosscheck` | — | 不经过适配器自己的 fetch 再发一遍，比对响应：一致 / 不一致 / 查不了 |
 | `import hurl` | 把 hurl 套件转成案例草稿（不联网、不执行） |
 | `tap` / `learn` | 反向代理录一段流量，长出适配器 / 孪生 / 案例草稿 |
 | `mutants` | 变异体目录：谁的坏法、怎么抓、怎么投稿 |

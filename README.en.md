@@ -1,4 +1,4 @@
-# agent-web v0.53.0
+# agent-web v0.54.0
 
 <p align="center">
   <img src="docs/media/hero.png" alt="agent-web: integration tests an agent can be judged on" width="100%">
@@ -18,7 +18,7 @@
 </p>
 
 <p align="center">
-  <b>v0.53.0</b> · 19 assertion kinds · 30 commands · 56 mutants
+  <b>v0.54.0</b> · 19 assertion kinds · 31 commands · 56 mutants
 </p>
 
 <p align="center">
@@ -319,6 +319,7 @@ The fourth domain (lexicon) adds a **data-scale** dimension: the first three dom
 | `record` / `prepare` / `draft` | Reconstruct trajectories from real action logs, generate case drafts |
 | `flow` | Single-case verdict page; give a directory for a dashboard |
 | `discover` | Probe a site: read-only adapter + case drafts + work order |
+| `crosscheck` | — | Re-fetch through an independent channel and compare responses: consistent / divergent / uncheckable |
 | `tap` / `learn` | Reverse-proxy records traffic, grows adapter / twin / case drafts |
 | `mutants` | Mutant directory: whose fault, how to catch, how to submit |
 | `audit` | False-green audit: use the real backend as a ruler |

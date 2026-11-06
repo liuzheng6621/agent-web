@@ -1,4 +1,4 @@
-# 路线图：从 v0.53.0 到 v0.60
+# 路线图：从 v0.54.0 到 v0.60
 
 这份文档回答一个问题：**接下来该做什么，按什么顺序，做到什么程度算完成。**
 
@@ -7,20 +7,20 @@
 
 ---
 
-## 0. 现在的实际状态（v0.53.0，全部实测）
+## 0. 现在的实际状态（v0.54.0，全部实测）
 
 | 项 | 数字 | 怎么核 |
 |---|---|---|
-| 版本 | 0.53.0 | `node bin/agent-web.mjs version` |
+| 版本 | 0.54.0 | `node bin/agent-web.mjs version` |
 | 断言 | 19 种 | `--help` 里的断言表 |
-| 命令 | 30 条 | 同上 |
+| 命令 | 31 条 | 同上 |
 | 变异体 | 56 个 | `node bin/agent-web.mjs mutants` |
-| 测试 | 377 条 | `npm test` |
+| 测试 | 398 条 | `npm test` |
 | 判据准入 | 适用 41 / 抓到 39（95.1%） | `node scripts/certify-baseline.mjs --emit-limits` |
 | 计入的域 | **4 个** | `docs/LIMITS.md` L11 的五条门槛 |
-| 台账状态 | L1/L2/L4/L5/L7/L10 mitigated · L3/L6 by-design · **L8 open** · L9 withdrawn · L11 ongoing | `grep status docs/LIMITS.md` |
+| 台账状态 | L1/L2/L4/L5/L7/**L8**/L10 mitigated · L3/L6 by-design · L9 withdrawn · L11 ongoing | `grep status docs/LIMITS.md` |
 
-十一条限制里只剩 **L8 一条 `open`**。这不是说其余十条解决了，是说它们都降到了
+**v0.54.0 起台账上不再有 `open` 的条目。**这不是说其余十条解决了，是说它们都降到了
 「有明确边界、有验收命令、边界写在文档里」的状态。
 
 ---
@@ -29,8 +29,9 @@
 
 只按三条排序，不按「想做什么」排：
 
-1. **唯一 `open` 的先做。** L8 是台账里唯一还挂着 `open` 的，其余都是 `mitigated` 或
-   `by-design`。留一条 `open` 在台账上，等于承认有个洞既不修也不声明边界。
+1. **唯一 `open` 的先做。** （v0.54.0 起这条已执行完毕：L8 降到 `mitigated`，台账上不再有 `open`。）
+   这条原则保留在这里，是因为它还会再用一次——任何新增限制一旦挂上 `open`，它就重新生效。
+   留一条 `open` 在台账上，等于承认有个洞既不修也不声明边界。
 2. **能把「声明」变成「实测」的先做。** L11 写着「只在四个域上验过」——这是诚实的，
    但 RealWorld 已经有 13 条案例、只差 10 条红没清。清掉之后域数从 4 变 5，
    这条就从「限制」变成「已验五域」。**声明升级比新增功能更值钱。**
@@ -42,9 +43,16 @@
 
 ---
 
-## 2. P6 — 交叉复核（L8，唯一 open 的那条）
+## 2. P6 — 交叉复核（L8）✅ 已完成（v0.54.0）
 
-**目标**：把「适配器可以撒谎」从 `open` 降到 `mitigated`——不是消灭，是划清能查与不能查。
+**结果**：L8 `open` → **`mitigated`**。`agent-web crosscheck --adapter=SPEC` 已上线，
+三类结论 `consistent` / `divergent` / `uncheckable`，`uncheckable` 单列且不算通过。
+
+反向验证两条都跑过：`test/fixtures/lying-http-adapter.mjs` 报 `divergent`（同一适配器里
+原样转发的 `tags.list` 仍是 `consistent`，证明不是见谁咬谁）；诚实适配器全 `consistent`
+（证明不是恒红）。内存适配器 → `uncheckable`，exit 2。
+
+**下面保留原计划正文**，作为这条的验收记录。
 
 ### 2.1 做什么
 
@@ -226,12 +234,12 @@ agent-web certify cases/<新域> --adapter=<新域>
 
 | 顺序 | 项 | 预计 | 完成后台账变化 |
 |---|---|---|---|
-| 1 | P6 交叉复核 | 2 天 | L8 `open` → `mitigated` |
+| 1 | ~~P6 交叉复核~~ **已完成 v0.54.0** | 2 天 | L8 `open` → **`mitigated`** |
 | 2 | P7 RealWorld 十条红 | 3 天 | L11 `ongoing` → 五域 |
 | 3 | P8 计数 | 1 天 | L3 仍 `by-design`，但「能数的都数了」 |
 | 4 | P9 定时任务域 | 3 天 | L7 的「跨实体时序」有真靶子 |
 
-**P6 先做的理由**：它是唯一 `open` 的。一条 `open` 挂在台账上超过两个版本，
+**P6 已完成**（v0.54.0）。它先做的理由成立：它是唯一 `open` 的。一条 `open` 挂在台账上超过两个版本，
 就会变成「大家都知道有问题但没人管」——那时候台账就不再是台账，是装饰。
 
 **P7 第二**：清十条红是纯执行工作，不需要设计。放在 P6 后面是因为它没有不确定性，
