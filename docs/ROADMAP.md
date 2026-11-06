@@ -1,4 +1,4 @@
-# 路线图：从 v0.54.2 到 v0.60
+# 路线图：从 v0.55.0 到 v0.60
 
 这份文档回答一个问题：**接下来该做什么，按什么顺序，做到什么程度算完成。**
 
@@ -7,18 +7,18 @@
 
 ---
 
-## 0. 现在的实际状态（v0.54.2，全部实测）
+## 0. 现在的实际状态（v0.55.0，全部实测）
 
 | 项 | 数字 | 怎么核 |
 |---|---|---|
-| 版本 | 0.54.2 | `node bin/agent-web.mjs version` |
+| 版本 | 0.55.0 | `node bin/agent-web.mjs version` |
 | 断言 | 19 种 | `--help` 里的断言表 |
 | 命令 | 31 条 | 同上 |
 | 变异体 | 56 个 | `node bin/agent-web.mjs mutants` |
-| 测试 | 401 条 | `npm test` |
+| 测试 | 403 条 | `npm test` |
 | 判据准入 | 适用 41 / 抓到 39（95.1%） | `node scripts/certify-baseline.mjs --emit-limits` |
-| 计入的域 | **4 个** | `docs/LIMITS.md` L11 的五条门槛 |
-| 台账状态 | L1/L2/L4/L5/L7/**L8**/L10 mitigated · L3/L6 by-design · L9 withdrawn · L11 ongoing | `grep status docs/LIMITS.md` |
+| 计入的域 | **5 个** | `docs/LIMITS.md` L11 的五条门槛 |
+| 台账状态 | L1/L2/L4/L5/L7/L8/**L11** mitigated · L3/L6 by-design · L9 withdrawn · L10 依赖外部 | `grep status docs/LIMITS.md` |
 
 **v0.54.0 起台账上不再有 `open` 的条目。**这不是说其余十条解决了，是说它们都降到了
 「有明确边界、有验收命令、边界写在文档里」的状态。
@@ -107,7 +107,7 @@ agent-web crosscheck --adapter=memory
 
 ---
 
-## 3. P7 — 给 RealWorld 补第二个实现（L11）
+## 3. P7 — 给 RealWorld 补第二个实现（L11）✅ 已完成（v0.55.0）
 
 **目标**：域数 4 → 5，L11 从 `ongoing` 变成「已验五域」。
 
@@ -142,6 +142,24 @@ agent-web compare cases/realworld --adapters=realworld,realworld-b   # 期望 10
 3. 每修一条，必须能人为塞回故障再转红（反向验证）。
 4. 一条一提交，提交信息写明层与反向验证。
 5. 每步跑全量记 pass 数，`3 → 13`。**中途变少必须停**。
+
+### 3.4 做完的记录（v0.55.0）
+
+第二份实现：`examples/realworld/fake-server-b.mjs`（371 行，零依赖）。它换掉了全部内部结构——
+数组存储而不是 Map、`词1.词2.<seq36>` 的 slug 规则、增量计数器代替全表扫描、单调时钟保证同毫秒内
+创建顺序稳定、表驱动校验——只保留可观测行为。
+
+`compare --adapters=realworld,realworld-b` = **13/13 一致、3 个集合逐字相同**，L11 转 `mitigated`。
+
+**顺带修掉一个探针的真 bug**：`role-effective` 原先只用第一条受限能力挑一个「局外人」，
+再拿这个角色去打全部受限能力。RealWorld 契约里 `users.create` 允许 `anonymous`、`user.update` 只允许 `user`，
+拿 `anonymous` 去打 `user.update` 当然被挡，但反过来就是「本来有权的人被用来证明越权被挡住了」——
+同一份实现里角色集合不同就必然诬告。改成每条能力各挑自己的局外人，
+夹具 `test/fixtures/mixed-roles-adapter.mjs` 钉住它（旧实现会判 fail）。
+
+**还证明了对照看得见故障**：B 带 `REALWORLD_B_BUG=order|count|owner` 三档故障开关，
+`test/realworld-compare.test.mjs` 先验一致（退出 0），再验弄坏之后分歧（退出 1 且点名案例）。
+只验前一件的测试，一个什么都不做的适配器也能通过。
 
 ### 3.3 验收
 
@@ -248,7 +266,7 @@ agent-web certify cases/<新域> --adapter=<新域>
 | 顺序 | 项 | 预计 | 完成后台账变化 |
 |---|---|---|---|
 | 1 | ~~P6 交叉复核~~ **已完成 v0.54.0** | 2 天 | L8 `open` → **`mitigated`** |
-| 2 | P7 给 RealWorld 补**第二个实现**（不是第二个适配器） | 3 天 | L11 `ongoing` → 五域 |
+| 2 | ~~P7 给 RealWorld 补第二个实现~~ **已完成 v0.55.0** | 3 天 | L11 `ongoing` → **`mitigated`**，五域 |
 | 3 | P8 计数 | 1 天 | L3 仍 `by-design`，但「能数的都数了」 |
 | 4 | P9 定时任务域 | 3 天 | L7 的「跨实体时序」有真靶子 |
 

@@ -30,7 +30,7 @@ README 的「边界：已实现与仍未解决」是这份清单的摘要。**�
 | L8 | 适配器可以撒谎 | `mitigated` | `node bin/agent-web.mjs probe cases/coffee --adapter=FILE` |
 | L9 | 并发被撤回了 | `withdrawn` | `npm run determinism`；开关守卫见 `test/limits.test.mjs` |
 | L10 | 难度标签只是统计 | `mitigated` | `node bin/agent-web.mjs drill stats --min-attempts=5` |
-| L11 | 只在四个域上验过（第五个目录只有一份实现，不计入） | `ongoing` | `node bin/agent-web.mjs compare cases/<域> --adapters=A,B` |
+| L11 | 只在五个域上验过 | `mitigated` | `node bin/agent-web.mjs compare cases/<域> --adapters=A,B` |
 
 ## L1 写操作的语义仍然要人给
 
@@ -238,9 +238,9 @@ npm run determinism:check    # 与基线比 —— 这才是串行 vs 并行的�
 
 验收：`node bin/agent-web.mjs drill stats --min-attempts=5`。
 
-## L11 只在四个域上验过
+## L11 只在五个域上验过
 
-`status: ongoing`
+`status: mitigated`
 
 咖啡点单（内存 + 真实 Spring Boot）、流浪动物追踪（真实后端 + 内存夹具）、复式记账（整数分 vs 两位小数）、
 词库检索（字典树 + 贪心分词 vs 二分 + 反向 DP，900 条合成数据）。
@@ -248,11 +248,14 @@ npm run determinism:check    # 与基线比 —— 这才是串行 vs 并行的�
 **计数判据（一句话）**：域要求**两个独立实现**，`compare` 判决一致率 100%。
 只有一份实现的目录不算——它验不出「跨实现一致性」，而那正是这个项目唯一卖的东西。
 
-`cases/` 下有五个目录。第五个 `realworld` **不计入**：它的官方 13 个 hurl 套件已经转成
-13 条案例、`verify` **13/13 pass**、并且进了 CI，但只有一个实现
-（`examples/realworld/fake-server.mjs`）。它验的是「转换器 + 适配器 + 夹具三者自洽」，
-不是跨实现一致性。补齐的办法见 [ROADMAP](ROADMAP.md)：给同一份 `openapi.yml` 写第二个实现，
-`compare --adapters=realworld,realworld-b` 一致率 100% 之后才算第五个域。
+**v0.55.0 补上第五个域**：RealWorld 契约的第二份实现 `examples/realworld/fake-server-b.mjs`
+（同一份 `openapi.yml`，内部全换：数组存储、不同 slug 规则、增量计数器、单调时钟、表驱动校验）。
+`compare --adapters=realworld,realworld-b` 实测 **13/13 一致、3 个集合逐字相同**。
+
+**「一致」本身不够**——两份实现一起偷懒也会一致。所以 B 带一个故障开关
+（`REALWORLD_B_BUG=order|count|owner`），`test/realworld-compare.test.mjs` 同时验两件事：
+一致时退出 0，把 B 弄坏之后对照必须退出 1 并指出是哪条案例分歧。只验前一件的测试，
+一个什么都不做的适配器也能过。
 
 前三个域逼出的机制是 `applies_to`：账本域的变异体在咖啡域记「不适用」，不进分母。
 第四个域逼出的是**数据规模**：前三个域的分页断言只在小结果集上跑过，
@@ -260,8 +263,8 @@ npm run determinism:check    # 与基线比 —— 这才是串行 vs 并行的�
 词库域还暴露了 `pagination` 的一个真盲区——它只数各页行数，从不读实现自己报的 `total`
 （补了 `pagination_total_reported`，见 `src/assert/pagination.mjs`）。
 
-**仍然只有四个。** 缺的是「长事务」「多租户」「异步回调」这三种形状，
-它们不是再加一个 CRUD 域就能覆盖的，需要新的断言 kind。
+**仍然只有五个。** 缺的是「长事务」「多租户」「异步回调」这三种形状，
+它们不是再加一个 CRUD 域就能覆盖的，需要新的断言 kind —— 这一步在 ROADMAP 的 P9。
 
 每加一个域的验收标准是：两个实现（或一个真实 + 一个孪生）、四类案例、三个域变异体、
 `compare` 判决一致率 100%、`probe` 通过、`certify` 基线不倒退。做不到就说明词汇还缺，

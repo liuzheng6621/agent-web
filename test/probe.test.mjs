@@ -179,3 +179,14 @@ test('探针：内置适配器九项全过', async () => {
     assert.ok(r.checks.some((c) => c.id === id), `缺检查项 ${id}`);
   }
 });
+
+test('探针：每条能力各挑自己的局外人（角色集合不同不许诬告）', async () => {
+  // 诚实实现：admin.purge 只准 admin，public.post 准 anonymous+member。
+  // 拿 admin.purge 挑出的 anonymous 去打 public.post，会把诚实实现判成越权。
+  const { createAdapter } = await import('./fixtures/mixed-roles-adapter.mjs');
+  const r = await probeAdapter({ adapter: createAdapter() });
+  const c = r.checks.find((x) => x.id === 'role-effective');
+  assert.equal(c.status, 'pass', c.detail);
+  assert.match(c.detail, /admin\.purge\(forbidden\)/);
+  assert.match(c.detail, /public\.post\(forbidden\)/);
+});

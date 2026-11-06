@@ -11,14 +11,16 @@
 
 
 
-const BASE = () => (process.env.REALWORLD_BASE_URL || 'http://127.0.0.1:8299').replace(/\/$/, '');
-const API = () => `${BASE()}/api`;
+// 基址由 createRealWorldAdapter({ baseUrl }) 决定，缺省读 REALWORLD_BASE_URL。
+// 做成每实例一份而不是模块级读环境变量：同一进程里要能同时开两套实现（impl A / impl B），
+// 模块级读会让后加载的那份把前一份的地址也改掉 —— `compare` 就变成自己跟自己比了。
+const DEFAULT_BASE = 'http://127.0.0.1:8299';
 
-async function http(method, path, { token, body } = {}) {
+async function http(baseUrl, method, path, { token, body } = {}) {
   const headers = { accept: 'application/json' };
   if (body !== undefined) headers['content-type'] = 'application/json';
   if (token) headers.authorization = `Token ${token}`;
-  const res = await fetch(`${API()}${path}`, {
+  const res = await fetch(`${baseUrl}/api${path}`, {
     method,
     headers,
     body: body === undefined ? undefined : JSON.stringify(body),
@@ -37,6 +39,7 @@ const PASSWORD = 'pw12345678';
 let runSeq = 0;
 
 export function createRealWorldAdapter(opts = {}) {
+  const baseUrl = String(opts.baseUrl || process.env.REALWORLD_BASE_URL || DEFAULT_BASE).replace(/\/$/, '');
   const runs = new Map();
   const history = [];
   const capabilityBase = [
@@ -88,7 +91,7 @@ export function createRealWorldAdapter(opts = {}) {
     async reset() {
       // 夹具模式：这个内存后端有 /_fixture/reset，直接清干净（真后端没有，走下面的收尾逻辑）。
       if (process.env.REALWORLD_FIXTURE_RESET !== '0') {
-        const ping = await http('POST', '/_fixture/reset', {});
+        const ping = await http(baseUrl, 'POST', '/_fixture/reset', {});
         if (ping.status === 200 && ping.payload && ping.payload.reset) {
           // 清完继续走注册流程
         }
@@ -96,18 +99,18 @@ export function createRealWorldAdapter(opts = {}) {
       // 这个契约没有复位接口，但「复位不干净」会让判决之间互相污染。
       // 能做的是把本适配器自己造过的东西收干净：逐个旧账号列出它的文章并删掉。
       for (const past of history) {
-        const list = await http('GET', `/articles?author=${encodeURIComponent(past.username)}&limit=100`, { token: past.token });
+        const list = await http(baseUrl, 'GET', `/articles?author=${encodeURIComponent(past.username)}&limit=100`, { token: past.token });
         const items = (list.payload && list.payload.articles) || [];
         for (const it of items) {
-          await http('DELETE', `/articles/${encodeURIComponent(it.slug)}`, { token: past.token });
+          await http(baseUrl, 'DELETE', `/articles/${encodeURIComponent(it.slug)}`, { token: past.token });
         }
       }
       runSeq += 1;
       const runId = `${Date.now().toString(36)}${runSeq}`;
       const a = { username: NAME(runId, 'a'), email: `${NAME(runId, 'a')}@test.local`, password: PASSWORD };
       const b = { username: NAME(runId, 'b'), email: `${NAME(runId, 'b')}@test.local`, password: PASSWORD };
-      const ra = await http('POST', '/users', { body: { user: a } });
-      const rb = await http('POST', '/users', { body: { user: b } });
+      const ra = await http(baseUrl, 'POST', '/users', { body: { user: a } });
+      const rb = await http(baseUrl, 'POST', '/users', { body: { user: b } });
       if (ra.status >= 400 || rb.status >= 400) {
         const why = (ra.payload && ra.payload.errors) || (rb.payload && rb.payload.errors) || '注册失败';
         throw new Error(`realworld 复位失败：${JSON.stringify(why)}`);
@@ -121,7 +124,7 @@ export function createRealWorldAdapter(opts = {}) {
       history.push({ username: b.username, token: rb.payload.user.token });
       return {
         runId,
-        state: { baseUrl: BASE() },
+        state: { baseUrl },
         // 角色 → 身份必须是**可比较的字符串**（运行器用它查角色单射）。
         roleBindings: { anonymous: null, user: a.username, user2: b.username },
         reset_note: '注册了两个新用户；服务端没有复位接口，articles 会累积',
@@ -131,14 +134,14 @@ export function createRealWorldAdapter(opts = {}) {
       const run = runs.get(runId);
       const missingScopes = [];
       const view = { articles: [], tags: [], comments: [] };
-      const arts = await http('GET', '/articles?limit=20');
+      const arts = await http(baseUrl, 'GET', '/articles?limit=20');
       if (arts.status === 200 && arts.payload) {
         view.articles = (arts.payload.articles || []).map((x) => ({
           slug: x.slug, title: x.title, description: x.description, body: x.body,
           author: x.author && x.author.username, favoritesCount: x.favoritesCount, tagList: x.tagList,
         }));
       } else missingScopes.push('articles');
-      const tags = await http('GET', '/tags');
+      const tags = await http(baseUrl, 'GET', '/tags');
       if (tags.status === 200 && tags.payload) view.tags = (tags.payload.tags || []).map((name) => ({ name }));
       else missingScopes.push('tags');
       return { state: view, missingScopes };
@@ -154,7 +157,7 @@ export function createRealWorldAdapter(opts = {}) {
         const s = p.toString();
         return s ? `?${s}` : '';
       };
-      const call = (method, path, body) => http(method, path, { token, body });
+      const call = (method, path, body) => http(baseUrl, method, path, { token, body });
       const bindRoleToAccount = (role, user) => {
         const previousEmail = run.roleEmails[role];
         for (const [alias, email] of Object.entries(run.roleEmails)) {

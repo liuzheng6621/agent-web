@@ -1,4 +1,4 @@
-# agent-web v0.54.2
+# agent-web v0.55.0
 
 <p align="center">
   <img src="docs/media/hero.png" alt="agent-web: integration tests an agent can be judged on" width="100%">
@@ -18,7 +18,7 @@
 </p>
 
 <p align="center">
-  <b>v0.54.2</b> · 19 assertion kinds · 31 commands · 56 mutants
+  <b>v0.55.0</b> · 19 assertion kinds · 31 commands · 56 mutants
 </p>
 
 <p align="center">
@@ -287,7 +287,7 @@ value multiset agreement (survives shuffled rows), enum overlap, cardinality. Di
 The renamed fixture recovers 17/17 with zero mismatches; after shuffling rows, renaming `totalAmount`
 to `x9` and deleting `pickupNo` it recovers 15/17 and **still zero mismatches** — the other two are
 reported as needing a human signature. A wrong mapping makes a case pass on a field that only looks right.
-## Validated across four domains (plus one contract check that does not count)
+## Validated across five domains
 
 | Domain | Implementation | What it proved |
 |---|---|---|
@@ -295,28 +295,38 @@ reported as needing a human signature. A wrong mapping makes a case pass on a fi
 | Animal rescue tasks | Real backend + memory fixture | When correctness is entirely invariants (points, approvals, roles), is the assertion vocabulary sufficient |
 | Double-entry bookkeeping | Two custom implementations (integer cents vs two-decimal strings) | Internal representations completely different, views byte-identical; debit-credit balance invariants expressible |
 | Lexicon search `cases/lexicon` | Two custom implementations (trie + greedy segmentation / sorted array + reverse DP) | 900 rows, 10 per page, three pages: cross-page duplicates, boundary drops and lying `total` only show up at this scale — [details](docs/domains/lexicon.md) |
+| RealWorld contract `cases/realworld` | Two independent implementations (`fake-server.mjs` is Map-backed, `fake-server-b.mjs` is array-backed) | One OpenAPI contract plus 13 official hurl suites converted verbatim: 100% verdict agreement — and when B is deliberately broken, `compare` names the exact case that disagrees |
 
 The third domain forced a mechanism: mutants can declare `applies_to`. A ledger-domain mutant in the coffee domain is "not applicable", not counted — otherwise the catch rate gets smashed by irrelevant mutants into a false pit.
 
 The fourth domain (lexicon) adds a **data-scale** dimension: the first three domains only ever ran pagination assertions over single-digit result sets, where a lying `total` or a dropped boundary row looks green. It also exposed a blind spot in the `pagination` assertion itself — it summed page sizes and never read the `total` the implementation reported, so "30 rows reported as 900" passed as long as every page was full.
 
-### The fifth directory, `cases/realworld`: a contract check, not a domain
+### Why the fifth domain counts: two implementations and a comparison that sees bugs
 
-RealWorld (84k stars, one OpenAPI contract, 990+ implementations) — its 13 official hurl suites are now
-13 cases, and `verify cases/realworld --adapter=realworld` is **13/13 pass**, wired into CI.
+RealWorld (84k stars, one OpenAPI contract, 990+ implementations) — its 13 official hurl suites are now 13 cases.
+The threshold is "two independent implementations and a 100% `compare`", so a second one was added:
+`examples/realworld/fake-server-b.mjs` — same contract, every internal replaced (array storage, a different
+slug scheme, incremental counters, a monotonic clock, table-driven validation), only observable behaviour kept.
 
-It does **not** count toward the four above, and that is a threshold, not modesty:
+```bash
+node examples/realworld/fake-server.mjs 8299 --allow-reset &
+node examples/realworld/fake-server-b.mjs 8298 --allow-reset &
+node bin/agent-web.mjs compare cases/realworld --adapters=realworld,realworld-b
+```
 
-> A domain requires **two independent implementations**. `cases/realworld` has one
-> (`examples/realworld/fake-server.mjs`). `compare` asks whether the same cases produce the same
-> verdicts on two implementations — with only one, the thing a domain is *for* cannot be checked.
+Result: **13/13 agree, three collections byte-identical**.
 
-What it does check is that **the converter, the adapter and the fixture agree with each other**
-(the hurl assertions are kept verbatim, never hand-edited). That is worth something, but it is not
-cross-implementation agreement, so it does not pad the domain count.
+But agreement can also mean the cases are asleep, so B ships a fault switch that proves the comparison sees it:
 
-How to close it is in [docs/ROADMAP.md](docs/ROADMAP.md): write a second implementation against the same
-`openapi.yml`; once `compare --adapters=realworld,realworld-b` agrees 100%, it becomes the fifth domain.
+```bash
+REALWORLD_B_BUG=order node examples/realworld/fake-server-b.mjs 8297 --allow-reset &
+REALWORLD_B_BASE_URL=http://127.0.0.1:8297 node bin/agent-web.mjs compare cases/realworld --adapters=realworld,realworld-b
+# -> 12/13, realworld/pagination diverges (pass vs fail), exit code 1
+```
+
+`REALWORLD_B_BUG` also accepts `count` (favourite counts stuck at 0) and `owner` (author check skipped).
+All three are exercised by `test/realworld-compare.test.mjs` — a test that only checks agreement would
+pass for an adapter that does nothing at all.
 
 ## Commands
 
@@ -420,7 +430,7 @@ The remaining boundaries are numbered to match L1–L11 in [docs/LIMITS.md](docs
 8. **Adapters can still lie (L8).** `probe` checks nine mechanical properties and `crosscheck` (v0.54.0) re-fetches through an independent channel, so together they catch "declared but missing", "role ignored", "reads that write" and "tampering with the response body". What they still cannot catch is a liar that watches the prober, or one that replaces the whole `globalThis.fetch`; process isolation is not implemented, and it would not be a security boundary anyway.
 9. **Parallel execution stays disabled for now (L9).** There is no parallel executor; re-enabling it requires byte-identical verdicts, failure causes and per-step receipts between serial and parallel runs.
 10. **Difficulty estimates depend on sample sources (L10).** Multiple independent submitters/batches are needed to interpret the result as external difficulty rather than self-test performance.
-11. **Real-backend validation covers only four domains (L11).** The threshold is two independent implementations plus 100% `compare` agreement. The fifth directory `cases/realworld` is 13/13 pass and wired into CI, but has a single implementation, so it is not counted (see the section above).
+11. **Real-backend validation covers only five domains (L11).** The threshold is two independent implementations plus 100% `compare` agreement. The first four domains each got a second implementation; the fifth (RealWorld) got one in v0.55.0. Adding a sixth is still manual work.
 <!-- limits:end -->
 
 ## Docs

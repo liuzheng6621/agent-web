@@ -6,6 +6,20 @@
 CI 也在查。这条规则是买来的：这个仓库曾经同时存在 `package.json` 0.16、README 0.9、
 Gitee Release v0.6.0 三个数，谁看都是三个项目。
 
+## 0.55.0 — 2026-11-06
+
+第五个域：给 RealWorld 补了第二份**实现**（不是第二个适配器）。
+
+- `examples/realworld/fake-server-b.mjs`：同一份 `openapi.yml`，内部全换——数组存储、
+  `词1.词2.<seq36>` 的 slug 规则、增量计数器、单调时钟（同毫秒内创建顺序也稳定）、表驱动校验。
+  `compare --adapters=realworld,realworld-b` 实测 **13/13 一致、3 个集合逐字相同**，L11 转 `mitigated`。
+- 修掉探针 `role-effective` 的一个真 bug：原先只用第一条受限能力挑「局外人」，再拿去打全部受限能力。
+  同一份实现里角色集合不同（`users.create` 允许 anonymous、`user.update` 只允许 user）时就必然诬告。
+  改成每条能力各挑自己的局外人；夹具 `test/fixtures/mixed-roles-adapter.mjs` 钉住它。
+- B 带故障开关 `REALWORLD_B_BUG=order|count|owner`，`test/realworld-compare.test.mjs` 先验一致、
+  再验弄坏之后对照能看见（退出 1 且点名分歧案例）。只验「一致」的测试，一个空适配器也能通过。
+- README 域表 4 → 5，中英同步；`docs/LIMITS.md` L11 转 `mitigated`；`docs/ROADMAP.md` P7 标 ✅。
+
 ## 0.54.2
 
 README 的「边界：已实现与仍未解决」整节重写。原来那一层列的四个东西（`align` / `window` 系列 /

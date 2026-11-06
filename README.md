@@ -1,4 +1,4 @@
-# agent-web v0.54.2
+# agent-web v0.55.0
 
 <p align="center">
   <img src="docs/media/hero.png" alt="agent-web：给 Agent 写机器可判的集成测试" width="100%">
@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <b>当前版本 0.54.2</b> · 19 种断言 · 31 条命令 · 56 个变异体
+  <b>当前版本 0.55.0</b> · 19 种断言 · 31 条命令 · 56 个变异体
 </p>
 
 <p align="center">
@@ -316,7 +316,7 @@ $ agent-web align our-view.json their-view.json --out=align.yml
 `recall` 在跑批后比对指纹：第一次命中只提醒，**第二次犯同一条就 exit 1 拦下**。
 加深记忆不是靠自觉，是靠退出码。
 
-## 在四个域上验过（另有一个契约验证，不计入域数）
+## 在五个域上验过
 
 | 域 | 实现 | 它证明了什么 |
 |---|---|---|
@@ -324,6 +324,7 @@ $ agent-web align our-view.json their-view.json --out=align.yml
 | 流浪动物追踪 `cases/animal` | Spring Boot 3 + MySQL 真实后端（第三方项目） | Spring Page 信封、大写状态、三角色；**审批接口没有角色检查**——案例判 fail，[细节](docs/domains/animal.md) |
 | 复式记账 | 两个自造实现（整数分 vs 两位小数字符串） | 内部表示完全不同，视图逐字相同；借贷平衡这类不变式能表达 |
 | 词库检索 `cases/lexicon` | 两个自造实现（字典树 + 贪心分词 / 二分 + 反向 DP） | 900 条数据、每页 10 条翻三页：跨页重复、边界丢行、`total` 说谎这三种坏法只有在这个规模上才真的暴露，[细节](docs/domains/lexicon.md) |
+| RealWorld 契约 `cases/realworld` | 两份独立实现（`fake-server.mjs` 用 Map，`fake-server-b.mjs` 用数组） | 一份 OpenAPI 契约 + 13 个官方 hurl 套件原样转成案例：100% 判决一致；把 B 故意弄坏之后，`compare` 立刻指出是哪一条案例分歧 |
 
 第三个域逼出了一个机制：变异体可以声明 `applies_to`。
 账本域的变异体在咖啡域是「不适用」，不进分母——否则抓获率会被无关变异体砸成假坑。
@@ -333,23 +334,32 @@ $ agent-web align our-view.json their-view.json --out=align.yml
 词库域还顺手补上了一个断言盲区——`pagination` 原先只数各页行数，
 从不读实现自己报的 `total`，于是「30 条报成 900」在每一页都满的情况下全绿。
 
-### 第五个目录 `cases/realworld`：契约验证，不计入域数
+### 第五个域为什么算域：两份实现 + 一个能看见故障的对照
 
-RealWorld（84k star，一份 OpenAPI 契约，990+ 个实现）的官方 13 个 hurl 套件已经转成了 13 条案例，
-`verify cases/realworld --adapter=realworld` **13/13 pass**，并且进了 CI。
+RealWorld（84k star，一份 OpenAPI 契约，990+ 个实现）的官方 13 个 hurl 套件已经原样转成 13 条案例。
+这个域的门槛是「两个独立实现 + `compare` 100% 一致」，所以补了第二份实现：
+`examples/realworld/fake-server-b.mjs`——同一份契约，内部全换（数组存储、不同的 slug 规则、
+增量计数器、单调时钟、表驱动校验），只保留可观测行为。
 
-它**不计入上面那四个**，理由是一条门槛，不是谦虚：
+```bash
+node examples/realworld/fake-server.mjs 8299 --allow-reset &
+node examples/realworld/fake-server-b.mjs 8298 --allow-reset &
+node bin/agent-web.mjs compare cases/realworld --adapters=realworld,realworld-b
+```
 
-> 域的门槛要求**两个独立实现**。`cases/realworld` 现在只有一个
-> （`examples/realworld/fake-server.mjs`），没有第二个实现可对照，
-> 而 `compare` 比的是「同一份案例在两个实现上判决是否一致」——
-> 只有一份实现，这个域最核心的那件事就验不了。
+结果：**13/13 一致，3 个集合逐字相同**。
 
-它验的是另一件事：**转换器 + 适配器 + 夹具三者是否自洽**（hurl 的断言原样保留、不许手改）。
-这有价值，但不是「跨实现一致性」，所以不往域数里凑。
+但「一致」本身可能是案例在睡觉，所以 B 带一个故障开关，专门用来证明对照看得见：
 
-补齐的办法写在 [docs/ROADMAP.md](docs/ROADMAP.md)：给同一份 `openapi.yml` 写第二个实现，
-`compare --adapters=realworld,realworld-b` 一致率 100% 之后它才算第五个域。
+```bash
+REALWORLD_B_BUG=order node examples/realworld/fake-server-b.mjs 8297 --allow-reset &
+REALWORLD_B_BASE_URL=http://127.0.0.1:8297 node bin/agent-web.mjs compare cases/realworld --adapters=realworld,realworld-b
+# → 12/13，realworld/pagination 分歧（pass vs fail），退出码 1
+```
+
+`REALWORLD_B_BUG` 还有 `count`（收藏数恒 0）与 `owner`（跳过作者校验）两档。
+这三档都写进了 `test/realworld-compare.test.mjs`——一个只验「一致」的测试，
+一个什么都不做的适配器也能通过。
 
 ## 命令一览
 
@@ -458,13 +468,13 @@ node bin/agent-web.mjs verify cases/realworld --adapter=realworld --detail
 8. **适配器仍可撒谎（L8）。** `probe` 查九项机械性质，`crosscheck`（v0.54.0）再用独立通道复核响应，两件加起来能抓「声明了却不存在」「忽略角色」「读偷偷写」「返回体做手脚」。仍抓不到的是**会看探测器的骗子**，以及「把整个 `globalThis.fetch` 换掉」；进程隔离未做，且它不是安全边界。
 9. **并发暂不开放（L9）。** 没有并行执行器；恢复前要证明串行与并行的判决、死因、逐步回执逐字一致。
 10. **难度仍受样本来源限制（L10）。** 需要多个独立提交者/批次，才可把统计解释为外部难度，而不只是自测结果。
-11. **真实后端只覆盖四个领域（L11）。** 门槛是「两个独立实现 + `compare` 一致率 100%」。第五个目录 `cases/realworld` 已 13/13 pass、进了 CI，但只有一份实现，所以不计入（见上一节）。
+11. **真实后端只覆盖五个领域（L11）。** 门槛是「两个独立实现 + `compare` 一致率 100%」。前四个域各自补上了第二实现，第五个（RealWorld）在 v0.55.0 补齐；再往上加域仍然是手工活。
 <!-- limits:end -->
 
 ## 文档
 
 - [docs/GUIDE.md](docs/GUIDE.md) —— 完整使用指南：从一个网址开始、从日志到正式判分、接入自己的应用
-- [docs/SPEC.md](docs/SPEC.md) —— 规范：案例格式、17 种断言与相位、判决顺序表、各机制的判定规则
+- [docs/SPEC.md](docs/SPEC.md) —— 规范：案例格式、19 种断言与相位、判决顺序表、各机制的判定规则
 - [docs/ADAPTER-GUIDE.md](docs/ADAPTER-GUIDE.md) —— 接自己的应用：三档路径、只改四处、验收顺序
 - [CHANGELOG.md](CHANGELOG.md) —— 每个版本做了什么、因为什么
 - [docs/LIMITS.md](docs/LIMITS.md) —— 11 条限制的台账：状态、验收命令、为什么这条不解决

@@ -32,7 +32,9 @@ for (const [file, want] of [['README.md', zh], ['README.en.md', en]]) {
 
 // CHANGELOG 第一条必须与 package.json 一致（这条另有测试，这里顺手也查一遍，两处都红更清楚）
 const changelog = read('CHANGELOG.md');
-const first = changelog.match(/^## ([\d.]+)$/m);
+// 版本标题允许带日期后缀（`## 0.55.0 — 2026-11-06`）。原来的正则要求行尾就是版本号，
+// 于是带日期的新条目插到顶部时它**静默跳过**，去比对下一条——一个本该拦错的守卫反而失明。
+const first = changelog.match(/^## ([\d.]+)(?:\s+—\s+\d{4}-\d{2}-\d{2})?$/m);
 if (!first || first[1] !== version) {
   problems.push({ file: 'CHANGELOG.md', want: `## ${version}（当前第一条是 ${first ? first[1] : '找不到'}）` });
 }

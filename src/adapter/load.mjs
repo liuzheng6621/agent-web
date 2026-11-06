@@ -63,6 +63,16 @@ const BUILTINS = {
     const m = await import('./realworld.mjs');
     return m.createRealWorldAdapter();
   },
+  // 同一份契约的**第二个实现**：地址取 REALWORLD_B_BASE_URL（默认 8298），
+  // 配套服务在 examples/realworld/fake-server-b.mjs。
+  // 它存在的唯一目的是让 `compare --adapters=realworld,realworld-b` 有意义 ——
+  // 两个适配器打两份独立实现，判决必须一致；只换适配器不换实现是自证。
+  'realworld-b': async () => {
+    const m = await import('./realworld.mjs');
+    return m.createRealWorldAdapter({
+      baseUrl: process.env.REALWORLD_B_BASE_URL || 'http://127.0.0.1:8298',
+    });
+  },
 };
 
 export function listBuiltins() {

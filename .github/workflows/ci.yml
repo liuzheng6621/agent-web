@@ -186,12 +186,30 @@ jobs:
           node bin/agent-web.mjs compare cases/ledger --adapters=ledger-a,ledger-b
       # RealWorld 的案例是 import hurl 从官方 13 个套件生成的派生文件：
       # 断言来自 hurl 原文，不许手改。这条步骤证明「转换器 + 适配器 + 夹具」三者仍然自洽。
-      - name: RealWorld：官方 hurl 套件转出的 13 条案例必须全绿
+      # 同一份契约的第二份实现（数组存储、不同 slug 规则、增量计数器、单调时钟）。
+      # 两件事都要验：一致时退出 0；把 B 弄坏之后对照必须退出 1。
+      # 只验前一件的测试，一个什么都不做的适配器也能通过。
+      - name: 第五域：RealWorld 的两份实现判决一致，且弄坏一份之后对照能看见
         run: |
           node examples/realworld/fake-server.mjs 8299 --allow-reset &
-          for i in $(seq 1 40); do
-            curl -sf http://127.0.0.1:8299/api/tags > /dev/null && break
+          node examples/realworld/fake-server-b.mjs 8298 --allow-reset &
+          for i in $(seq 1 60); do
+            curl -sf http://127.0.0.1:8299/api/tags > /dev/null \
+              && curl -sf http://127.0.0.1:8298/api/tags > /dev/null && break
             sleep 0.25
           done
           node bin/agent-web.mjs verify cases/realworld --adapter=realworld
+          node bin/agent-web.mjs verify cases/realworld --adapter=realworld-b
+          node bin/agent-web.mjs compare cases/realworld --adapters=realworld,realworld-b
+          REALWORLD_B_BUG=order node examples/realworld/fake-server-b.mjs 8297 --allow-reset &
+          for i in $(seq 1 60); do
+            curl -sf http://127.0.0.1:8297/api/tags > /dev/null && break
+            sleep 0.25
+          done
+          if REALWORLD_B_BASE_URL=http://127.0.0.1:8297 node bin/agent-web.mjs compare cases/realworld/pagination.json --adapters=realworld,realworld-b; then
+            echo '::error::把第二份实现弄坏之后，对照居然还一致 —— 案例在睡觉'
+            exit 1
+          else
+            echo '对照能看见故障（退出码非 0），符合预期'
+          fi
 

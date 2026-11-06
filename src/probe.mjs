@@ -236,15 +236,23 @@ export async function probeAdapter({ adapter, adapterName = 'unknown', timeoutMs
         const restrictedCaps = (manifest.capabilities ?? []).filter(
           (c) => c.kind === 'write' && Array.isArray(c.roles) && c.roles.length > 0 && roles.some((r) => !c.roles.includes(r)),
         );
-        const outsider = roles.find((r) => !restricted.roles.includes(r));
+        // **每一条能力各挑一个「它不允许」的角色**，不能拿第一条挑出来的角色套到全部能力上。
+        // 拿别人的角色去打别的能力，等于用「本来就有权的人」证明「越权被挡住了」——
+        // 一旦有两三条能力的角色集合不同，这条检查就会诬告诚实实现（realworld 契约就这样：
+        // users.create 允许 anonymous，user.update 只允许 user，同一个 outsider 不可能两边都不许）。
+        const attempts = [];
+        for (const cap of restrictedCaps) {
+          const outsider = roles.find((r) => !cap.roles.includes(r));
+          if (outsider) attempts.push({ cap, outsider });
+        }
         const applied = [];
         const forbidden = [];
         const other = [];
-        for (const cap of restrictedCaps.slice(0, 6)) {
+        for (const { cap, outsider } of attempts.slice(0, 6)) {
           runId = (await withTimeout(adapter.reset({}))).runId;
           const res = await withTimeout(adapter.execute(runId, { as: outsider, capability: cap.id, arguments: {} }));
           const code = res && res.error && res.error.code;
-          if (res && res.outcome === 'applied') applied.push(cap.id);
+          if (res && res.outcome === 'applied') applied.push(`${cap.id}(以 ${outsider})`);
           else if (code === 'forbidden' || code === 'not_owner' || code === 'unknown_role') forbidden.push(`${cap.id}(${code})`);
           else other.push(`${cap.id}(${code || (res && res.outcome) || '?'})`);
         }
@@ -254,17 +262,17 @@ export async function probeAdapter({ adapter, adapterName = 'unknown', timeoutMs
             '角色真的生效',
             FAIL,
             FAIL,
-            `角色 ${outsider} 不在允许角色里，却能执行：${applied.join('、')} —— 换个身份就能绕过，越权案例全部无效`,
+            `这些能力被不该有权的角色执行成功：${applied.join('、')} —— 换个身份就能绕过，越权案例全部无效`,
           );
         } else if (forbidden.length > 0) {
-          add('role-effective', '角色真的生效', PASS, FAIL, `${outsider} 被角色挡住：${forbidden.join('、')}`);
+          add('role-effective', '角色真的生效', PASS, FAIL, `越权被挡住：${forbidden.join('、')}`);
         } else {
           add(
             'role-effective',
             '角色真的生效',
             'skipped',
             WARN,
-            `试了 ${restrictedCaps.slice(0, 6).length} 条受限写能力，全是业务拒绝：${other.join('、')} —— 空参下证明不了角色生效`,
+            `试了 ${attempts.slice(0, 6).length} 条受限写能力，全是业务拒绝：${other.join('、')} —— 空参下证明不了角色生效`,
           );
         }
       }
