@@ -6,6 +6,21 @@
 CI 也在查。这条规则是买来的：这个仓库曾经同时存在 `package.json` 0.16、README 0.9、
 Gitee Release v0.6.0 三个数，谁看都是三个项目。
 
+## 0.51.0
+
+第 19 种断言 `state_machine`：不是「走过哪些态」，而是「**只许走这些边**」。
+
+`status_transition` 只能断言「某条边出现过」。它说不出「不许从 PENDING 直接到 PICKED」——
+那句话不是关于出现过的边，而是关于所有**可能被走**的边。
+
+- **`transitions` 必须显式声明**：不给就 `unknown/not_declared`。没声明就没约束，判真等于假装查过了。
+- **`states` 可选**：观测到未声明的状态 → `unknown/unknown_state`，不判假——那是声明漏了一个态，不是实现走错了。
+- **`walk` 两种取序列方式**，因为状态机在两个地方都成立：
+  - `snapshots`（默认）：跟某一个实体在每一步快照里的状态走（订单从下单到取餐）。
+  - `rows`：把流水集合自己当序列，每行取 `path` 那一列（「事件日志只许按这四条边走」）。快照里只看第一行会漏掉追加在末尾的边。
+- **独占杀手 `m-illegal-transition-allowed`**：在最后一个快照的 `status_log` 末尾追加一条 `PICKED→MAKING`。四条声明的边一条不少，`status_transition` 照样判真，只有「只许走这些边」这句话能发现它。`kind-necessity` 实测：能杀 3 个（`m-history-empty`、`m-duplicate-event`、`m-illegal-transition-allowed`）。
+- `certify` 口径：47 个变异体、12 条案例、适用 32、抓到 30（93.75%），欠账仍是 `m-pickup-no-offset` 与 `m-unsorted-orders`。
+
 ## 0.50.0
 
 P3 align 下钻：容器配上了，里面的字段也要配——同时补上「语义重叠必须人签」的检测。

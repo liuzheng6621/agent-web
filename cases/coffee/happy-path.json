@@ -73,6 +73,40 @@
         "timezone": "UTC",
         "at_field": "at",
         "note": "下单到取餐不得超过 24 小时：步号坐标说不出这件事，只有时间戳能"
+      },
+      {
+        "kind": "state_machine",
+        "selector": {
+          "collection": "status_log"
+        },
+        "path": "to",
+        "states": [
+          "PENDING",
+          "MAKING",
+          "READY",
+          "PICKED",
+          "CANCELED"
+        ],
+        "transitions": [
+          [
+            "PENDING",
+            "MAKING"
+          ],
+          [
+            "MAKING",
+            "READY"
+          ],
+          [
+            "READY",
+            "PICKED"
+          ],
+          [
+            "PENDING",
+            "CANCELED"
+          ]
+        ],
+        "note": "流水只许走这四条边：多一条往回走的边必须判假",
+        "walk": "rows"
       }
     ],
     "invariants": [

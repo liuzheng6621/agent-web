@@ -14,6 +14,7 @@ import * as payloadTruncate from './m-payload-truncate.mjs';
 import * as dropCreateEvent from './m-drop-create-event.mjs';
 import * as duplicateEvent from './m-duplicate-event.mjs';
 import * as shipmentLate from './m-shipment-late.mjs';
+import * as illegalTransition from './m-illegal-transition-allowed.mjs';
 import * as execRoleIgnore from './m-exec-role-ignore.mjs';
 import * as execDuplicateWrite from './m-exec-duplicate-write.mjs';
 import * as execDropIntermediate from './m-exec-drop-intermediate.mjs';
@@ -63,6 +64,7 @@ const ENTRIES = [
   ['m-drop-create-event', dropCreateEvent],
   ['m-duplicate-event', duplicateEvent],
   ['m-shipment-late', shipmentLate],
+  ['m-illegal-transition-allowed', illegalTransition],
   ['m-exec-role-ignore', execRoleIgnore],
   ['m-exec-duplicate-write', execDuplicateWrite],
   ['m-exec-drop-intermediate', execDropIntermediate],

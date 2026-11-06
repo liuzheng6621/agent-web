@@ -104,6 +104,27 @@ const TIMELINESS_SPEC = {
   baseline: [{ kind: 'entity_exists', selector: { collection: 'orders' } }],
 };
 
+// 状态机：happy-path 的流水只许走那四条边。
+// 去掉这条断言，m-illegal-transition-allowed（末尾多一条 PICKED→MAKING）就该漏网。
+const STATE_MACHINE_SPEC = {
+  kind: 'state_machine',
+  caseId: 'happy-path',
+  assertion: {
+    kind: 'state_machine',
+    walk: 'rows',
+    selector: { collection: 'status_log' },
+    path: 'to',
+    states: ['PENDING', 'MAKING', 'READY', 'PICKED', 'CANCELED'],
+    transitions: [
+      ['PENDING', 'MAKING'],
+      ['MAKING', 'READY'],
+      ['READY', 'PICKED'],
+      ['PENDING', 'CANCELED'],
+    ],
+  },
+  baseline: [{ kind: 'entity_exists', selector: { collection: 'orders' } }],
+};
+
 const SHAPE = [
   { kind: 'entity_exists', selector: { collection: 'orders', index: 0 } },
   { kind: 'count_delta', selector: { collection: 'orders' }, delta: 2 },
@@ -148,6 +169,23 @@ async function run() {
     console.log(`${ok ? 'PASS' : 'FAIL'}  ${spec.kind}（案例 ${spec.caseId}）`);
     console.log(`      能杀 ${kills.length} 个：${kills.map((m) => m.id).join(' ') || '—'}`);
     console.log(`      只有它能杀 ${necessary.length} 个：${necessary.join(' ') || '—'}
+`);
+  }
+
+  // 状态机：同 payload/timeliness 的口径，去掉它必须漏掉那个变异体。
+  {
+    const spec = STATE_MACHINE_SPEC;
+    const withIt = await certify({ cases: [withGoal(spec.caseId, [...spec.baseline, spec.assertion])], adapterFactory: factory, adapterName: 'memory', mutations: pool });
+    const without = await certify({ cases: [withGoal(spec.caseId, [...spec.baseline])], adapterFactory: factory, adapterName: 'memory', mutations: pool });
+    const kills = withIt.mutations.filter((m) => (m.killedBy ?? []).some((k) => (typeof k === 'string' ? k : k.kind) === spec.kind));
+    const caughtWith = new Set(withIt.mutations.filter((m) => m.status === 'caught').map((m) => m.id));
+    const caughtWithout = new Set(without.mutations.filter((m) => m.status === 'caught').map((m) => m.id));
+    const necessary = [...caughtWith].filter((id) => !caughtWithout.has(id));
+    const ok = kills.length > 0 && necessary.length > 0;
+    if (!ok) failedTemporal += 1;
+    console.log(`${ok ? 'PASS' : 'FAIL'}  ${spec.kind}（案例 ${spec.caseId}）`);
+    console.log(`      能杀 ${kills.length} 个：${kills.map((m) => m.id).join(' ') || '—'}`);
+    console.log(`      只有它能杀：${necessary.join(' ') || '—'}
 `);
   }
 

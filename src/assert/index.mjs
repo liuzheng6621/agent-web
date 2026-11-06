@@ -21,6 +21,7 @@ import { pagination as evalPagination } from './pagination.mjs';
 import { payload as evalPayload, PAYLOAD_OPS } from './payload.mjs';
 import { linkage as evalLinkage } from './linkage.mjs';
 import { timeliness as evalTimeliness, durationMs, TIMELINESS_VERSION } from './timeliness.mjs';
+import { state_machine as evalStateMachine, STATE_MACHINE_VERSION } from './state_machine.mjs';
 
 export const KINDS = Object.freeze([
   'entity_exists',
@@ -38,6 +39,7 @@ export const KINDS = Object.freeze([
   'payload',
   'linkage',
   'timeliness',
+  'state_machine',
 ]);
 
 export { WINDOW_INNER };
@@ -75,6 +77,9 @@ export const PHASE_MATRIX = Object.freeze({
   // 时间戳只活在终态视图的事件行上（trace 的中间快照里事件还没发生完），
   // 所以相位固定 final。想看「某一步之后还没发货」用 window 套它。
   timeliness: { default: 'final', allowed: ['final'] },
+  // 状态机看的是「走过的每一步」，所以固定 trace：只判终态等于只看终点，
+  // 中途跳态（PENDING→PICKED 再没有别的）会被当成合法。
+  state_machine: { default: 'trace', allowed: ['trace'] },
 });
 
 const SELECTOR_KINDS = new Set([
@@ -94,6 +99,25 @@ export function validateAssertion(a, at = 'assertion') {
 
   if ((a.kind === 'window' || a.kind === 'every_step') && (!a.of || typeof a.of !== 'object')) {
     return [`${at} 的 ${a.kind} 需要一个内层断言 of`];
+  }
+  if (a.kind === 'state_machine') {
+    if (!Array.isArray(a.transitions) || a.transitions.length === 0) {
+      errors.push(`${at} 必须给 transitions（如 [["PENDING","MAKING"]]）；没声明就没约束`);
+    } else {
+      for (let i = 0; i < a.transitions.length; i += 1) {
+        const e = a.transitions[i];
+        if (!Array.isArray(e) || e.length !== 2 || typeof e[0] !== 'string' || typeof e[1] !== 'string') {
+          errors.push(`${at}.transitions[${i}] 必须是 [from, to] 两个字符串`);
+        }
+      }
+    }
+    if (a.states !== undefined) {
+      if (!Array.isArray(a.states) || a.states.length === 0) {
+        errors.push(`${at}.states 必须是非空数组`);
+      } else if (!a.states.every((x) => typeof x === 'string')) {
+        errors.push(`${at}.states 里每一项都必须是字符串`);
+      }
+    }
   }
   if (a.kind === 'timeliness') {
     if (!a.from || typeof a.from !== 'object') errors.push(`${at}.from 必须是对象（起点事件的匹配条件）`);
@@ -284,6 +308,8 @@ export function evalAssertion(a, ctx, depth = 0) {
       return evalLinkage(a, ctx);
     case 'timeliness':
       return evalTimeliness(a, ctx);
+    case 'state_machine':
+      return evalStateMachine(a, ctx);
     default:
       return { status: UNKNOWN, code: 'invalid_case', message: `未知断言 ${a.kind}` };
   }

@@ -94,7 +94,7 @@ memory                                   内置名
 }
 ```
 
-### 4.1 十八种 kind
+### 4.1 十九种 kind
 
 | kind | 必填参数 | 相位 |
 | --- | --- | --- |
@@ -284,7 +284,7 @@ memory 适配器          → pass
 
 ### 4.3.2 payload：返回体断言
 
-前十六种断言读的都是**规范视图**（那份「此刻系统里有什么」的快照）。`payload` 读的是
+前十七种断言读的都是**规范视图**（那份「此刻系统里有什么」的快照）。`payload` 读的是
 **每一步的响应体**——视图里没有 token、没有分页信封、没有请求回执，这些只能从返回体看。
 
 ```json
@@ -1664,6 +1664,38 @@ Postman 是 JSON 且层层嵌套，Bruno 是自有目录格式，转换成本更
 
 **键是参数路径**，支持点号与数组通配（`items[].qty` 会写进数组每一项）。
 校验期就拦三种错：`min > max`、空约束对象、不认识的约束项。
+
+### 4.3.4 state_machine：只许走这些边
+
+`status_transition` 能断言「某条边出现过」。它说不出「不许从 PENDING 直接到 PICKED」——
+那句话不是关于**出现过的边**，而是关于所有**可能被走**的边。
+
+```json
+{"kind":"state_machine",
+ "walk":"rows",
+ "selector":{"collection":"status_log"},
+ "path":"to",
+ "states":["PENDING","MAKING","READY","PICKED","CANCELED"],
+ "transitions":[["PENDING","MAKING"],["MAKING","READY"],["READY","PICKED"],["PENDING","CANCELED"]]}
+```
+
+| 字段 | 必填 | 说明 |
+|---|---|---|
+| `transitions` | **是** | 允许的边。不给就 `unknown/not_declared`——没声明就没约束 |
+| `states` | 否 | 全部合法状态。观测到不在其中的值 → `unknown/unknown_state` |
+| `walk` | 否 | `snapshots`（默认，跟一个实体走）或 `rows`（把流水集合当序列） |
+| `path` | 否 | 取值列，默认 `status` |
+
+**两种 walk 都成立，因为状态机在两个地方都出现**：
+
+- `snapshots`：同一个订单在每一步快照里的 `status` 序列 —— 「这单是不是按规矩走的」。
+- `rows`：流水集合每行的 `to` 列 —— 「这份日志里有没有不该出现的边」。
+  只走 `snapshots` 会漏掉**追加在末尾**的多余边：快照里只看第一行，后面的行永远看不见。
+
+**相位固定 `trace`**：只判终态等于只看终点，中途跳态会被当成合法。
+
+**独占杀手** `m-illegal-transition-allowed`：在最后一个快照的 `status_log` 末尾追加一条
+`PICKED→MAKING`。四条声明的边一条不少，`status_transition` 照样判真，只有这一种断言能发现它。
 
 ### 4.3.3 timeliness：真实时间约束
 

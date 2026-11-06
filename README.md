@@ -1,4 +1,4 @@
-# agent-web v0.50.0
+# agent-web v0.51.0
 
 <p align="center">
   <img src="docs/media/hero.png" alt="agent-web：给 Agent 写机器可判的集成测试" width="100%">
@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <b>当前版本 0.50.0</b> · 18 种断言 · 30 条命令 · 46 个变异体
+  <b>当前版本 0.51.0</b> · 19 种断言 · 30 条命令 · 47 个变异体
 </p>
 
 <p align="center">
@@ -168,6 +168,7 @@ FAIL todo/recorded   assertion_false
 | `payload` | 检查某一步的 HTTP 响应体 |
 | `linkage` | 检查跨集合实体关联与对应数量 |
 | `timeliness` | 终态 | 两个事件的真实时间戳之差不得超过上限（`max:"24h"`），必须声明 `timezone` |
+| `state_machine` | trace | 只许走声明的那些边（`transitions`）；`walk:"rows"` 把流水集合当序列 |
 
 关系式比写死具体值更耐移植：`totalAmount == Σ items.subTotal` 在哪个实现上都该成立，
 而 `totalAmount == 56` 只在菜单价格不变时成立。形状断言同理——「列表不重」不依赖任何具体编号。

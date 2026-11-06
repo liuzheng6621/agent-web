@@ -95,7 +95,7 @@ test('校验：不给时区必须报错（时间比较不能靠猜）', () => {
 });
 
 test('注册表：timeliness 是第 18 种，相位固定 final', () => {
-  assert.equal(KINDS.length, 18);
+  assert.equal(KINDS.length, 19, '状态机上线后是 19 种');
   assert.ok(KINDS.includes('timeliness'));
   assert.deepEqual(PHASE_MATRIX.timeliness.allowed, ['final']);
   assert.equal(phaseOf({ kind: 'timeliness' }), 'final');
