@@ -381,18 +381,19 @@ Two layers. These capabilities already have code and tests and should not be cou
 - `drill grade --record` / `drill stats` provide a ledger, Wilson 95% intervals and empirical ordering; an item needs at least five attempts before it gets a difficulty band.
 - `negatives` derives candidate negative cases from the manifest's declarations (missing required args, role violations, wrong types, absent entities, duplicate submits); everything stays `disputed` and only a review sheet is produced.
 
-The remaining boundaries are numbered to match L1–L11 in [docs/LIMITS.md](docs/LIMITS.md):
+The remaining boundaries are numbered to match L1–L11 in [docs/LIMITS.md](docs/LIMITS.md).
+**Each entry states only the unsolved part** — what already works is in the list above and is not repeated here:
 
 1. **Write semantics still need a human (L1).** `tap` records what the app did, but cannot infer that "insufficient stock must be rejected"; a domain owner must approve the rule.
-2. **Field mappings still need review (L2).** `align` proposes mappings; nested-array leaves and same-name/different-meaning fields across collections remain unresolved.
+2. **Field mappings still need review (L2).** Nested-array leaves and same-name/different-meaning fields across collections cannot be decided by machine; a human must sign.
 3. **No universal flow-quality score (L3).** Define domain goals, metrics and weights first; keep quality scoring separate from legality verdicts.
-4. **Negative expectations still need a human signature (L4).** `negatives` derives candidates from declarations with a stated basis, but whether a request *should* be rejected remains a business decision; candidates never enter verdicts.
+4. **Negative expectations still need a human signature (L4).** Whether a request *should* be rejected is a business decision; candidates only produce a review sheet and never enter verdicts.
 5. **Mutant coverage is incomplete (L5).** `breed` mainly generates view-shape faults; execution- and business-layer mutants still need domain-specific examples and distinguishability evidence.
 6. **Arbitrary mutant equivalence is undecidable in general (L6).** Finite-state or bounded scenarios can be proved or exhaustively checked; otherwise report "not distinguished within budget," never "equivalent."
-7. **Real-time semantics are still missing (L7).** Step windows, per-step checks, pagination and linkage exist; "ship within 24 hours after payment" needs explicit timestamps, clock and timezone semantics.
+7. **Real-time semantics are still missing (L7).** "Ship within 24 hours after payment" needs explicit timestamps, clock and timezone semantics; step indices cannot express wall-clock time.
 8. **Adapters need process isolation (L8).** `probe` is not a security sandbox; use a read-only filesystem, resource/time limits and restricted network egress.
-9. **Parallel execution stays disabled for now (L9).** The verdict-fingerprint gate exists (`npm run determinism`), but there is no parallel executor; re-enabling it requires byte-identical verdicts, failure causes and per-step receipts between serial and parallel runs.
-10. **Difficulty estimates depend on sample sources (L10).** The ledger and statistics work; multiple independent submitters/batches are needed to interpret the result as external difficulty rather than self-test performance.
+9. **Parallel execution stays disabled for now (L9).** There is no parallel executor; re-enabling it requires byte-identical verdicts, failure causes and per-step receipts between serial and parallel runs.
+10. **Difficulty estimates depend on sample sources (L10).** Multiple independent submitters/batches are needed to interpret the result as external difficulty rather than self-test performance.
 11. **Real-backend validation covers only four domains (L11).** Add domains using two implementations, positive/negative cases, domain mutants, `compare` agreement and a passing `probe`.
 <!-- limits:end -->
 

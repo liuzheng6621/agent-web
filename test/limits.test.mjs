@@ -196,3 +196,41 @@ test('域表格：标题里的域数、表格行数、中英两版必须三者�
     assert.ok(cells[0].length > 0 && cells[2].length > 0, `域表格这行有空单元：${row}`);
   }
 });
+
+// 这一节分两层：上层列「已经有代码和测试守着」的能力，下层只列「还没解决」的边界。
+// 实测漂过：下层有 5 条开头把上层已经说过的事又复述一遍（「align 已给建议」
+// 「negatives 已能派生」「步号区间…关联已有」「算法和台账已接通」「判决指纹门已就位」），
+// 读者读下来只剩一个疑问：这节到底在说做了还是没做。
+// 守卫：下层 11 条里不许再出现完成态措辞 —— 完成的都在上层。
+const DONE_ZH = ['已就位', '已接通', '已给建议', '已能', '已有', '已覆盖', '已实现', '已支持', '已提供', '已具备'];
+const DONE_EN = ['already', ' is in place', ' gate exists', 'are in place', 'works;'];
+
+function boundaryItems(lang) {
+  const text = read(lang === 'zh' ? 'README.md' : 'README.en.md');
+  const start = text.search(lang === 'zh' ? /^剩下的边界/m : /^The remaining boundaries/m);
+  assert.ok(start >= 0, (lang === 'zh' ? 'README.md' : 'README.en.md') + ' 找不到「剩下的边界」段落');
+  const end = text.indexOf('<!-- limits:end -->', start);
+  const block = text.slice(start, end);
+  return block.split('\n').filter((l) => /^\d+\.\s/.test(l));
+}
+
+test('限制清单：下层只写没解决的部分，不许复述上层已经做到的事', () => {
+  const zh = boundaryItems('zh');
+  const en = boundaryItems('en');
+  assert.equal(zh.length, 11, '中文下层的条数变了：' + zh.length);
+  assert.equal(en.length, 11, '英文下层的条数变了：' + en.length);
+
+  for (const line of zh) {
+    for (const w of DONE_ZH) {
+      assert.ok(!line.includes(w),
+        `下层这条又说了「${w}」——已经做到的写在上层清单里，这里只写没解决的：\n  ${line}`);
+    }
+  }
+  for (const line of en) {
+    const low = line.toLowerCase();
+    for (const w of DONE_EN) {
+      assert.ok(!low.includes(w),
+        `boundary item restates what already works ("${w.trim()}") — that belongs in the upper list:/n  ${line}`);
+    }
+  }
+});
