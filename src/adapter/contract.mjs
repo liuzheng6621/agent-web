@@ -65,6 +65,32 @@ export function validateManifest(m) {
         errors.push(`${at}.evidence_level 必须是 ${EVIDENCE_LEVELS.join('/')}`);
       }
       if (c.args !== undefined && typeof c.args !== 'object') errors.push(`${at}.args 必须是对象`);
+      // 约束是可选的，但一旦声明就必须合法：半份约束比没有约束更危险
+      // （工具会按它派生边界输入，写错了就派生出错的负例）。
+      if (c.constraints !== undefined) {
+        if (typeof c.constraints !== 'object' || c.constraints === null || Array.isArray(c.constraints)) {
+          errors.push(`${at}.constraints 必须是对象（键是参数路径，值是 {min,max,integer,enum}）`);
+        } else {
+          for (const [key, spec] of Object.entries(c.constraints)) {
+            const kat = `${at}.constraints[${JSON.stringify(key)}]`;
+            if (typeof spec !== 'object' || spec === null) {
+              errors.push(`${kat} 必须是对象`);
+              continue;
+            }
+            const known = ['min', 'max', 'integer', 'enum'];
+            for (const k of Object.keys(spec)) {
+              if (!known.includes(k)) errors.push(`${kat}.${k} 不是约束项（只认 ${known.join('/')}）`);
+            }
+            if (spec.min !== undefined && !Number.isFinite(spec.min)) errors.push(`${kat}.min 必须是数字`);
+            if (spec.max !== undefined && !Number.isFinite(spec.max)) errors.push(`${kat}.max 必须是数字`);
+            if (spec.min !== undefined && spec.max !== undefined && spec.min > spec.max) {
+              errors.push(`${kat}.min 大于 max（${spec.min} > ${spec.max}）`);
+            }
+            if (spec.enum !== undefined && !Array.isArray(spec.enum)) errors.push(`${kat}.enum 必须是数组`);
+            if (Object.keys(spec).length === 0) errors.push(`${kat} 是空约束，删掉它或写点东西`);
+          }
+        }
+      }
     });
   }
   if (!Array.isArray(m.scopes) || m.scopes.length === 0) {

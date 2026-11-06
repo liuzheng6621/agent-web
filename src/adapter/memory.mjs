@@ -64,6 +64,9 @@ const MANIFEST = {
       kind: 'write',
       evidence_level: 'validated',
       args: { items: 'Array<{dishId:string, qty:number}>' },
+      // 边界不是猜的：下面这条就是适配器 execute 里那道 `qty 必须是 1..99`。
+      // 声明与实现不一致时，probe 的 declared-vs-behavior 会抓出来。
+      constraints: { 'items[].qty': { min: 1, max: 99, integer: true } },
       roles: ['customer'],
     },
     {

@@ -53,7 +53,7 @@ import { probeAdapter, formatProbe, probeExit } from '../src/probe.mjs';
 import { discover, formatDiscover } from '../src/discover.mjs';
 import { startTap } from '../src/tap.mjs';
 import { readTraffic, learnTraffic, writeLearnOut } from '../src/learn.mjs';
-import { deriveNegatives, renderNegativeSheet, formatNegativeSummary, writeNegatives } from '../src/negatives.mjs';
+import { deriveNegatives, renderNegativeSheet, formatNegativeSummary, writeNegatives, classifyObserved, formatObservedSummary } from '../src/negatives.mjs';
 import { preflightAll, formatPreflight, preflightExit } from '../src/preflight.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -438,8 +438,10 @@ async function cmdAlign(args, flags) {
 async function cmdNegatives(args, flags) {
   if (args.length === 0) {
     console.error('用法：agent-web negatives <目录或文件> [--adapter=memory] [--out=DIR] [--max=N] [--json] [--detail]');
-    console.error('  从清单的**声明**派生负例候选（必填缺失 / 角色越权 / 类型不符 / 不存在实体 / 重复提交）。');
+    console.error('  从清单的**声明**派生负例候选（必填缺失 / 角色越权 / 类型不符 / 边界越界 / 不存在实体 / 重复提交）。');
     console.error('  全部标 disputed，只写审阅表，不写进案例目录，也不进判决。');
+    console.error('  加 --run 会实际跑一遍，按结果分四类：observed_reject / observed_accept / diverged / unknown。');
+    console.error('  --second=SPEC 时同一个候选在两个实现上都跑，结论不同记 diverged。');
     return 2;
   }
   const adapterName = flags.adapter ?? 'memory';
@@ -463,6 +465,37 @@ async function cmdNegatives(args, flags) {
     });
   }
 
+  // --run：把候选真的跑一遍。观察到的事实仍然不是判据 —— 每条候选保持 disputed，
+  // 只是多了一栏「实际发生了什么」，让人判断洞在实现里还是在声明里。
+  if (flags.run) {
+    const second = flags.second ? await makeAdapter(String(flags.second)) : null;
+    for (const r of results) {
+      for (const cand of r.candidates) {
+        const store = JSON.parse(fs.readFileSync(path.join(ROOT, r.source), 'utf8'));
+        const mk = () => ({
+          ...JSON.parse(JSON.stringify(store)),
+          id: `${r.case_id}~${cand.kind}`,
+          task: {
+            ...JSON.parse(JSON.stringify(store.task)),
+            goal_assertions: [
+              {
+                kind: 'entity_exists',
+                selector: { collection: (store.task?.goal_assertions?.[0]?.selector?.collection) ?? 'orders' },
+              },
+            ],
+            invariants: [],
+          },
+          reference_trajectory: cand.steps,
+        });
+        const base = mk();
+        // 传整个判决而不是 .verdict：分类要看 evidence.trace 里最后一步的结局
+        const va = await judge({ case: base, adapter, adapterName: adapterName });
+        const vb = second ? await judge({ case: base, adapter: second, adapterName: String(flags.second) }) : null;
+        cand.observed = classifyObserved(va, vb, cand.expectation);
+      }
+    }
+  }
+
   const outDir = flags.out ?? path.join('.agent-web', 'negatives');
   const written = writeNegatives(outDir, results);
 
@@ -470,6 +503,10 @@ async function cmdNegatives(args, flags) {
     console.log(JSON.stringify({ dir: written.dir, results }, null, 2));
   } else {
     console.log(formatNegativeSummary(results));
+    if (flags.run) {
+      console.log('');
+      console.log(formatObservedSummary(results));
+    }
     if (flags.detail) {
       for (const r of results) {
         console.log('');

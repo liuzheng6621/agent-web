@@ -40,9 +40,14 @@ README 的「边界：已实现与仍未解决」是这份清单的摘要。**�
 能推**往返语义**（建一条 → 列表里出现 → `count_delta +1`）。剩下真正要人的是业务规则：
 「库存不足该拒绝」「退款不许超过实付」。录不到，只能人补断言。
 
-没有做的事：从 `capabilities[].args` 与 OpenAPI 约束自动生成边界输入（0、-1、超库存、缺字段、
-错角色），在正确实现与孪生上各跑一遍，产出候选规则让人 `accept`。这条路可行，
-但必须默认标 `disputed` 而不是直接写进案例——机器观测不许冒充人的期望。
+**v0.49.0 补上的**：`manifest.capabilities[].constraints`（`min`/`max`/`integer`/`enum`，键支持
+`items[].qty` 这种数组通配）让边界变成**声明**而不是猜测；`negatives` 新增 `boundary_violation`
+候选，`--run` 把候选真跑一遍，按最后一步的结局分 `observed_reject` / `observed_accept` /
+`diverged` / `unknown` 四类，`--second=SPEC` 时两个实现都跑、结论不同记 `diverged`。
+候选仍然是 `disputed`，进 `cases/` 要 `accept --by` 署名——**机器观测不许冒充人的期望**。
+
+仍要人给的：业务规则本身（「库存不足该拒绝」「退款不许超过实付」）。`constraints` 能表达
+「qty 在 1..99」，表达不了「折扣不能叠加」。
 
 ## L2 字段映射靠人
 

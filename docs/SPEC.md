@@ -1515,6 +1515,47 @@ accepted: []
 - 让 `drill` 只报 `asked` 而不报 `skipped` / `not_applicable` / `invisible`（四桶必须相加等于配对数）
 - 允许 `drill grade` 用提交里的文字说明代替实跑结果
 
+## 23. 负例候选与实跑（negatives --run）
+
+负例的老问题是判据：机器只看得到「实际返回了什么」，照抄就是放水。这一层换了前提——
+**不猜观测，只读声明**，并且把「观察到的结局」与「应该是什么」分开写。
+
+### 23.1 六类候选
+
+| kind | 依据 | 置信 |
+|---|---|---|
+| `missing_required_arg` | `args` 里不带 `?` 的参数被删掉 | high |
+| `role_violation` | `roles` 里没有的身份去调 | high |
+| `boundary_violation` | `constraints` 里的 `min`/`max`/`integer`/`enum` | high |
+| `wrong_type` | 声明成 number 塞字符串 | medium |
+| `unknown_entity` | 主键类参数塞不存在的值 | medium |
+| `duplicate_submit` | 写能力重复一次 | low（两个假设都列） |
+
+没有声明就一条都不造。`boundary_violation` 尤其如此：工具能问出 `qty=0`，是因为适配器
+自己写了 `min:1`，不是因为工具觉得数字该有个范围。
+
+### 23.2 `--run` 的四类结论
+
+```bash
+agent-web negatives cases/coffee --adapter=memory --run [--second=SPEC] [--detail]
+```
+
+| observed | 含义 |
+|---|---|
+| `observed_reject` | 按期望被拒（声明与实现一致，可以进案例） |
+| `observed_accept` | 期望被拒却成功了 —— **实现有洞**，或声明写严了 |
+| `diverged` | 两个实现结论不同 —— 契约没说清，先别写案例 |
+| `unknown` | 跑不出结论（缺观测或环境没起来） |
+
+**看的是最后一步的结局，不是整体判决**。负例本来就会让案例自带的 goal 断言不成立
+（「订单数 >= 1」被拒后必然为假），拿整体判决分类等于在测「我把断言改坏了吗」。
+
+### 23.3 候选永远不进判决
+
+每条候选都带 `status: 'disputed'`。观察到的事实不是判据：进 `cases/` 仍要
+`agent-web accept --by=NAME` 署名。审阅表（`.agent-web/negatives/`）多一栏「实测」，
+汇总多三行，仅此而已。
+
 ## 22. 从现成套件转案例（import hurl）
 
 案例写不完是这套工具最硬的墙。`import` 承认这件事，并给出一个不靠猜的入口：
@@ -1559,6 +1600,25 @@ Postman 是 JSON 且层层嵌套，Bruno 是自有目录格式，转换成本更
 转出来的案例必须过 `validateCase`；`test/import-hurl.test.mjs` 守着十二件事
 （状态行、捕获、能力名、角色、`expected_outcome`、待办不丢、5xx 跳过、写盘、payload 六种 op、
 看不见返回体是 `unknown`、缺参在校验期报错、相位只允许 `trace`）。
+
+### 3.2.1 constraints：参数边界的声明
+
+`manifest.capabilities[].constraints` 是可选的，一旦声明就必须合法——半份约束比没有约束更危险，
+因为 `negatives` 会按它派生边界输入，写错了就派生出错的负例。
+
+```json
+{"id":"order.create","kind":"write","args":{"items":"Array<{dishId:string, qty:number}>"},
+ "constraints":{"items[].qty":{"min":1,"max":99,"integer":true}}}
+```
+
+| 约束项 | 含义 |
+|---|---|
+| `min` / `max` | 数值上下限（含端点）。派生 `min-1` 与 `max+1` |
+| `integer` | 必须是整数。派生「非整数」 |
+| `enum` | 允许的取值集合。派生「枚举外值」 |
+
+**键是参数路径**，支持点号与数组通配（`items[].qty` 会写进数组每一项）。
+校验期就拦三种错：`min > max`、空约束对象、不认识的约束项。
 
 ### 4.3.3 timeliness：真实时间约束
 

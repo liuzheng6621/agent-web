@@ -78,6 +78,70 @@ function setArg(step, name, value) {
   return next;
 }
 
+/**
+ * 按点号路径写值：`items[].qty` 会写进数组每一项，`a.b` 写进嵌套对象。
+ * 只支持「点号 + 数组通配」，够用且不引入表达式引擎。
+ */
+function setPathArg(step, path, value) {
+  const next = JSON.parse(JSON.stringify(step));
+  if (next.bindings) {
+    // 被改的那个叶子如果原来是绑定来的，绑定要撤掉，否则改了个没人读的字段
+    const leaf = path.split('.').pop().replace(/\[\]/g, '');
+    delete next.bindings[leaf];
+    if (Object.keys(next.bindings).length === 0) delete next.bindings;
+  }
+  const segs = path.split('.');
+  const walk = (obj, i) => {
+    const seg = segs[i];
+    const isLast = i === segs.length - 1;
+    const wildcard = seg.endsWith('[]');
+    const key = wildcard ? seg.slice(0, -2) : seg;
+    if (isLast) {
+      obj[key] = value;
+      return;
+    }
+    if (wildcard) {
+      const arr = Array.isArray(obj[key]) ? obj[key] : [];
+      obj[key] = arr.map((item) => {
+        const copy = typeof item === 'object' && item !== null ? { ...item } : item;
+        walk(copy, i + 1);
+        return copy;
+      });
+      return;
+    }
+    obj[key] = typeof obj[key] === 'object' && obj[key] !== null ? { ...obj[key] } : {};
+    walk(obj[key], i + 1);
+  };
+  next.arguments = next.arguments || {};
+  // 目标路径的根键必须是案例本来就有的参数，否则造出来的是一条「传了奇怪参数」的负例
+  const root = segs[0].replace(/\[\]/g, '');
+  if (!(root in next.arguments)) return null;
+  walk(next.arguments, 0);
+  return next;
+}
+
+/** 从一个声明的约束里取出「该试哪些边界值」。只试声明过的，不猜。 */
+function boundaryProbes(path, spec, given) {
+  const probes = [];
+  if (Number.isFinite(spec.min)) {
+    probes.push({ label: `min-1 (${spec.min - 1})`, value: spec.min - 1 });
+  }
+  if (Number.isFinite(spec.max)) {
+    probes.push({ label: `max+1 (${spec.max + 1})`, value: spec.max + 1 });
+  }
+  if (spec.integer) {
+    probes.push({ label: 'non-integer', value: (Number.isFinite(spec.min) ? spec.min : 1) + 0.5 });
+  }
+  if (Array.isArray(spec.enum) && spec.enum.length > 0) {
+    probes.push({ label: 'outside enum', value: '__not_in_enum__' });
+  }
+  // 值本来就落在合法区间的中间时，才值得试边界；已经在边界上的案例不重复造
+  const leaf = path.split('.').pop().replace(/\[\]/g, '');
+  const current = typeof given?.[leaf] === 'number' ? given[leaf] : null;
+  if (current !== null && Number.isFinite(spec.max) && current > spec.max) return [];
+  return probes;
+}
+
 function withRole(step, role) {
   const next = JSON.parse(JSON.stringify(step));
   next.as = role;
@@ -123,6 +187,9 @@ export function deriveNegatives({ case: c, manifest, max = 40 }) {
   const seen = new Set();
 
   const push = (cand, stepsForCand) => {
+    // 造不出合法轨迹（比如要改的路径在案例里根本没传）就不提这条候选：
+    // 一条「改不动的负例」比没有负例更糟，它会被当成已覆盖。
+    if (!stepsForCand) return;
     const key = `${cand.kind}|${cand.capability}|${cand.step_index}|${cand.mutation}`;
     if (seen.has(key) || out.length >= max) return;
     seen.add(key);
@@ -181,6 +248,8 @@ export function deriveNegatives({ case: c, manifest, max = 40 }) {
           review: [
             `换身份后接口返回的是 401/403，还是干脆 200 加空数据？后者是泄漏。`,
             '这条角色约束是不是只在 UI 层挡着？',
+            `注意：如果 manifest.roles 里的 ${role} 是**身份别名**而不是角色（同一个 role 换个人），` +
+              '这条会实测成 observed_accept —— 那是清单把「角色」和「身份」混成一栏，不是实现有洞。',
           ],
         }),
         [...prefix(steps, index - 1), withRole(step, role)],
@@ -210,6 +279,33 @@ export function deriveNegatives({ case: c, manifest, max = 40 }) {
         }),
         [...prefix(steps, index - 1), setArg(step, name, bad)],
       );
+    }
+
+    // 3b) 声明的边界之外：min / max / integer / enum
+    // 这一类不是猜的——约束就写在 manifest 里。工具能问出「qty=0」「qty=100」，
+    // 是因为适配器自己声明了 1..99，而不是因为工具觉得数字应该有个范围。
+    const constraints = cap.constraints || {};
+    for (const [path, spec] of Object.entries(constraints)) {
+      const probed = boundaryProbes(path, spec, given);
+      for (const probe of probed) {
+        push(
+          candidate({
+            caseId: c.id,
+            kind: 'boundary_violation',
+            step,
+            index,
+            expectation: 'rejected',
+            confidence: 'high',
+            basis: `${cap.id}.constraints[${JSON.stringify(path)}]=${JSON.stringify(spec)}，试 ${probe.label}`,
+            mutation: `${step.id}.${path} = ${JSON.stringify(probe.value)}`,
+            review: [
+              `服务端真的按声明的边界拒绝吗？还是只在 UI 上限了？`,
+              `被拒之后有没有留下半条记录（要配 window 断言）？`,
+            ],
+          }),
+          [...prefix(steps, index - 1), setPathArg(step, path, probe.value)],
+        );
+      }
     }
 
     // 4) 不存在的实体
@@ -266,6 +362,86 @@ export function deriveNegatives({ case: c, manifest, max = 40 }) {
 }
 
 /** 审阅表：人能直接勾的清单，不是判决。 */
+/**
+ * 把一条候选跑出来看：只记「实际发生了什么」，不记「应该是什么」。
+ *
+ * 这一步的价值在于分开三件常被混为一谈的事：
+ *   - 期望被拒、实际也被拒  → observed_reject（声明与实现一致，可以进案例）
+ *   - 期望被拒、实际成功了  → observed_accept（**实现有洞**，或声明写严了）
+ *   - 两个实现给的结论不同   → diverged（契约本身没说清，先别写案例）
+ *   - 跑不动（unknown）      → 不猜
+ *
+ * 判决仍然是 disputed：观察到的事实不是判据，进 cases/ 仍然要人 accept 署名。
+ */
+export function classifyObserved(verdictA, verdictB, expectation) {
+  // 看的是**最后一步的结局**，不是整体判决。
+  // 整体判决被案例自带的 goal 断言左右（负例本来就该让「订单数 >= 1」不成立），
+  // 拿它分类等于在测「我把断言改坏了吗」，而不是「服务端拒没拒」。
+  const lastOutcome = (v) => {
+    const tr = v && v.evidence && Array.isArray(v.evidence.trace) ? v.evidence.trace : null;
+    if (!tr || tr.length === 0) return null;
+    const last = tr[tr.length - 1];
+    return last && typeof last.outcome === 'string' ? last : null;
+  };
+  const a = lastOutcome(verdictA);
+  const b = lastOutcome(verdictB);
+  if (!a) {
+    return { observed: 'unknown', detail: '跑不出结论（没有轨迹，或环境没起来）', a: null, b: b ? b.outcome : null };
+  }
+  if (b && a.outcome !== b.outcome) {
+    return {
+      observed: 'diverged',
+      detail: `两个实现结论不同：A=${a.outcome}（${a.error?.code ?? '—'}），B=${b.outcome}（${b.error?.code ?? '—'}）`,
+      a: a.outcome,
+      b: b.outcome,
+    };
+  }
+  const code = a.error?.code ? `（${a.error.code}）` : '';
+  if (expectation === 'rejected') {
+    return a.outcome === 'rejected'
+      ? { observed: 'observed_reject', detail: `确实被拒了${code}`, a: a.outcome, b: b ? b.outcome : null }
+      : { observed: 'observed_accept', detail: `期望被拒，实际 ${a.outcome}${code}`, a: a.outcome, b: b ? b.outcome : null };
+  }
+  if (expectation === 'applied') {
+    return a.outcome === 'applied'
+      ? { observed: 'observed_accept', detail: '确实执行了', a: a.outcome, b: b ? b.outcome : null }
+      : { observed: 'observed_reject', detail: `期望成功，实际被拒${code}`, a: a.outcome, b: b ? b.outcome : null };
+  }
+  return {
+    observed: a.outcome === 'applied' ? 'observed_accept' : 'observed_reject',
+    detail: `没有预设期望，只记录实际结局 ${a.outcome}${code}（幂等与否属于业务决定）`,
+    a: a.outcome,
+    b: b ? b.outcome : null,
+  };
+}
+
+/** 汇总：给审阅表用的三行结论。 */
+export function formatObservedSummary(results) {
+  const counts = new Map();
+  let total = 0;
+  for (const r of results) {
+    for (const cand of r.candidates) {
+      if (!cand.observed) continue;
+      total += 1;
+      const key = cand.observed.observed; // 分类结果是对象 {observed, detail, a, b}
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+  }
+  if (total === 0) return '（没有跑过的候选：加 --run 才会实际执行）';
+  const order = ['observed_reject', 'observed_accept', 'diverged', 'unknown'];
+  const label = {
+    observed_reject: '按期望被拒',
+    observed_accept: '实际执行成功（实现有洞或声明写严了）',
+    diverged: '两个实现结论不同',
+    unknown: '跑不出结论',
+  };
+  const lines = [`实跑 ${total} 条候选：`];
+  for (const k of order) {
+    if (counts.has(k)) lines.push(`  ${label[k]}  ${counts.get(k)} 条（${k}）`);
+  }
+  return lines.join(String.fromCharCode(10));
+}
+
 export function renderNegativeSheet(caseId, candidates) {
   const lines = [];
   lines.push(`# 负例候选 · ${caseId}`);
@@ -285,6 +461,9 @@ export function renderNegativeSheet(caseId, candidates) {
       ? `待定（${cand.hypotheses.join(' / ')}）`
       : cand.expectation;
     lines.push(`- [ ] \`${cand.kind}\` · ${cand.capability} · as=${cand.as} · 期望 **${exp}** · 置信 ${cand.confidence}`);
+    if (cand.observed) {
+      lines.push(`  - 实测：**${cand.observed.observed}** — ${cand.observed.detail}`);
+    }
     lines.push(`  - 依据：${cand.basis}`);
     lines.push(`  - 改法：${cand.mutation}`);
     for (const r of cand.review) lines.push(`  - 待确认：${r}`);

@@ -6,6 +6,19 @@
 CI 也在查。这条规则是买来的：这个仓库曾经同时存在 `package.json` 0.16、README 0.9、
 Gitee Release v0.6.0 三个数，谁看都是三个项目。
 
+## 0.49.0
+
+P2 elicit：把「写操作要人写」降到「人签」——边界输入现在由**声明**派生，而且跑出来给你看。
+
+- **契约新增可选 `constraints`**：`{min, max, integer, enum}`，键是参数路径（支持 `items[].qty` 这种数组通配）。声明非法（min>max、空约束、不认识约束项）在 `validateManifest` 就报错——半份约束比没有约束更危险，工具会按它派生边界。
+- **内存适配器先声明一条真的**：`order.create.constraints['items[].qty'] = {min:1,max:99,integer:true}`，与 `execute` 里那道 `qty 必须是 1..99 的整数` 对齐。
+- **`negatives` 新增候选类型 `boundary_violation`**：只试声明过的边界（`min-1`、`max+1`、非整数、枚举外值），没声明就一条都不造——不猜。
+- **`negatives --run`**：把候选真的跑一遍，按**最后一步的结局**分四类：`observed_reject` / `observed_accept` / `diverged` / `unknown`。**不看整体判决**——负例本来就会让案例自带的 goal 断言不成立，拿整体判决分类等于在测「我把断言改坏了吗」。
+- **`--second=SPEC`**：同一候选在两个实现上都跑，结论不同记 `diverged`（契约没说清，先别写案例）。
+- **候选仍是 `disputed`**：观察到的事实不是判据，进 `cases/` 仍要 `accept --by` 署名。审阅表多一栏「实测」，汇总多三行。
+
+实测（`negatives cases/coffee --adapter=memory --run`）：12 条案例、189 条候选，实跑后 `按期望被拒 150 条 / 实际执行成功 39 条`。那 39 条里 `role_violation` 全部落在 `customer → customer2`——内存适配器把 `customer2` 声明成**身份别名**而不是角色，这是清单的问题不是实现的洞，已在候选的「待确认」里写明这条。
+
 ## 0.48.1
 
 快路径与重放路径的一处语义分歧（CI run #77 在「快路径必须与重放逐格相同」那步红的）。
