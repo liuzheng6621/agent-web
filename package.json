@@ -1,6 +1,6 @@
 {
   "name": "agent-web",
-  "version": "0.49.0",
+  "version": "0.50.0",
   "description": "给 Agent 写机器可判的集成测试：一份案例，多个实现，判决必须一致。",
   "type": "module",
   "bin": {

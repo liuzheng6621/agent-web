@@ -1,0 +1,52 @@
+{
+  "orders": [
+    {
+      "id": 1,
+      "status": "PENDING",
+      "count": 2,
+      "quantity": 2,
+      "totalAmount": 56,
+      "items": [
+        {
+          "dishName": "拿铁",
+          "count": 2,
+          "quantity": 2,
+          "unitPrice": 28,
+          "subTotal": 56
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "status": "PICKED",
+      "count": 1,
+      "quantity": 1,
+      "totalAmount": 22,
+      "items": [
+        {
+          "dishName": "美式",
+          "count": 1,
+          "quantity": 1,
+          "unitPrice": 22,
+          "subTotal": 22
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "status": "CANCELED",
+      "count": 3,
+      "quantity": 3,
+      "totalAmount": 84,
+      "items": [
+        {
+          "dishName": "拿铁",
+          "count": 3,
+          "quantity": 3,
+          "unitPrice": 28,
+          "subTotal": 84
+        }
+      ]
+    }
+  ]
+}

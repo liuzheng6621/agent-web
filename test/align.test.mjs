@@ -32,6 +32,9 @@ const truth = readJson('truth.json');
 function mismatches(report, table) {
   const bad = [];
   for (const m of report.mappings) {
+    // 下钻字段的键形如 items[].count，真值表里是 count —— 只比裸名，
+    // 否则「配对了」会被当成「配错了」。
+    if (m.field.includes('[].')) continue;
     const want = Object.prototype.hasOwnProperty.call(table, m.field) ? table[m.field] : m.field;
     if (want === null) bad.push({ field: m.field, mapped: m.target_field, reason: '应当说不清，却给了高置信' });
     else if (want !== m.target_field) bad.push({ field: m.field, mapped: m.target_field, want });
@@ -83,6 +86,8 @@ test('改名夹具：集合全配上、字段恢复 >= 90%、零错配', () => {
   assert.equal(r.summary.collections, 3);
   assert.equal(r.summary.collections_unresolved, 0);
   assert.ok(r.summary.rate >= 0.9, '字段恢复率 ' + r.summary.rate);
+  assert.equal(r.summary.nested_collections, 1, '数组元素里的字段必须下钻');
+  assert.equal(r.summary.nested_mapped, 4, 'items 里四个字段全该配上');
   assert.deepEqual(mismatches(r, truth.fields), []);
 });
 
@@ -154,4 +159,55 @@ test('退出码：默认不管未定；--require-all 与 --max-unresolved 才拦
   assert.equal(alignExit(bad, { requireAll: true }), 1);
   assert.equal(alignExit(bad, { maxUnresolved: 1 }), 1);
   assert.equal(alignExit(bad, { maxUnresolved: 2 }), 0);
+});
+
+const ambRef = JSON.parse(fs.readFileSync(path.join(FIX, 'amb-ref.json'), 'utf8'));
+const ambTgt = JSON.parse(fs.readFileSync(path.join(FIX, 'amb-tgt.json'), 'utf8'));
+
+test('下钻：容器配上了，元素里的字段也要配（items → lines）', () => {
+  const r = alignViews(ref, renamed, {});
+  const nested = r.mappings.filter((m) => m.field.includes('[].'));
+  assert.equal(r.summary.nested_collections, 1, '数组字段必须被下钻一次');
+  assert.equal(nested.length, 4, 'items 里四个字段全该配上');
+  const byName = new Map(nested.map((m) => [m.field, m.target_field]));
+  assert.equal(byName.get('items[].count'), 'lines[].qty');
+  assert.equal(byName.get('items[].unitPrice'), 'lines[].unitRate');
+  assert.equal(byName.get('items[].subTotal'), 'lines[].lineSum');
+  assert.equal(byName.get('items[].dishName'), 'lines[].label');
+});
+
+test('下钻：两侧前缀各自用自己的容器名，不共用参照的名字', () => {
+  const r = alignViews(ref, renamed, {});
+  for (const m of r.mappings.filter((x) => x.field.includes('[].'))) {
+    assert.ok(m.field.startsWith('items[].'), '源侧前缀错了：' + m.field);
+    assert.ok(m.target_field.startsWith('lines[].'), '目标侧前缀错了：' + m.target_field);
+  }
+});
+
+test('歧义：两个源字段都自信地指向同一个目标字段 → 一个都不配，全留给人签', () => {
+  const r = alignViews(ambRef, ambTgt, {});
+  const amb = r.ambiguous.map((a) => a.path).sort();
+  assert.deepEqual(amb, ['count', 'quantity'], 'count 与 quantity 都指向 qty，必须判歧义');
+  const mapped = r.mappings.map((m) => m.field);
+  assert.ok(!mapped.includes('count'), '有歧义时不许擅自配 count');
+  assert.ok(!mapped.includes('quantity'), '有歧义时不许擅自配 quantity');
+  for (const a of r.ambiguous) {
+    assert.equal(a.target_path, 'qty');
+    assert.ok(a.rivals.length >= 1, '必须写明竞争对手是谁');
+  }
+});
+
+test('歧义：只有一个源字段时照常配上（别把正常情况也拦下来）', () => {
+  const r = alignViews(ref, renamed, {});
+  assert.equal(r.ambiguous.length, 0, '正常夹具不该有歧义');
+});
+
+test('取值完全一致且唯一 → 采纳；但纯数字不算身份证据', () => {
+  const r = alignViews(ref, renamed, {});
+  const dish = r.mappings.find((m) => m.field === 'items[].dishName');
+  assert.ok(dish, 'dishName → label 取值一模一样且唯一，该采纳');
+  assert.equal(dish.target_field, 'lines[].label');
+  // 数字撞车常见：hard 夹具里 totalAmount 不该因为「值像」被配成 x9
+  const hard = alignViews(ref, JSON.parse(fs.readFileSync(path.join(FIX, 'hard-view.json'), 'utf8')), {});
+  assert.ok(!hard.mappings.some((m) => m.field === 'totalAmount'), '数字取值一致不构成身份证据');
 });

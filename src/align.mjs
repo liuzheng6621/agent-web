@@ -230,7 +230,7 @@ export function scoreFieldPair(pa, pb, opts) {
   const independent = ns > 0 || vs >= 0.999;
   const confident = rounded >= (o.high ?? HIGH) && independent && (vs > 0 || ns >= 0.8);
   if (rounded >= (o.high ?? HIGH) && !confident) why.push('分够高但没有独立证据（名字与取值/枚举都不支持）');
-  return { score: rounded, why, confident: Boolean(confident), gate: null };
+  return { score: rounded, why, confident: Boolean(confident), gate: null, vs: vs === null ? 0 : vs };
 }
 
 /** 集合级签名：把所有行的所有叶子值排序后取哈希。改名不改它，改值就改它。 */
@@ -275,6 +275,124 @@ export function scoreCollectionPair(a, b) {
  * 两棵规范视图对齐。
  * 输入是 {collectionName: rows[]}，输出是映射表 + 未决项 + 每条的证据。
  */
+/**
+ * 下钻：数组元素里那些字段也要配。
+ *
+ * 不做的后果是「容器配上了，里面全靠人肉」——`items → lines` 打 94%，
+ * 但 `count → qty` 没人管，案例一写就错在叶子上。
+ *
+ * 做法与顶层同一条：同一个打分函数、同一道置信门槛，只是作用在「摊平后的元素行」上。
+ */
+export function elementProfiles(rows, key) {
+  const elems = [];
+  for (const r of rows) {
+    const v = r && typeof r === 'object' ? r[key] : undefined;
+    if (!Array.isArray(v)) continue;
+    for (const e of v) if (e && typeof e === 'object' && !Array.isArray(e)) elems.push(e);
+  }
+  return profileCollection(elems);
+}
+
+/**
+ * 一组字段的配对：返回 mappings / unresolved / ambiguous。
+ * ambiguous 指的是「两个源字段都自信地指向同一个目标字段」——那是语义重叠，
+ * 机器分不出哪个才对，必须留给人。
+ */
+export function alignFieldSet(rp, tp, opts, refPrefix = '', tgtPrefix = '') {
+  const o = opts || {};
+  const high = o.high ?? HIGH;
+  const low = o.low ?? LOW;
+  const pairs = [];
+  for (const [rk, rprof] of rp.fields) {
+    for (const [tk, tprof] of tp.fields) {
+      const sc = scoreFieldPair(rprof, tprof, { high });
+      if (sc.score <= 0) continue;
+      pairs.push({ ref: rk, target: tk, score: sc.score, why: sc.why, confident: sc.confident, vs: sc.vs });
+    }
+  }
+  pairs.sort((x, y) => y.score - x.score || String(x.ref).localeCompare(String(y.ref)));
+
+  // 「取值完全一致且唯一」的采纳规则。
+  //
+  // 名字毫无关系、基数信号又弱时（元素行只有两三条，cs 只给 0.5），
+  // 分数会卡在 0.65 上不去，于是 dishName → label 这种明显该配的被判未定。
+  // 但取值多重集完全一致是这里能拿到的最强证据，且**唯一**时不存在撞车风险。
+  // 所以补一条：exact 且该源字段只有一个目标 exact，就采纳。
+  const exactByRef = new Map();
+  for (const p2 of pairs) {
+    if (!(p2.vs >= 0.999)) continue;
+    if (!exactByRef.has(p2.ref)) exactByRef.set(p2.ref, []);
+    exactByRef.get(p2.ref).push(p2);
+  }
+  for (const [rk, cands] of exactByRef) {
+    if (cands.length !== 1) continue;
+    const p2 = cands[0];
+    if (p2.confident) continue;
+    // 只对**非纯数字**生效。数字撞车太常见（28 既是单价也是小计、两个计数都从 1 数到 3），
+    // 「取值一样」在数值上不构成身份证据；字符串（菜名、状态名）才有区分度。
+    const prof = rp.fields.get(rk);
+    const numeric = prof && prof.type === 'number';
+    if (numeric) {
+      p2.why.push('取值完全一致但都是数字 → 不算身份证据，留给人签');
+      continue;
+    }
+    p2.confident = true;
+    p2.why.push('取值完全一致且唯一 → 采纳');
+  }
+
+  const mappings = [];
+  const unresolved = [];
+  const ambiguous = [];
+  const byTarget = new Map();
+  for (const p of pairs) {
+    if (!p.confident) continue;
+    if (!byTarget.has(p.target)) byTarget.set(p.target, []);
+    byTarget.get(p.target).push(p);
+  }
+  // 多个源字段争同一个目标：一律不配，列成 ambiguous
+  for (const [target, cands] of byTarget) {
+    if (cands.length > 1) {
+      for (const c of cands) {
+        ambiguous.push({
+          path: `${refPrefix}${c.ref}`,
+          target_path: `${tgtPrefix}${target}`,
+          confidence: c.score,
+          rivals: cands.filter((x) => x.ref !== c.ref).map((x) => `${refPrefix}${x.ref}`),
+          reason: '两个源字段都自信地指向同一个目标字段，语义重叠，必须人签',
+        });
+      }
+      byTarget.delete(target);
+    }
+  }
+
+  const takenRef = new Set();
+  const takenTgt = new Set(ambiguous.map((a) => a.path));
+  for (const p of pairs) {
+    if (takenRef.has(p.ref) || takenTgt.has(p.target)) continue;
+    if (!byTarget.has(p.target)) continue;
+    if (!p.confident) continue;
+    takenRef.add(p.ref);
+    takenTgt.add(p.target);
+    mappings.push({
+      field: `${refPrefix}${p.ref}`,
+      target_field: `${tgtPrefix}${p.target}`,
+      confidence: p.score,
+      evidence: p.why,
+    });
+  }
+  for (const [rk] of rp.fields) {
+    if (takenRef.has(rk)) continue;
+    const cands = pairs.filter((p) => p.ref === rk && p.score >= low).slice(0, 3)
+      .map((p) => ({ field: `${tgtPrefix}${p.target}`, confidence: p.score, why: p.why }));
+    unresolved.push({
+      field: `${refPrefix}${rk}`,
+      candidates: cands,
+      reason: cands.length === 0 ? '没有任何字段像它' : '最高分低于阈值，需要人签',
+    });
+  }
+  return { mappings, unresolved, ambiguous };
+}
+
 export function alignViews(ref, target, opts) {
   const o = opts || {};
   const high = o.high ?? HIGH;
@@ -321,49 +439,73 @@ export function alignViews(ref, target, opts) {
   const mappings = [];
   const unresolved = [];
   const suspicious = [];
+  const ambiguous = [];
+  const nested = [];
   for (const col of collections) {
     const rp = refProf.get(col.ref);
     const tp = tgtProf.get(col.target);
-    const pairs = [];
-    for (const [rk, rprof] of rp.fields) {
-      for (const [tk, tprof] of tp.fields) {
-        const s = scoreFieldPair(rprof, tprof, { high: high });
-        if (s.score <= 0) continue;
-        pairs.push({ ref: rk, target: tk, score: s.score, why: s.why, confident: s.confident, gate: s.gate, refType: rprof.type, targetType: tprof.type });
-      }
+    const top = alignFieldSet(rp, tp, { high, low }, '');
+    for (const m of top.mappings) {
+      mappings.push({ collection: col.ref, target_collection: col.target, field: m.field, target_field: m.target_field, confidence: m.confidence, evidence: m.evidence });
     }
-    pairs.sort((x, y) => y.score - x.score || String(x.ref).localeCompare(String(y.ref)));
+    for (const u of top.unresolved) {
+      unresolved.push({ collection: col.ref, field: u.field, candidates: u.candidates, reason: u.reason });
+    }
+    for (const a of top.ambiguous) {
+      ambiguous.push({ collection: col.ref, target_collection: col.target, ...a });
+    }
 
-    const takenRef = new Set();
-    const takenTgt = new Set();
-    for (const p of pairs) {
-      if (takenRef.has(p.ref) || takenTgt.has(p.target)) continue;
-      if (p.confident) {
-        takenRef.add(p.ref);
-        takenTgt.add(p.target);
+    // 下钻：数组元素里的字段也要配，否则「容器配上了，里面全靠人肉」。
+    for (const m of top.mappings) {
+      const rleaf = rp.fields.get(m.field);
+      const tleaf = tp.fields.get(m.target_field);
+      if (!rleaf || !tleaf || rleaf.type !== 'array' || tleaf.type !== 'array') continue;
+      const rElems = elementProfiles(ref[col.ref], m.field);
+      const tElems = elementProfiles(target[col.target], m.target_field);
+      if (rElems.fields.size === 0 || tElems.fields.size === 0) continue;
+      const inner = alignFieldSet(rElems, tElems, { high, low }, `${m.field}[].`, `${m.target_field}[].`);
+      nested.push({
+        collection: col.ref,
+        target_collection: col.target,
+        via: `${m.field} → ${m.target_field}`,
+        fields: rElems.fields.size,
+        mapped: inner.mappings.length,
+        ambiguous: inner.ambiguous.length,
+      });
+      for (const im of inner.mappings) {
         mappings.push({
           collection: col.ref,
           target_collection: col.target,
-          field: p.ref,
-          target_field: p.target,
-          confidence: p.score,
-          evidence: p.why,
+          field: im.field,
+          target_field: im.target_field,
+          confidence: im.confidence,
+          evidence: im.evidence,
+          nested_via: `${m.field} → ${m.target_field}`,
         });
       }
+      for (const iu of inner.unresolved) {
+        unresolved.push({ collection: col.ref, field: iu.field, candidates: iu.candidates, reason: iu.reason, nested_via: `${m.field} → ${m.target_field}` });
+      }
+      for (const ia of inner.ambiguous) {
+        ambiguous.push({ collection: col.ref, target_collection: col.target, ...ia, nested_via: `${m.field} → ${m.target_field}` });
+      }
     }
-    for (const [rk] of rp.fields) {
-      if (takenRef.has(rk)) continue;
-      const cands = pairs.filter((p) => p.ref === rk && p.score >= low).slice(0, 3)
-        .map((p) => ({ field: p.target, confidence: p.score, why: p.why }));
-      unresolved.push({ collection: col.ref, field: rk, candidates: cands, reason: cands.length === 0 ? '没有任何字段像它' : '最高分低于阈值，需要人签' });
-    }
+
     // 高置信错配的自查：被映射上的字段，如果目标集合里还有另一个同类型字段的名字更像它，就报可疑
     for (const m of mappings.filter((x) => x.collection === col.ref)) {
-      const rivals = pairs.filter((p) => p.target !== m.target_field && p.confident && p.score >= m.confidence - 0.05 && nameScore(m.field, p.target) > nameScore(m.field, m.target_field));
-      if (rivals.length > 0) suspicious.push({ collection: col.ref, field: m.field, mapped_to: m.target_field, rivals: rivals.map((r) => r.target) });
+      const rivals = [];
+      for (const [tk, tprof] of tp.fields) {
+        if (tk === m.target_field) continue;
+        if (tprof.type !== (tp.fields.get(m.target_field)?.type ?? tprof.type)) continue;
+        if (nameScore(m.field, tk) > nameScore(m.field, m.target_field)) rivals.push(tk);
+      }
+      if (rivals.length > 0) suspicious.push({ collection: col.ref, field: m.field, mapped_to: m.target_field, rivals });
     }
   }
-  const totalFields = collections.reduce((a, c) => a + refProf.get(c.ref).fields.size, 0);
+  // 分母 = 顶层字段 + 真正下钻过的元素字段。只算顶层的会让比率超过 100%，
+  // 只算元素的又会把「没有数组的集合」拉低。
+  const totalFields = collections.reduce((a, c) => a + refProf.get(c.ref).fields.size, 0)
+    + nested.reduce((a, n) => a + n.fields, 0);
   return {
     align_version: ALIGN_VERSION,
     source: o.source ?? null,
@@ -373,6 +515,8 @@ export function alignViews(ref, target, opts) {
     unresolved,
     unresolved_collections: unresolvedCollections,
     suspicious,
+    ambiguous,
+    nested,
     summary: {
       collections: collections.length,
       collections_unresolved: unresolvedCollections.length,
@@ -381,6 +525,9 @@ export function alignViews(ref, target, opts) {
       rate: totalFields === 0 ? null : mappings.length / totalFields,
       unresolved: unresolved.length,
       suspicious: suspicious.length,
+      ambiguous: ambiguous.length,
+      nested_collections: nested.length,
+      nested_mapped: nested.reduce((a, n) => a + n.mapped, 0),
     },
   };
 }
@@ -409,6 +556,22 @@ export function formatAlign(report, opts) {
     for (const u of us) {
       const cand = u.candidates.length === 0 ? '（没有候选）' : u.candidates.map((x) => x.field + ' ' + pct(x.confidence)).join('、');
       out.push('    ' + u.field.padEnd(16) + '→ 未定            ' + cand);
+    }
+  }
+  const amb = report.ambiguous || [];
+  if (amb.length > 0) {
+    out.push('');
+    out.push('  歧义（两个字段都自信地指向同一个目标，机器分不出该留哪个）：');
+    for (const a of amb) {
+      out.push('    ' + a.path + ' 与 ' + (a.rivals || []).join('、') + ' 都指向 ' + a.target_path + '   ' + pct(a.confidence));
+    }
+  }
+  const nested = report.nested || [];
+  if (nested.length > 0) {
+    out.push('');
+    out.push('  下钻（数组元素里的字段）：');
+    for (const n of nested) {
+      out.push('    ' + n.collection + ' 经 ' + n.via + '：' + n.mapped + ' / ' + n.fields + ' 条配上' + (n.ambiguous > 0 ? '，' + n.ambiguous + ' 条歧义' : ''));
     }
   }
   if (report.unresolved_collections.length > 0) {

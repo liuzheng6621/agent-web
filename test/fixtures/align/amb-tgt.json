@@ -1,0 +1,46 @@
+{
+  "tickets": [
+    {
+      "key": 1,
+      "state": "PENDING",
+      "qty": 2,
+      "sum": 56,
+      "lines": [
+        {
+          "label": "拿铁",
+          "qty": 2,
+          "unitRate": 28,
+          "lineSum": 56
+        }
+      ]
+    },
+    {
+      "key": 2,
+      "state": "PICKED",
+      "qty": 1,
+      "sum": 22,
+      "lines": [
+        {
+          "label": "美式",
+          "qty": 1,
+          "unitRate": 22,
+          "lineSum": 22
+        }
+      ]
+    },
+    {
+      "key": 3,
+      "state": "CANCELED",
+      "qty": 3,
+      "sum": 84,
+      "lines": [
+        {
+          "label": "拿铁",
+          "qty": 3,
+          "unitRate": 28,
+          "lineSum": 84
+        }
+      ]
+    }
+  ]
+}
