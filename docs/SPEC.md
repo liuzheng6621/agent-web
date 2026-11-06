@@ -1777,3 +1777,44 @@ Postman 是 JSON 且层层嵌套，Bruno 是自有目录格式，转换成本更
 **独占杀手**：`m-shipment-late` 在 `observe` 时把 `order.picked` 那行的 `at` 推后 25 小时，
 状态与顺序一字不动。`node scripts/kind-necessity.mjs` 实测「能杀 1 个 / 只有它能杀」。
 去掉这条断言，它就漏网——这是这一种 kind 存在的唯一理由。
+
+## 26. 轨迹计数（report --counts）
+
+L3 说「不判质量」，这条不推翻它。它做的是**把能数的东西数出来**：
+
+```bash
+agent-web report .tmp-r.jsonl --counts            # 表格
+agent-web report .tmp-r.jsonl --counts --json     # 每个案例一个对象，只有五个键
+agent-web report .tmp-r.jsonl --counts --cases=cases/coffee   # 才给得出绕路比
+```
+
+### 26.1 五个数，定义写死
+
+| 键 | 定义 |
+|---|---|
+| `steps` | 轨迹长度 |
+| `repeat_reads` | 同一**读**能力 + 同一参数，多读的次数 |
+| `detour_ratio` | 实走步数 ÷ 案例参考轨迹步数；没有分母时为 `null` |
+| `wasted_writes` | 某次写的产出被后面一步引用，而那一步正是它的反操作 |
+| `retries` | 同一能力同一参数，上一次没成、这一次期望它成 |
+
+**为什么绕路比的分母必须是参考轨迹**：第一版用「产出被后面引用 / 是该能力最后一次 /
+是一次被期望的拒绝」三条结构规则算「必要步数」，实测一条老实巴交的 4 步案例算出 1.33。
+那个规则测的是「我这条轨迹自己有多自洽」，不是「比这份案例多走了几步」。
+现在分母是案例里那条 `reference_trajectory` 的长度——它才是这份案例认为够用的路径。
+**拿不到分母就记 `null`**，不写 1：写 1 会被读成「一步没多走」，那是编的。
+
+### 26.2 它绝不进判决
+
+`--counts` 走的是 `report` 的独立出口，跟 `summarize`/`agreement` 那套指标不共享代码路径。
+输出里不许出现 `score`、`grade`、`rank`、`建议`、`优秀`、`较差`、`评分`、`质量分`
+——`test/report-counts.test.mjs` 会逐词扫输出文本，出现一个就红。
+
+这不是洁癖。一旦有分数，下一个问题就是「多少分算过」，接着是「跨项目怎么比」，
+最后 L3 从 `by-design` 变回 `open`，等于把这个项目绕开的问题又请回来。
+
+### 26.3 证据里为什么要留参数
+
+`evidence.trace[]` 原本只留 `capability` 与 `outcome`，`arguments` 被投影掉了。
+数重复读靠的就是参数：不留参数，「读两次同一个列表」和「读了两个不同列表」长得一模一样。
+现在每个 trace 条目带 `arguments`，判决文件仍然可以离线复查。

@@ -1,4 +1,4 @@
-# agent-web v0.55.0
+# agent-web v0.56.0
 
 <p align="center">
   <img src="docs/media/hero.png" alt="agent-web: integration tests an agent can be judged on" width="100%">
@@ -18,7 +18,7 @@
 </p>
 
 <p align="center">
-  <b>v0.55.0</b> · 19 assertion kinds · 31 commands · 56 mutants
+  <b>v0.56.0</b> · 19 assertion kinds · 31 commands · 56 mutants
 </p>
 
 <p align="center">
@@ -334,7 +334,7 @@ pass for an adapter that does nothing at all.
 |---|---|
 | `selftest` | Zero-dependency self-check, one of each verdict |
 | `verify` | Run cases, produce verdicts |
-| `report` | Metrics from verdict results |
+| `report` | Metrics from verdicts; `--counts` counts the trajectory only (steps / repeat reads / detour ratio / wasted writes / retries) and never feeds a verdict |
 | `accept` | Confirm a draft; unconfirmed cases produce no verdict |
 | `capabilities` | Print capability manifest with evidence levels |
 | `coverage` | Capability coverage reconciliation, `--min` sets a threshold |

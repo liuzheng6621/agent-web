@@ -306,6 +306,9 @@ async function judgeInner({ case: c, adapter, adapterName = 'unknown', trajector
         id: t.id,
         capability: t.capability,
         as: t.as,
+        // 参数要留在证据里：`report --counts` 靠它区分「重读同一个东西」与「读了两样东西」，
+        // 也靠它认「先建后撤」这种白做的写。留空的话事后只能重跑才能数。
+        arguments: t.arguments,
         expected_outcome: t.expected_outcome,
         outcome: t.outcome,
         identity: t.identity ?? null,

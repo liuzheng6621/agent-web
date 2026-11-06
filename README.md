@@ -1,4 +1,4 @@
-# agent-web v0.55.0
+# agent-web v0.56.0
 
 <p align="center">
   <img src="docs/media/hero.png" alt="agent-web：给 Agent 写机器可判的集成测试" width="100%">
@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <b>当前版本 0.55.0</b> · 19 种断言 · 31 条命令 · 56 个变异体
+  <b>当前版本 0.56.0</b> · 19 种断言 · 31 条命令 · 56 个变异体
 </p>
 
 <p align="center">
@@ -367,7 +367,7 @@ REALWORLD_B_BASE_URL=http://127.0.0.1:8297 node bin/agent-web.mjs compare cases/
 |---|---|
 | `selftest` | 零依赖自测，三种判决各来一次 |
 | `verify` | 跑案例出判决 |
-| `report` | 由判决结果出指标 |
+| `report` | 由判决结果出指标；`--counts` 只数轨迹（步数 / 重复读 / 绕路比 / 撤销的写 / 重试），不进判决 |
 | `accept` | 确认草稿；没确认的案例不出判决 |
 | `capabilities` | 打印能力清单与证据等级 |
 | `coverage` | 能力覆盖率对账，`--min` 设门槛 |

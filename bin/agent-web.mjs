@@ -36,6 +36,7 @@ import { replayTrajectory, buildDraftCase } from '../src/draft.mjs';
 import { validateCase, validateSteps, acceptCase, draftBlocker } from '../src/case.mjs';
 import { renderFlowHtml, renderDashboardHtml } from '../src/flow.mjs';
 import { summarize, agreement, formatText, countFailedAssertions } from '../src/report.mjs';
+import { countTrajectory, formatCounts, COUNT_KEYS } from '../src/counts.mjs';
 import { loadAdapter, listBuiltins } from '../src/adapter/load.mjs';
 import { ENTRIES, KNOWLEDGE_VERSION, validateAll } from '../knowledge/index.mjs';
 import { signalsFromCertify, signalsFromProbe, recallSignals, loadState, saveState, bump, recallExit, formatRecall } from '../src/recall.mjs';
@@ -1033,7 +1034,7 @@ async function cmdVerify(args, flags) {
 
 async function cmdReport(args, flags) {
   if (args.length === 0) {
-    console.error('用法：agent-web report <results.jsonl> [--expected=<expected.json>]');
+    console.error('用法：agent-web report <results.jsonl> [--expected=<expected.json>] [--counts [--adapter=X] [--cases=DIR] [--json]]');
     return 2;
   }
   const lines = fs
@@ -1043,12 +1044,62 @@ async function cmdReport(args, flags) {
   const verdicts = lines.map((l) => JSON.parse(l));
   const expected = typeof flags.expected === 'string' ? JSON.parse(fs.readFileSync(path.resolve(flags.expected), 'utf8')) : {};
   const summary = summarize(verdicts);
+
+  // `--counts`：只数轨迹，不判。它跟下面的指标块是两回事，
+  // 所以走单独的出口——混在一起早晚有人把计数当成分数读。
+  if (flags.counts) {
+    const reads = await readCapabilitySet(flags.adapter);
+    const refs = typeof flags.cases === 'string' ? referenceStepCounts(flags.cases) : null;
+    const rows = verdicts.map((v) => ({
+      case_id: v.case_id,
+      counts: countTrajectory(v.evidence?.trace ?? [], {
+        reads,
+        referenceSteps: refs ? refs.get(v.case_id) ?? null : null,
+      }),
+    }));
+    if (flags.json) {
+      console.log(JSON.stringify(rows.map((r) => ({ case_id: r.case_id, ...r.counts })), null, 2));
+    } else {
+      console.log(formatCounts(rows));
+    }
+    return 0;
+  }
+
   if (flags.json) {
     console.log(JSON.stringify({ summary, agreement: agreement(verdicts, expected) }, null, 2));
   } else {
     console.log(formatText(summary, { agreement: Object.keys(expected).length ? agreement(verdicts, expected) : null }));
   }
   return 0;
+}
+
+/** 从案例目录读出每条案例的参考轨迹长度，作为绕路比的分母。 */
+function referenceStepCounts(caseDir) {
+  const map = new Map();
+  for (const file of collectCaseFiles(caseDir)) {
+    try {
+      const c = JSON.parse(fs.readFileSync(file, 'utf8'));
+      // 案例文件里是 `id` 与顶层 `reference_trajectory`；判决里是 `case_id`。
+      const id = c.case_id ?? c.id ?? path.basename(file, '.json');
+      const n = (c.reference_trajectory ?? c.task?.reference_trajectory ?? []).length;
+      if (n > 0) map.set(id, n);
+    } catch { /* 读不了的案例不影响其余 */ }
+  }
+  return map;
+}
+
+/** 拿到适配器就按 manifest 的 kind 判读写；拿不到返回 null，由计数层退回后缀启发式。 */
+async function readCapabilitySet(adapterName) {
+  if (!adapterName) return null;
+  try {
+    const adapter = await makeAdapter(String(adapterName));
+    const manifest = await adapter.manifest();
+    const reads = (manifest.capabilities ?? []).filter((c) => c.kind === 'read').map((c) => c.id);
+    if (typeof adapter.close === 'function') await adapter.close();
+    return new Set(reads);
+  } catch {
+    return null;
+  }
 }
 
 async function cmdCapabilities(args, flags) {

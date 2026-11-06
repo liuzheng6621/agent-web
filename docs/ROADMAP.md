@@ -7,15 +7,15 @@
 
 ---
 
-## 0. 现在的实际状态（v0.55.0，全部实测）
+## 0. 现在的实际状态（v0.56.0，全部实测）
 
 | 项 | 数字 | 怎么核 |
 |---|---|---|
-| 版本 | 0.55.0 | `node bin/agent-web.mjs version` |
+| 版本 | 0.56.0 | `node bin/agent-web.mjs version` |
 | 断言 | 19 种 | `--help` 里的断言表 |
 | 命令 | 31 条 | 同上 |
 | 变异体 | 56 个 | `node bin/agent-web.mjs mutants` |
-| 测试 | 403 条 | `npm test` |
+| 测试 | 417 条 | `npm test` |
 | 判据准入 | 适用 41 / 抓到 39（95.1%） | `node scripts/certify-baseline.mjs --emit-limits` |
 | 计入的域 | **5 个** | `docs/LIMITS.md` L11 的五条门槛 |
 | 台账状态 | L1/L2/L4/L5/L7/L8/**L11** mitigated · L3/L6 by-design · L9 withdrawn · L10 依赖外部 | `grep status docs/LIMITS.md` |
@@ -175,7 +175,7 @@ npm test                                               # 377 → 增加 realworl
 
 ---
 
-## 4. P8 — 计数不等于评分（L3）
+## 4. P8 — 计数不等于评分（L3）✅ 已完成（v0.56.0）
 
 **目标**：L3 保持 `by-design`，但把「能数的东西」真的数出来。
 
@@ -267,7 +267,7 @@ agent-web certify cases/<新域> --adapter=<新域>
 |---|---|---|---|
 | 1 | ~~P6 交叉复核~~ **已完成 v0.54.0** | 2 天 | L8 `open` → **`mitigated`** |
 | 2 | ~~P7 给 RealWorld 补第二个实现~~ **已完成 v0.55.0** | 3 天 | L11 `ongoing` → **`mitigated`**，五域 |
-| 3 | P8 计数 | 1 天 | L3 仍 `by-design`，但「能数的都数了」 |
+| 3 | ~~P8 计数~~ **已完成 v0.56.0** | 1 天 | L3 仍 `by-design`，但「能数的都数了」 |
 | 4 | P9 定时任务域 | 3 天 | L7 的「跨实体时序」有真靶子 |
 
 **P6 已完成**（v0.54.0）。它先做的理由成立：它是唯一 `open` 的。一条 `open` 挂在台账上超过两个版本，
