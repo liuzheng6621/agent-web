@@ -1041,7 +1041,20 @@ async function cmdReport(args, flags) {
     .readFileSync(path.resolve(args[0]), 'utf8')
     .split('\n')
     .filter((l) => l.trim() !== '');
-  const verdicts = lines.map((l) => JSON.parse(l));
+  let verdicts;
+  try {
+    verdicts = lines.map((l) => JSON.parse(l));
+  } catch (e) {
+    // 最常见的误用：把案例文件当判决文件喂进来。指出来，别丢一句 JSON 解析错误。
+    let looksLikeCase = false;
+    try {
+      looksLikeCase = Array.isArray(JSON.parse(fs.readFileSync(path.resolve(args[0]), 'utf8')).reference_trajectory);
+    } catch { /* 也不是案例 */ }
+    console.error(looksLikeCase
+      ? `这份文件是案例（含 reference_trajectory），不是判决。先跑 agent-web verify ${args[0]} --out=results.jsonl，再 report 那份 jsonl。`
+      : `读不了 ${args[0]}：${e.message}`);
+    return 2;
+  }
   const expected = typeof flags.expected === 'string' ? JSON.parse(fs.readFileSync(path.resolve(flags.expected), 'utf8')) : {};
   const summary = summarize(verdicts);
 

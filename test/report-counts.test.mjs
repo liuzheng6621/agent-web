@@ -148,3 +148,12 @@ test('CLI：report --counts --json 的每个对象只有五个计数键', () => 
   assert.deepEqual(Object.keys(rows[0]).sort(), ['case_id', ...COUNT_KEYS].sort());
   fs.unlinkSync(out);
 });
+
+test('CLI：把案例当判决喂进来时，提示应该指出该跑什么', () => {
+  const r = spawnSync(process.execPath, [CLI, 'report', 'cases/coffee/happy-path.json', '--counts'],
+    { cwd: ROOT, encoding: 'utf8' });
+  assert.equal(r.status, 2, '误用该退 2，不是 1');
+  assert.match(r.stderr, /是案例/);
+  assert.match(r.stderr, /verify/);
+  assert.equal(r.stdout, '', '别往 stdout 吐半截表');
+});
