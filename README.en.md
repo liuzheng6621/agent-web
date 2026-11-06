@@ -1,4 +1,4 @@
-# agent-web v0.47.0
+# agent-web v0.48.0
 
 <p align="center">
   <img src="docs/media/hero.png" alt="agent-web: integration tests an agent can be judged on" width="100%">
@@ -18,7 +18,7 @@
 </p>
 
 <p align="center">
-  <b>v0.47.0</b> · 17 assertion kinds · 30 commands · 45 mutants
+  <b>v0.48.0</b> · 18 assertion kinds · 30 commands · 46 mutants
 </p>
 
 <p align="center">
@@ -168,6 +168,7 @@ Three things it does not do: guess business rules (recording a successful delist
 | `pagination` | Check duplicates, omissions, order and total across pages |
 | `payload` | Assert a step's HTTP response body |
 | `linkage` | Check entity links and cardinality across collections |
+| `timeliness` | final | Two events' real timestamps must differ by no more than a bound (`max:"24h"`); `timezone` is required |
 
 Relations are more portable than hardcoded values: `totalAmount == Σ items.subTotal` should hold on any implementation, while `totalAmount == 56` only holds when menu prices have not changed. Shape assertions work the same way — "no duplicates" does not depend on any specific id.
 

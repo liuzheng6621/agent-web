@@ -60,6 +60,19 @@
         },
         "path": "totalAmount",
         "value": 28
+      },
+      {
+        "kind": "timeliness",
+        "from": {
+          "type": "order.created"
+        },
+        "to": {
+          "type": "order.picked"
+        },
+        "max": "24h",
+        "timezone": "UTC",
+        "at_field": "at",
+        "note": "下单到取餐不得超过 24 小时：步号坐标说不出这件事，只有时间戳能"
       }
     ],
     "invariants": [

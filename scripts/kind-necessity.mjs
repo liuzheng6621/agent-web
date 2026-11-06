@@ -89,6 +89,21 @@ const PAYLOAD_SPEC = [
   },
 ];
 
+// 时间语义：happy-path 五步走完，下单到取餐必须在上限内。
+// 去掉这条断言，m-shipment-late 就该漏网 —— 这是它存在的唯一理由。
+const TIMELINESS_SPEC = {
+  kind: 'timeliness',
+  caseId: 'happy-path',
+  assertion: {
+    kind: 'timeliness',
+    from: { type: 'order.created' },
+    to: { type: 'order.picked' },
+    max: '24h',
+    timezone: 'UTC',
+  },
+  baseline: [{ kind: 'entity_exists', selector: { collection: 'orders' } }],
+};
+
 const SHAPE = [
   { kind: 'entity_exists', selector: { collection: 'orders', index: 0 } },
   { kind: 'count_delta', selector: { collection: 'orders' }, delta: 2 },
@@ -133,6 +148,23 @@ async function run() {
     console.log(`${ok ? 'PASS' : 'FAIL'}  ${spec.kind}（案例 ${spec.caseId}）`);
     console.log(`      能杀 ${kills.length} 个：${kills.map((m) => m.id).join(' ') || '—'}`);
     console.log(`      只有它能杀 ${necessary.length} 个：${necessary.join(' ') || '—'}
+`);
+  }
+
+  // 时间语义：与 payload 同一套口径，但断言是终态相位。
+  {
+    const spec = TIMELINESS_SPEC;
+    const withIt = await certify({ cases: [withGoal(spec.caseId, [...spec.baseline, spec.assertion])], adapterFactory: factory, adapterName: 'memory', mutations: pool });
+    const without = await certify({ cases: [withGoal(spec.caseId, [...spec.baseline])], adapterFactory: factory, adapterName: 'memory', mutations: pool });
+    const kills = withIt.mutations.filter((m) => (m.killedBy ?? []).some((k) => (typeof k === 'string' ? k : k.kind) === spec.kind));
+    const caughtWith = new Set(withIt.mutations.filter((m) => m.status === 'caught').map((m) => m.id));
+    const caughtWithout = new Set(without.mutations.filter((m) => m.status === 'caught').map((m) => m.id));
+    const necessary = [...caughtWith].filter((id) => !caughtWithout.has(id));
+    const ok = kills.length > 0 && necessary.length > 0;
+    if (!ok) failedTemporal += 1;
+    console.log(`${ok ? 'PASS' : 'FAIL'}  ${spec.kind}（案例 ${spec.caseId}）`);
+    console.log(`      能杀 ${kills.length} 个：${kills.map((m) => m.id).join(' ') || '—'}`);
+    console.log(`      只有它能杀：${necessary.join(' ') || '—'}
 `);
   }
 

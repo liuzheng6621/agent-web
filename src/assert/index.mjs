@@ -20,6 +20,7 @@ import { window as evalWindow, everyStep as evalEveryStep, WINDOW_INNER } from '
 import { pagination as evalPagination } from './pagination.mjs';
 import { payload as evalPayload, PAYLOAD_OPS } from './payload.mjs';
 import { linkage as evalLinkage } from './linkage.mjs';
+import { timeliness as evalTimeliness, durationMs, TIMELINESS_VERSION } from './timeliness.mjs';
 
 export const KINDS = Object.freeze([
   'entity_exists',
@@ -36,6 +37,7 @@ export const KINDS = Object.freeze([
   'pagination',
   'payload',
   'linkage',
+  'timeliness',
 ]);
 
 export { WINDOW_INNER };
@@ -70,6 +72,9 @@ export const PHASE_MATRIX = Object.freeze({
   pagination: { default: 'trace', allowed: ['trace'] },
   payload: { default: 'trace', allowed: ['trace'] },
   linkage: { default: 'final', allowed: ['final'] },
+  // 时间戳只活在终态视图的事件行上（trace 的中间快照里事件还没发生完），
+  // 所以相位固定 final。想看「某一步之后还没发货」用 window 套它。
+  timeliness: { default: 'final', allowed: ['final'] },
 });
 
 const SELECTOR_KINDS = new Set([
@@ -89,6 +94,21 @@ export function validateAssertion(a, at = 'assertion') {
 
   if ((a.kind === 'window' || a.kind === 'every_step') && (!a.of || typeof a.of !== 'object')) {
     return [`${at} 的 ${a.kind} 需要一个内层断言 of`];
+  }
+  if (a.kind === 'timeliness') {
+    if (!a.from || typeof a.from !== 'object') errors.push(`${at}.from 必须是对象（起点事件的匹配条件）`);
+    if (!a.to || typeof a.to !== 'object') errors.push(`${at}.to 必须是对象（终点事件的匹配条件）`);
+    if (a.max_ms === undefined && a.max === undefined) {
+      errors.push(`${at} 必须给 max（如 "24h"）或 max_ms`);
+    } else if (a.max_ms !== undefined && !(Number.isFinite(a.max_ms) && a.max_ms > 0)) {
+      errors.push(`${at}.max_ms 必须是正数`);
+    } else if (a.max !== undefined && durationMs(a.max) === null) {
+      errors.push(`${at}.max=${JSON.stringify(a.max)} 读不成时长，写法如 "24h" / "90m" / "5000ms"`);
+    }
+    // 时区不给就在求值期报 unknown —— 但校验期先提醒一次，别等人跑完才发现。
+    if (a.timezone === undefined) {
+      errors.push(`${at}.timezone 必须显式声明（如 "UTC"）：时间比较不能靠猜时区`);
+    }
   }
   if (a.kind === 'window') {
     if (a.from_step !== undefined && !(Number.isInteger(a.from_step) && a.from_step >= 0)) {
@@ -262,6 +282,8 @@ export function evalAssertion(a, ctx, depth = 0) {
       return evalPayload(a, ctx);
     case 'linkage':
       return evalLinkage(a, ctx);
+    case 'timeliness':
+      return evalTimeliness(a, ctx);
     default:
       return { status: UNKNOWN, code: 'invalid_case', message: `未知断言 ${a.kind}` };
   }

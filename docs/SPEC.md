@@ -94,7 +94,7 @@ memory                                   内置名
 }
 ```
 
-### 4.1 十五种 kind
+### 4.1 十八种 kind
 
 | kind | 必填参数 | 相位 |
 | --- | --- | --- |
@@ -284,7 +284,7 @@ memory 适配器          → pass
 
 ### 4.3.2 payload：返回体断言
 
-前十五种断言读的都是**规范视图**（那份「此刻系统里有什么」的快照）。`payload` 读的是
+前十六种断言读的都是**规范视图**（那份「此刻系统里有什么」的快照）。`payload` 读的是
 **每一步的响应体**——视图里没有 token、没有分页信封、没有请求回执，这些只能从返回体看。
 
 ```json
@@ -1559,3 +1559,40 @@ Postman 是 JSON 且层层嵌套，Bruno 是自有目录格式，转换成本更
 转出来的案例必须过 `validateCase`；`test/import-hurl.test.mjs` 守着十二件事
 （状态行、捕获、能力名、角色、`expected_outcome`、待办不丢、5xx 跳过、写盘、payload 六种 op、
 看不见返回体是 `unknown`、缺参在校验期报错、相位只允许 `trace`）。
+
+### 4.3.3 timeliness：真实时间约束
+
+前面的 kind 都在「第几步」这个坐标上工作。`window` 能说「第 2 步到第 3 步之间状态没变」，
+但它说不出「发货必须在付款后 24 小时内」——那件事与步号无关，只与真实时间有关。
+
+```json
+{"kind":"timeliness",
+ "from":{"type":"order.created"},
+ "to":{"type":"order.picked"},
+ "max":"24h",
+ "timezone":"UTC",
+ "at_field":"at"}
+```
+
+| 字段 | 必填 | 说明 |
+|---|---|---|
+| `from` / `to` | 是 | 事件匹配条件：`type` 按事件类型，`field`+`value` 按任意字段；`pick` 取 `first`（默认）或 `last` |
+| `max` / `max_ms` | 二选一 | 上限。`max` 支持 `ms/s/m/h/d`（`24h`、`90m`、`5000ms`、`2d`） |
+| `timezone` | **是** | 时区。不给就是 `unknown`——时间比较不能靠猜 |
+| `at_field` | 否 | 时间戳字段名，默认 `at` |
+| `collection` | 否 | 事件所在集合，默认 `status_log` |
+
+**相位固定 `final`**：时间戳只活在终态视图的事件行上，中间快照里事件还没发生完。
+想看「某一步之后还没发货」，用 `window` 套它。
+
+**三条硬边界（写在代码里，不是文档里的君子协定）**
+
+1. 事件没有时间戳 → `unknown/missing_observation`。**看不见不等于做错了**，判假会把
+   「没记录时间」和「超时了」混成一件事。
+2. 时区没声明 → `unknown/missing_timezone`。跨时区的「24 小时」没有意义。
+3. **恰好等于上限算成立**。「24 小时内」包含 24 小时，`gap === max` 判真。
+   反过来，`gap < 0`（终点早于起点）判假，那是顺序错了，不是时间不够。
+
+**独占杀手**：`m-shipment-late` 在 `observe` 时把 `order.picked` 那行的 `at` 推后 25 小时，
+状态与顺序一字不动。`node scripts/kind-necessity.mjs` 实测「能杀 1 个 / 只有它能杀」。
+去掉这条断言，它就漏网——这是这一种 kind 存在的唯一理由。
