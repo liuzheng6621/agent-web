@@ -23,7 +23,7 @@ README 的「边界：已实现与仍未解决」是这份清单的摘要。**�
 | L1 | 写操作的语义仍然要人给 | `mitigated` | `node bin/agent-web.mjs discover URL --writes` |
 | L2 | 字段映射靠人 | `mitigated` | `node bin/agent-web.mjs align test/fixtures/align/ref-view.json test/fixtures/align/renamed-view.json` |
 | L3 | 只判合法性，不判质量 | `by-design` | 见 L3 正文 |
-| L4 | 负例得人来补 | `open` | 尚无 |
+| L4 | 负例得人来补 | `mitigated` | `node bin/agent-web.mjs negatives cases/coffee --adapter=memory` |
 | L5 | 变异体仍有盲区 | `mitigated` | `node bin/agent-web.mjs breed cases/coffee --adapter=memory` |
 | L6 | 等价变异体问题没有解决 | `by-design` | `node bin/agent-web.mjs certify cases/coffee --adapter=memory` |
 | L7 | 断言表达能力仍有缺口 | `mitigated` | `node scripts/kind-necessity.mjs` |
@@ -71,14 +71,21 @@ README 的「边界：已实现与仍未解决」是这份清单的摘要。**�
 
 ## L4 负例得人来补
 
-`status: open`
+`status: mitigated`
 
-`draft` 会把该写负例的地方列成待办，但标准是「应该允许什么」，照实际抄等于放水——
-所以它不自动写。可作为候选输入的四类是：越权、非法状态迁移、缺参/非法值、重复提交；
-目前还没有通用负例生成器。未来若从声明自动派生候选，判据应来自**声明**（必填缺失→4xx、枚举越界→4xx、无 token→401），不是来自「上次实际返回了什么」，并且生成物必须标为待审核。
+`negatives` 按清单的**声明**派生候选，不读观测：必填参数缺失、角色越权、类型不符、
+主键指向不存在实体、重复提交。每条候选带 `basis`（哪条声明支持它）、`confidence`
+和 `review`（人要想清楚的问题），全部 `status: disputed`，只写
+`.agent-web/negatives/` 下的审阅表，**从不写进案例目录，也从不进判决**。
+
+分得清的是「声明能推出来的」和「只有业务能定的」：重复提交幂等与否声明里没有，
+所以它只给 `applied` / `rejected` 两个假设，不自带期望。
+
+仍不解决的是：非法状态迁移需要状态机声明（当前清单没有这一项），
+以及候选转正之后仍然要人署名 `accept`。
 
 每条负例还要配一条 `window` 断言「被拒之后不许留下半条记录」，否则负例只证明了「被拒」，
-没证明「没副作用」。
+没证明「没副作用」。验收：`node bin/agent-web.mjs negatives cases/coffee --adapter=memory`。
 
 ## L5 变异体仍有盲区
 

@@ -6,6 +6,23 @@
 CI 也在查。这条规则是买来的：这个仓库曾经同时存在 `package.json` 0.16、README 0.9、
 Gitee Release v0.6.0 三个数，谁看都是三个项目。
 
+## 0.44.0
+
+负例不再只留一句「得人来补」：`negatives` 从声明派生候选，但不替你决定期望。
+
+- 新增 `agent-web negatives <案例或目录> --adapter=SPEC`：按清单声明派生五类候选——
+  必填参数缺失、角色越权、类型不符、主键指向不存在实体、重复提交。
+- 每条候选带 `basis`（哪条声明支持它）、`confidence`、`review`（人要想清楚的问题），
+  全部 `status: disputed`；只写 `.agent-web/negatives/` 下的 JSON + Markdown 审阅表，
+  **从不写进案例目录，也从不进判决**。
+- 重复提交只给 `applied` / `rejected` 两个假设，不自带期望：幂等与否声明里没有，
+  这一条只能由业务决定。
+- 派生轨迹的最后一步会被改写成 `expected_outcome: rejected`，避免出现「审阅表说该拒绝、
+  轨迹却写着该成功」的自相矛盾；`test/negatives.test.mjs` 有守卫。
+- `docs/LIMITS.md` 的 L4 从 `open` 改为 `mitigated`；文档同时写明仍未解决的部分：
+  非法状态迁移需要状态机声明，候选转正仍要人署名 `accept`。
+- 顺手修掉 `docs/GUIDE.md` 里写死的旧版本号与缺失的 `align` 命令条目。
+
 ## 0.43.0
 
 `witness` 现在看每一步，不只看终态——「中途坏、结尾修好」这一类终于能被看见。

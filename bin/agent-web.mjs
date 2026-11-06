@@ -53,6 +53,7 @@ import { probeAdapter, formatProbe, probeExit } from '../src/probe.mjs';
 import { discover, formatDiscover } from '../src/discover.mjs';
 import { startTap } from '../src/tap.mjs';
 import { readTraffic, learnTraffic, writeLearnOut } from '../src/learn.mjs';
+import { deriveNegatives, renderNegativeSheet, formatNegativeSummary, writeNegatives } from '../src/negatives.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..');
@@ -430,6 +431,55 @@ async function cmdAlign(args, flags) {
     requireAll: flags['require-all'] === true,
     maxUnresolved: flags['max-unresolved'] !== undefined ? Number(flags['max-unresolved']) : null,
   });
+}
+
+
+async function cmdNegatives(args, flags) {
+  if (args.length === 0) {
+    console.error('用法：agent-web negatives <目录或文件> [--adapter=memory] [--out=DIR] [--max=N] [--json] [--detail]');
+    console.error('  从清单的**声明**派生负例候选（必填缺失 / 角色越权 / 类型不符 / 不存在实体 / 重复提交）。');
+    console.error('  全部标 disputed，只写审阅表，不写进案例目录，也不进判决。');
+    return 2;
+  }
+  const adapterName = flags.adapter ?? 'memory';
+  const adapter = await makeAdapter(adapterName);
+  const manifest = await adapter.manifest();
+  const files = collectCaseFiles(args[0]);
+  const max = flags.max !== undefined ? Number(flags.max) : 40;
+
+  const results = [];
+  for (const f of files) {
+    const raw = JSON.parse(fs.readFileSync(f, 'utf8'));
+    const errors = validateCase(raw);
+    if (errors.length > 0) {
+      console.error(`${path.relative(process.cwd(), f)} 不是合法案例，跳过：${errors[0]}`);
+      continue;
+    }
+    results.push({
+      case_id: raw.id,
+      source: path.relative(process.cwd(), f),
+      candidates: deriveNegatives({ case: raw, manifest, max }),
+    });
+  }
+
+  const outDir = flags.out ?? path.join('.agent-web', 'negatives');
+  const written = writeNegatives(outDir, results);
+
+  if (flags.json) {
+    console.log(JSON.stringify({ dir: written.dir, results }, null, 2));
+  } else {
+    console.log(formatNegativeSummary(results));
+    if (flags.detail) {
+      for (const r of results) {
+        console.log('');
+        console.log(renderNegativeSheet(r.case_id, r.candidates));
+      }
+    }
+    console.log('');
+    console.log(`审阅表写到 ${path.relative(process.cwd(), written.dir)}/（${written.files.length} 个文件）`);
+    console.log('这些候选不进判决。确认之后改写成案例，再 agent-web accept 署名。');
+  }
+  return 0;
 }
 
 
@@ -1706,6 +1756,7 @@ const HELP = `agent-web —— 给 Agent 写机器可判的集成测试
   agent-web learn <traffic.jsonl> --out=DIR  把录制学成四件东西（yaml/孪生/案例/认不出的）
   agent-web mutants                           变异体目录：谁的坏法、怎么抓、怎么投稿
   agent-web align <参照视图> <目标视图> [--out=align.yml]  跨命名体系的字段映射提议
+  agent-web negatives <案例或目录> --adapter=SPEC  按声明派生负例候选（全部 disputed，只出审阅表）
   agent-web audit <真实.jsonl> <候选.jsonl>    假绿审计：拿真实后端当尺子量候选实现
   agent-web traps <结果.jsonl> --cases=DIR    陷阱普查：这批判决有多少是盲的
   agent-web knowledge                         事故档案：这个仓库踩过的 ${ENTRIES.length} 个坑
@@ -1770,6 +1821,8 @@ async function main() {
         return await cmdBreed(args, flags);
       case 'align':
         return await cmdAlign(args, flags);
+      case 'negatives':
+        return await cmdNegatives(args, flags);
       case 'mutants':
         return cmdMutants(args, flags);
       case 'drill':

@@ -1,4 +1,4 @@
-# agent-web v0.43.0
+# agent-web v0.44.0
 
 <p align="center">
   <img src="docs/media/hero.png" alt="agent-web: integration tests an agent can be judged on" width="100%">
@@ -18,7 +18,7 @@
 </p>
 
 <p align="center">
-  <b>v0.43.0</b> · 17 assertion kinds · 28 commands · 36 mutants
+  <b>v0.44.0</b> · 17 assertion kinds · 29 commands · 36 mutants
 </p>
 
 <p align="center">
@@ -376,13 +376,14 @@ Two layers. These capabilities already have code and tests and should not be cou
 - `align` proposes evidence-backed cross-schema mappings; low-confidence matches require human acceptance.
 - `window` / `every_step` / `pagination` / `linkage` cover temporal windows, per-step state, paging and cross-entity relations.
 - `drill grade --record` / `drill stats` provide a ledger, Wilson 95% intervals and empirical ordering; an item needs at least five attempts before it gets a difficulty band.
+- `negatives` derives candidate negative cases from the manifest's declarations (missing required args, role violations, wrong types, absent entities, duplicate submits); everything stays `disputed` and only a review sheet is produced.
 
 The remaining boundaries are numbered to match L1–L11 in [docs/LIMITS.md](docs/LIMITS.md):
 
 1. **Write semantics still need a human (L1).** `tap` records what the app did, but cannot infer that "insufficient stock must be rejected"; a domain owner must approve the rule.
 2. **Field mappings still need review (L2).** `align` proposes mappings; nested-array leaves and same-name/different-meaning fields across collections remain unresolved.
 3. **No universal flow-quality score (L3).** Define domain goals, metrics and weights first; keep quality scoring separate from legality verdicts.
-4. **Negative expectations still need approval (L4).** Boundary requests can be generated as candidates, but observed responses alone cannot determine what should be accepted or rejected.
+4. **Negative expectations still need a human signature (L4).** `negatives` derives candidates from declarations with a stated basis, but whether a request *should* be rejected remains a business decision; candidates never enter verdicts.
 5. **Mutant coverage is incomplete (L5).** `breed` mainly generates view-shape faults; execution- and business-layer mutants still need domain-specific examples and distinguishability evidence.
 6. **Arbitrary mutant equivalence is undecidable in general (L6).** Finite-state or bounded scenarios can be proved or exhaustively checked; otherwise report "not distinguished within budget," never "equivalent."
 7. **Real-time semantics are still missing (L7).** Step windows, per-step checks, pagination and linkage exist; "ship within 24 hours after payment" needs explicit timestamps, clock and timezone semantics.

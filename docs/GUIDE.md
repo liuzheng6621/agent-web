@@ -2,7 +2,7 @@
 
 README 只放入门和目录。这一份是完整说明：每条命令的细节、判决顺序表怎么来的、遇到过的坑怎么修的、以及为什么有些看起来该做的东西没有做。
 
-内容与 v0.29.2 的 README 一致，后续新增能力会先补 README 的短说明，再补到这里。
+内容与当前 README 一致，后续新增能力会先补 README 的短说明，再补到这里。
 
 ---
 
@@ -978,7 +978,7 @@ git config --local http.https://github.com.proxy http://127.0.0.1:8899
 
 ## 版本与后续
 
-当前版本 `0.29.2`（`package.json` 里的数字就是它，`CHANGELOG.md` 第一条必须与它一致，测试和 CI 都在查）。能力清单：
+当前版本 `0.43.0`（`package.json` 里的数字就是它，`CHANGELOG.md` 第一条必须与它一致，测试和 CI 都在查）。能力清单：
 
 | 命令 | 一句话 |
 | --- | --- |
@@ -994,6 +994,8 @@ git config --local http.https://github.com.proxy http://127.0.0.1:8899
 | `drill` | 把变异体变成题，机器批改提交的断言 |
 | `probe` | 探针：查适配器有没有在基本行为上撒谎 |
 | `record` / `prepare` / `draft` | 从请求日志还原可重放步骤，生成待确认草稿 |
+| `negatives` | 按清单的声明派生负例候选，全部标 disputed，只出审阅表 |
+| `align` | 两套命名体系之间提映射建议，低置信度留给人签 |
 | `accept` | 草稿转正，必须署名 |
 | `drift` | 两次跑批的初态形状变了没有 |
 | `knowledge` / `recall` | 事故档案；这次有没有重犯旧错 |
