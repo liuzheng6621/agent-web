@@ -1,4 +1,4 @@
-# agent-web v0.52.2
+# agent-web v0.53.0
 
 <p align="center">
   <img src="docs/media/hero.png" alt="agent-web：给 Agent 写机器可判的集成测试" width="100%">
@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <b>当前版本 0.52.2</b> · 19 种断言 · 30 条命令 · 56 个变异体
+  <b>当前版本 0.53.0</b> · 19 种断言 · 30 条命令 · 56 个变异体
 </p>
 
 <p align="center">
@@ -443,6 +443,7 @@ node bin/agent-web.mjs verify cases/realworld --adapter=realworld --detail
 - [docs/ADAPTER-GUIDE.md](docs/ADAPTER-GUIDE.md) —— 接自己的应用：三档路径、只改四处、验收顺序
 - [CHANGELOG.md](CHANGELOG.md) —— 每个版本做了什么、因为什么
 - [docs/LIMITS.md](docs/LIMITS.md) —— 11 条限制的台账：状态、验收命令、为什么这条不解决
+- [docs/ROADMAP.md](docs/ROADMAP.md) —— 接下来做什么、按什么顺序、每条怎么验收
 - [docs/mutants/](docs/mutants/README.md) —— 变异体目录与投稿标准
 - [knowledge/](knowledge/README.md) —— 事故档案与入库宪法
 - [docs/media/](docs/media/) —— 本页面所有图、动图与介绍片，全部本地生成

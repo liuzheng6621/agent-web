@@ -1,4 +1,4 @@
-# agent-web v0.52.2
+# agent-web v0.53.0
 
 <p align="center">
   <img src="docs/media/hero.png" alt="agent-web: integration tests an agent can be judged on" width="100%">
@@ -18,7 +18,7 @@
 </p>
 
 <p align="center">
-  <b>v0.52.2</b> · 19 assertion kinds · 30 commands · 56 mutants
+  <b>v0.53.0</b> · 19 assertion kinds · 30 commands · 56 mutants
 </p>
 
 <p align="center">
@@ -406,6 +406,7 @@ The remaining boundaries are numbered to match L1–L11 in [docs/LIMITS.md](docs
 - [docs/ADAPTER-GUIDE.md](docs/ADAPTER-GUIDE.md) — Connect your own app: three-tier paths, change only four places, verification order
 - [CHANGELOG.md](CHANGELOG.md) — What each version did and why
 - [docs/LIMITS.md](docs/LIMITS.md) — Ledger of the 11 limits: status, acceptance command, why it stays
+- [docs/ROADMAP.md](docs/ROADMAP.md) — What comes next, in what order, and how each item is verified
 - [docs/mutants/](docs/mutants/README.md) — Mutant directory and submission standards
 - [knowledge/](knowledge/README.md) — Incident archive and admission constitution
 - [docs/media/](docs/media/) — All images, animations and the introduction video on this page, all generated locally
