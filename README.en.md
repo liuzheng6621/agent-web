@@ -368,21 +368,24 @@ Keep the status scopes separate: importer unit tests are **15/15**. The checked-
 
 For compatibility with a real implementation, point `REALWORLD_BASE_URL` at that service (see `examples/realworld/README.md`).
 
-## What it does not do
+## What is implemented, and what remains open
 
-Ordered by proximity to real use.
+Several items in the older limitation list have since been implemented:
 
-1. **Write-operation semantics still need a human.** `tap` can record "what the app agreed to", so writes do not need to be hand-coded from scratch; but rules like "insufficient stock should reject" cannot be recorded — a human must add the assertion.
-2. **Field mapping is manual.** Cross-naming-system automatic mapping (`align`) is not built yet; the canonical view mapping is intentionally in the adapter.
-3. **Legality, not quality.** Step count, repeated reads, detour count can be tallied, but "was the flow good" requires scoring — that is a different thing.
-4. **Negative cases need a human.** `draft` lists where negatives are missing as todos; the standard for negatives is "what should be allowed", so copying what actually happened admits everything.
-5. **Mutants still have blind spots.** `breed` only generates observation-shape faults; execution-layer and business-layer faults still rely on contributions.
-6. **Equivalent mutant problem unsolved.** Just made explicit: unkillable but difference producible -> owed; cannot even produce a difference -> undetermined, proof required.
-7. **Assertion vocabulary still has gaps.** Pagination, cross-step slice invariants (the one the bookkeeping domain exposed) cannot be expressed.
-8. **An adapter can lie.** `probe` checks six mechanical properties; loading an adapter executes code with your privileges, the CLI warns once.
-9. **Concurrency was withdrawn.** It was tried: serial 77s -> 6-way 8s, but the same mutant moved from "caught by assertion 4" to "verdict-level x3" — the answer drifts. An evaluator that is 9x faster but sometimes answers differently is worse than the slow one. The code was reverted; there is no `--jobs` (`k04-parallel-verdict-drift`).
-10. **Difficulty labels are statistics only.** Drill-measured pass rates are not wired in yet.
-11. **Validated in three domains only.** A new domain will likely expose new gaps — that is exactly the point of the next domain.
+- **Cross-schema mapping via `align`.** It proposes mappings from names, types, sample values and cardinality with supporting evidence. Low-confidence matches remain `unresolved` for human review; the tool does not silently rewrite an adapter.
+- **Window, per-step, pagination and cross-entity assertions.** `window` / `every_step` inspect an interval or each state transition; `pagination` checks results across pages; `linkage` checks entity references and cardinality across collections.
+- **Empirical drill statistics.** `drill grade --record` stores grading outcomes, `drill stats` reports solve rates with Wilson 95% intervals, and `--order=empirical` ranks items from recorded results. Difficulty bands require at least five attempts; insufficient samples stay explicitly unclassified.
+
+### Remaining limits
+
+1. **Business semantics need a human.** `tap` records what the application did, but cannot infer that "insufficient stock must be rejected". It can generate candidate negatives; a business owner must approve the rule.
+2. **Quality needs an explicit objective.** Legality, latency, step count and repeated requests can be measured. There is no universal definition or weighting for "a good flow" across domains.
+3. **Negative expectations need review.** Candidate boundary requests can be generated, but observation alone cannot decide which requests should be accepted or rejected.
+4. **Mutant coverage is incomplete.** `breed` generates view-shape faults; execution- and business-layer mutants still need domain-specific contributions and validation.
+5. **Equivalent mutants cannot be decided in general.** The evaluator distinguishes visible-but-uncaught faults from cases where no difference can be observed; it cannot solve equivalence for arbitrary black-box programs.
+6. **Adapters remain trusted code.** `probe` checks a limited set of mechanical properties, not honesty or security. Loading an external adapter executes code with the user's privileges; runtime isolation must be provided by the deployment environment.
+7. **Parallel execution remains disabled.** A previous attempt produced verdict drift when execution order changed. Re-enabling it requires isolated state and deterministic evidence, not just a speed-up.
+8. **Real-backend validation is limited to three domains.** More independent domains are needed to test portability and expose new gaps.
 
 ## Docs
 
