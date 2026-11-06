@@ -75,6 +75,14 @@
         },
         "path": "price",
         "value": 22
+      },
+      {
+        "kind": "unique",
+        "selector": {
+          "collection": "menu"
+        },
+        "path": "dishName",
+        "note": "菜名唯一：复制首条会让它重复"
       }
     ]
   },

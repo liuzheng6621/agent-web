@@ -107,6 +107,59 @@
         ],
         "note": "流水只许走这四条边：多一条往回走的边必须判假",
         "walk": "rows"
+      },
+      {
+        "kind": "field_equals",
+        "selector": {
+          "collection": "status_log",
+          "index": 1
+        },
+        "path": "type",
+        "value": "order.making"
+      },
+      {
+        "kind": "field_equals",
+        "selector": {
+          "collection": "status_log",
+          "index": 2
+        },
+        "path": "type",
+        "value": "order.ready"
+      },
+      {
+        "kind": "field_equals",
+        "selector": {
+          "collection": "status_log",
+          "index": 3
+        },
+        "path": "type",
+        "value": "order.picked"
+      },
+      {
+        "kind": "field_equals",
+        "selector": {
+          "collection": "status_log",
+          "index": 1
+        },
+        "path": "from",
+        "value": "PENDING"
+      },
+      {
+        "kind": "linkage",
+        "from": {
+          "collection": "status_log"
+        },
+        "to": {
+          "collection": "orders",
+          "on": {
+            "from_field": "orderId",
+            "to_field": "id"
+          }
+        },
+        "expect": {
+          "op": "exists"
+        },
+        "note": "反向：流水行不许指向不存在的订单。不给 expect.op 时默认比整行对象，必然不等 —— 必须写 op:exists"
       }
     ],
     "invariants": [

@@ -37,17 +37,26 @@ const NUMBER_OPS = [
   { name: 'off-by-one', symptom: '数字差一', mechanism: '把这个数值加 1', apply: 'v + 1', rewrites: '差一' },
   { name: 'double', symptom: '数字翻倍', mechanism: '把这个数值乘 2', apply: 'v * 2', rewrites: '翻倍' },
   { name: 'cent', symptom: '金额丢分', mechanism: '把这个数值除以 100 四舍五入', apply: 'Math.round(v) / 100', rewrites: '丢两位', noop: (v) => Math.round(v) / 100 === v },
+  // 归零是最常见的「静默失败」：金额算错成 0、数量算错成 0，界面看起来还挺正常。
+  { name: 'zero', symptom: '数字变成 0', mechanism: '把这个数值置为 0', apply: '0', rewrites: '归零', noop: (v) => v === 0 },
 ];
 
 const STRING_OPS = [
   { name: 'prefix', symptom: '文本被加前缀', mechanism: '在这个字符串前加 zz_', apply: "'zz_' + v", rewrites: '加前缀' },
   { name: 'upper', symptom: '文本大小写被改', mechanism: '把这个字符串转成大写', apply: 'String(v).toUpperCase()', rewrites: '转大写', noop: (v) => String(v).toUpperCase() === String(v) },
   { name: 'blank', symptom: '文本被清空', mechanism: '把这个字符串置为空串', apply: "''", rewrites: '置空', noop: (v) => v === '' },
+  { name: 'lower', symptom: '文本被转成小写', mechanism: '把这个字符串转成小写', apply: 'String(v).toLowerCase()', rewrites: '转小写', noop: (v) => String(v).toLowerCase() === String(v) },
+  { name: 'truncate', symptom: '文本被截掉末尾', mechanism: '去掉最后一个字符', apply: 'String(v).slice(0, -1)', rewrites: '截尾', noop: (v) => String(v).length < 2 },
 ];
 
 const COLLECTION_OPS = [
   { name: 'drop-last', symptom: '最后一条凭空消失', mechanism: '返回前把这个集合的最后一个元素删掉', rewrites: '丢尾' },
   { name: 'reverse', symptom: '顺序被颠倒', mechanism: '返回前把这个集合逆序', rewrites: '逆序' },
+  // 以下三条只在「集合本来就按某个键有序」时有意义；无序集合上它们是等价变异体，
+  // 会被 certify 判 undetermined —— 那不是缺陷，是这条形状还不值得断言。
+  { name: 'drop-first', symptom: '第一条凭空消失', mechanism: '返回前把这个集合的第一个元素删掉', rewrites: '丢头' },
+  { name: 'duplicate-first', symptom: '第一条被复制一份', mechanism: '返回前把第一个元素再 push 一遍', rewrites: '复制首条' },
+  { name: 'null-fields', symptom: '字段全变 null', mechanism: '返回前把每个元素的每个字段置 null', rewrites: '全 null' },
 ];
 
 const slug = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -150,6 +159,23 @@ const clone = (v) =>
   typeof structuredClone === 'function' ? structuredClone(v) : JSON.parse(JSON.stringify(v));
 `;
 
+/* 这两个定义被 renderMutant 用到，必须留在模块顶层；写进函数体内会踩 TDZ。 */
+const COLLECTION_AFTER = {
+  'drop-last': '少 1 条',
+  'drop-first': '少 1 条（丢头）',
+  reverse: '顺序颠倒',
+  'duplicate-first': '多 1 条（首条重复）',
+  'null-fields': '每个字段都是 null',
+};
+
+/** 把算子表达式在给定值上求值。表达式只用到 v / Math / String，来源是我们自己的算子表。 */
+function applyOp(apply, v) {
+  // eslint-disable-next-line no-new-func
+  const fn = new Function('v', `return (${apply});`);
+  return fn(v);
+}
+
+
 /** 一条变异体的源码。自包含：不 import 任何东西，拷到哪都能跑。 */
 export function renderMutant(item) {
   const { id, op, target } = item;
@@ -157,13 +183,10 @@ export function renderMutant(item) {
     ? target.collection + '[' + target.index + '].' + target.path
     : target.collection;
   const before = target.kind === 'collection' ? '共 ' + target.length + ' 条' : JSON.stringify(target.value);
+  // 用 op.apply 真的算一遍，别手写分支：算子一多，手写分支必然漏（归零就漏成了原值）。
   const after = target.kind === 'collection'
-    ? (op.name === 'drop-last' ? '少 1 条' : '顺序颠倒')
-    : (op.name === 'blank' ? '""' : op.name === 'off-by-one' ? String(Number(target.value) + 1)
-      : op.name === 'double' ? String(Number(target.value) * 2)
-        : op.name === 'cent' ? String(Math.round(Number(target.value)) / 100)
-          : op.name === 'prefix' ? JSON.stringify('zz_' + target.value)
-            : JSON.stringify(String(target.value).toUpperCase()));
+    ? (COLLECTION_AFTER[op.name] ?? '集合被改')
+    : JSON.stringify(applyOp(op.apply, target.value));
 
   const catchHint = target.kind === 'collection'
     ? (op.name === 'drop-last'
@@ -171,14 +194,28 @@ export function renderMutant(item) {
       : '一条 sorted 断言，或 count_delta 加首元素 field_equals；只断言数量抓不到')
     : '一条 field_equals 断言 ' + where + '；只断言状态或数量抓不到';
 
-  const body = target.kind === 'collection'
-    ? (op.name === 'drop-last'
-      ? `      const arr = state[${JSON.stringify(target.collection)}];
+  const COLLECTION_BODY = {
+    'drop-last': `      const arr = state[${JSON.stringify(target.collection)}];
       if (!Array.isArray(arr) || arr.length === 0) return res;
-      arr.pop();`
-      : `      const arr = state[${JSON.stringify(target.collection)}];
+      arr.pop();`,
+    reverse: `      const arr = state[${JSON.stringify(target.collection)}];
       if (!Array.isArray(arr) || arr.length < 2) return res;
-      arr.reverse();`)
+      arr.reverse();`,
+    'drop-first': `      const arr = state[${JSON.stringify(target.collection)}];
+      if (!Array.isArray(arr) || arr.length === 0) return res;
+      arr.shift();`,
+    'duplicate-first': `      const arr = state[${JSON.stringify(target.collection)}];
+      if (!Array.isArray(arr) || arr.length === 0) return res;
+      arr.push(clone(arr[0]));`,
+    'null-fields': `      const arr = state[${JSON.stringify(target.collection)}];
+      if (!Array.isArray(arr)) return res;
+      for (const row of arr) {
+        if (!row || typeof row !== 'object') continue;
+        for (const k of Object.keys(row)) row[k] = null;
+      }`,
+  };
+  const body = target.kind === 'collection'
+    ? (COLLECTION_BODY[op.name] ?? '      // 未知算子')
     : `      const entity = (state[${JSON.stringify(target.collection)}] ?? [])[${target.index}];
       if (!entity) return res;
       const current = getPath(entity, ${JSON.stringify(target.path)});

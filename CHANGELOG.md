@@ -6,6 +6,22 @@
 CI 也在查。这条规则是买来的：这个仓库曾经同时存在 `package.json` 0.16、README 0.9、
 Gitee Release v0.6.0 三个数，谁看都是三个项目。
 
+## 0.52.0
+
+P5 变异体扩容：算子表从 8 个扩到 13 个，采纳 9 个生成的变异体进正式目录（47 → **56**）。
+
+- **算子表扩**：数值补 `zero`（归零——最常见的静默失败：金额算错成 0、数量算错成 0，界面看着还挺正常）；字符串补 `lower`（转小写）、`truncate`（截尾）；集合级补 `drop-first`（丢头）、`duplicate-first`（复制首条）、`null-fields`（字段全 null）。
+- **修掉生成器里两处会造废件的地方**：
+  1. `symptom` 文案手写分支，算子一多必然漏——`zero` 就漏成了「从 122 变成 122」。改成用 `op.apply` 真的算一遍（`new Function('v', ...)`，表达式只来自我们自己的算子表）。
+  2. 集合级算子的 `body` 是三元表达式，新算子会落到 `reverse` 分支上。改成 `COLLECTION_BODY` 表驱动。
+- **踩到 TDZ**：`COLLECTION_AFTER` 写进 `renderMutant` 函数体内，被同函数体前面的语句引用 → `Cannot access 'COLLECTION_AFTER' before initialization`。移到模块顶层。
+- **采纳 9 个**（其余生成物留在 `.tmp-b8` 不入库）：`zero-orders-0-totalamount`、`zero-orders-0-items-0-count`、`truncate-orders-0-status`、`lower-orders-0-status`、`null-fields-menu`、`duplicate-first-menu`、`drop-first-menu`、`blank-status-log-0-type`、`truncate-status-log-0-type`。
+- **补三条断言才抓住它们**（这也说明生成器在起作用）：
+  - `happy-path` 加反向 `linkage`（`status_log.orderId → orders.id`，`expect.op:"exists"`）+ 中间行 `field_equals`（第 1/2/3 行的 `type`、第 1 行的 `from`）→ 抓 `status-log` 里 12 个生成变异体。**注意**：`linkage` 不给 `expect.op` 时默认比整行对象，必然不等，必须写 `op:"exists"`。
+  - `readonly-menu` 加 `unique{dishName}` → 抓 `duplicate-first-menu`、`null-fields-menu`。
+  - **撤掉我写错的一条**：先前给 `readonly-menu` 加了 `sorted_by{path:"id"}`，但 menu 的 id 是字符串 slug（`latte/americano/signature`），本来就不按字典序排，正确实现直接判 fail。**断言写错比不写更糟**。
+- 正式目录实测：56 个变异体 / 适用 41 / 抓到 **39（95.1%）**，欠账仍是 `m-pickup-no-offset` 与 `m-unsorted-orders`（两条都有等价性理由写在基线表里）。
+
 ## 0.51.0
 
 第 19 种断言 `state_machine`：不是「走过哪些态」，而是「**只许走这些边**」。

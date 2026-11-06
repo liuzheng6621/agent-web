@@ -52,6 +52,15 @@ import * as lexiconCategoryOutOfEnum from './m-lexicon-category-out-of-enum.mjs'
 import * as lexiconSegmentTruncate from './m-lexicon-segment-truncate.mjs';
 import * as lexiconLookupEmptyObject from './m-lexicon-lookup-empty-object.mjs';
 import * as lexiconSegmentEcho from './m-lexicon-segment-echo.mjs';
+import * as zeroTotal from './m-breed-zero-orders-0-totalamount.mjs';
+import * as zeroItemCount from './m-breed-zero-orders-0-items-0-count.mjs';
+import * as truncateStatus from './m-breed-truncate-orders-0-status.mjs';
+import * as lowerStatus from './m-breed-lower-orders-0-status.mjs';
+import * as nullMenu from './m-breed-null-fields-menu.mjs';
+import * as dupFirstMenu from './m-breed-duplicate-first-menu.mjs';
+import * as dropFirstMenu from './m-breed-drop-first-menu.mjs';
+import * as blankLogType from './m-breed-blank-status-log-0-type.mjs';
+import * as truncateLogType from './m-breed-truncate-status-log-0-type.mjs';
 
 const ENTRIES = [
   ['m-money-off-by-cent', moneyOffByCent],
@@ -102,6 +111,16 @@ const ENTRIES = [
   ['m-lexicon-segment-truncate', lexiconSegmentTruncate],
   ['m-lexicon-lookup-empty-object', lexiconLookupEmptyObject],
   ['m-lexicon-segment-echo', lexiconSegmentEcho],
+  ['m-breed-zero-orders-0-totalamount', zeroTotal],
+  ['m-breed-zero-orders-0-items-0-count', zeroItemCount],
+  ['m-breed-truncate-orders-0-status', truncateStatus],
+  ['m-breed-lower-orders-0-status', lowerStatus],
+  ['m-breed-null-fields-menu', nullMenu],
+  ['m-breed-duplicate-first-menu', dupFirstMenu],
+  ['m-breed-drop-first-menu', dropFirstMenu],
+  ['m-breed-blank-status-log-0-type', blankLogType],
+  ['m-breed-truncate-status-log-0-type', truncateLogType],
+
 ];
 
 const LAYERS = new Set(['state', 'execute']);
