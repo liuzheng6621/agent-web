@@ -20,3 +20,4 @@ agent-web-output/
 .tmp-frames/
 agent-web-site/
 .tmp-out/
+.ci-clone/
