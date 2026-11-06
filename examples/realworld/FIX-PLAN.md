@@ -1,5 +1,9 @@
 # RealWorld 十条红的修复计划（交给外部实现者的施工单）
 
+> **状态：已完成（v0.46.0，commit `d001436`）。** 十条全部修完，`verify cases/realworld --adapter=realworld`
+> 现在 **13/13 pass**，并已进 CI。这份文件保留为记录：它写清了当时每一条红的层级归属和
+> 反向验证要求，后来动手时正是按这个顺序做的。若要再交给别人，请从「现状」重新跑一遍再改。
+
 > 目标：`agent-web verify cases/realworld --adapter=realworld` 从 **pass 3 / fail 9 / unknown 1**
 > 变成 **13/13 pass**，且**不许**通过改 `cases/realworld/*.json` 或 `expected.json` 来变绿。
 
