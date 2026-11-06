@@ -292,8 +292,11 @@ reported as needing a human signature. A wrong mapping makes a case pass on a fi
 | Coffee shop ordering | Built-in memory + real Spring Boot backend | Same cases against two implementations, 100% verdict agreement; false passes caught |
 | Animal rescue tasks | Real backend + memory fixture | When correctness is entirely invariants (points, approvals, roles), is the assertion vocabulary sufficient |
 | Double-entry bookkeeping | Two custom implementations (integer cents vs two-decimal strings) | Internal representations completely different, views byte-identical; debit-credit balance invariants expressible |
+| Lexicon search `cases/lexicon` | Two custom implementations (trie + greedy segmentation / sorted array + reverse DP) | 900 rows, 10 per page, three pages: cross-page duplicates, boundary drops and lying `total` only show up at this scale — [details](docs/domains/lexicon.md) |
 
 The third domain forced a mechanism: mutants can declare `applies_to`. A ledger-domain mutant in the coffee domain is "not applicable", not counted — otherwise the catch rate gets smashed by irrelevant mutants into a false pit.
+
+The fourth domain (lexicon) adds a **data-scale** dimension: the first three domains only ever ran pagination assertions over single-digit result sets, where a lying `total` or a dropped boundary row looks green. It also exposed a blind spot in the `pagination` assertion itself — it summed page sizes and never read the `total` the implementation reported, so "30 rows reported as 900" passed as long as every page was full.
 
 ## Commands
 

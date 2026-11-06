@@ -146,3 +146,53 @@ test('限制清单：注释里提到并发开关不算「提供」，字符串�
   assert.equal(offersJobsFlag('const a = "--jobs";'), true);
   assert.equal(offersJobsFlag("const url = 'https://x/y'; // --jobs 只在这里提过"), false);
 });
+
+// 域表格的标题写着「在 N 个域上验过」，N 是手写的数字，表格是手写的行 —— 两处会漂。
+// 实测漂过一次：加词库域时把标题改成「four domains」，表格却还是三行，
+// 读者看到「四个域」下面只有三条，第一反应是这份文档不可信。
+// 守卫要求：标题里的数字 == 表格数据行数 == 中英一致。
+const NUM_ZH = { 一: 1, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9, 十: 10 };
+const NUM_EN = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 };
+
+/** 取某章节下的表格数据行（去掉表头与分隔行）。 */
+function tableRows(text, headingRe) {
+  const m = text.match(headingRe);
+  if (!m) return null;
+  const after = text.slice(m.index + m[0].length);
+  const stop = after.search(/\n## /);
+  const block = stop >= 0 ? after.slice(0, stop) : after;
+  return block.split('\n').filter((l) => l.startsWith('| ') && !/^\|\s*-/.test(l)).slice(1);
+}
+
+test('域表格：标题里的域数、表格行数、中英两版必须三者一致', () => {
+  const zh = read('README.md');
+  const en = read('README.en.md');
+
+  const zhHead = zh.match(/^## 在(.)个域上验过$/m);
+  assert.ok(zhHead, '中文 README 找不到「## 在N个域上验过」章节');
+  const zhWant = NUM_ZH[zhHead[1]];
+  assert.ok(zhWant, `中文标题里的数字认不出来：${zhHead[1]}`);
+
+  const enHead = en.match(/^## Validated across (\w+) domains?$/m);
+  assert.ok(enHead, '英文 README 找不到「## Validated across N domains」章节');
+  const enWant = NUM_EN[enHead[1].toLowerCase()];
+  assert.ok(enWant, `英文标题里的数字认不出来：${enHead[1]}`);
+
+  const zhRows = tableRows(zh, /^## 在.个域上验过$/m);
+  const enRows = tableRows(en, /^## Validated across \w+ domains?$/m);
+  assert.ok(zhRows && zhRows.length > 0, '中文域表格没有数据行');
+  assert.ok(enRows && enRows.length > 0, '英文域表格没有数据行');
+
+  assert.equal(zhRows.length, zhWant, `中文标题写「${zhHead[1]}个域」，表格只有 ${zhRows.length} 行`);
+  assert.equal(enRows.length, enWant, `英文标题写「${enHead[1]} domains」，表格只有 ${enRows.length} 行`);
+  assert.equal(zhRows.length, enRows.length,
+    `中英域表格行数不同：中文 ${zhRows.length} 行、英文 ${enRows.length} 行 —— 加域时两版都要加`);
+
+  // 每个域在中文表里都该指向一份 docs/domains/*.md 或者给出可跑的命令；
+  // 这一条不强制（前两个域没有独立文档），但要求表格里的域不是空的。
+  for (const row of zhRows) {
+    const cells = row.split('|').map((c) => c.trim()).filter(Boolean);
+    assert.equal(cells.length, 3, `域表格这行不是三列：${row}`);
+    assert.ok(cells[0].length > 0 && cells[2].length > 0, `域表格这行有空单元：${row}`);
+  }
+});
