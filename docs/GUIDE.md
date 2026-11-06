@@ -995,6 +995,7 @@ git config --local http.https://github.com.proxy http://127.0.0.1:8899
 | `probe` | 探针：查适配器有没有在基本行为上撒谎 |
 | `record` / `prepare` / `draft` | 从请求日志还原可重放步骤，生成待确认草稿 |
 | `negatives` | 按清单的声明派生负例候选，全部标 disputed，只出审阅表 |
+| `preflight` | 跑之前对账：拿声明预测 ready / unknown / fail，与 expected.json 比 |
 | `align` | 两套命名体系之间提映射建议，低置信度留给人签 |
 | `accept` | 草稿转正，必须署名 |
 | `drift` | 两次跑批的初态形状变了没有 |

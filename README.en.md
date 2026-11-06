@@ -18,7 +18,7 @@
 </p>
 
 <p align="center">
-  <b>v0.44.0</b> · 17 assertion kinds · 29 commands · 36 mutants
+  <b>v0.44.0</b> · 17 assertion kinds · 30 commands · 36 mutants
 </p>
 
 <p align="center">

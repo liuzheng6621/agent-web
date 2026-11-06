@@ -54,6 +54,7 @@ import { discover, formatDiscover } from '../src/discover.mjs';
 import { startTap } from '../src/tap.mjs';
 import { readTraffic, learnTraffic, writeLearnOut } from '../src/learn.mjs';
 import { deriveNegatives, renderNegativeSheet, formatNegativeSummary, writeNegatives } from '../src/negatives.mjs';
+import { preflightAll, formatPreflight, preflightExit } from '../src/preflight.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..');
@@ -480,6 +481,40 @@ async function cmdNegatives(args, flags) {
     console.log('这些候选不进判决。确认之后改写成案例，再 agent-web accept 署名。');
   }
   return 0;
+}
+
+
+async function cmdPreflight(args, flags) {
+  if (args.length === 0) {
+    console.error('用法：agent-web preflight <目录或文件> [--adapter=SPEC] [--detail] [--json]');
+    console.error('  跑之前先对账：拿清单的声明预测每条案例会判成什么（ready / unknown / fail）。');
+    console.error('  预测与 expected.json 对不上才判红；仓库里故意写坏的案例不算问题。');
+    return 2;
+  }
+  const adapterName = flags.adapter ?? 'memory';
+  const adapter = await makeAdapter(adapterName);
+  const manifest = await adapter.manifest();
+  const files = collectCaseFiles(args[0]);
+  const expected = readExpected(args[0]);
+
+  const cases = [];
+  for (const f of files) {
+    const raw = JSON.parse(fs.readFileSync(f, 'utf8'));
+    const errors = validateCase(raw);
+    if (errors.length > 0) {
+      console.error(`${path.relative(process.cwd(), f)} 不是合法案例，跳过：${errors[0]}`);
+      continue;
+    }
+    cases.push(raw);
+  }
+
+  const results = preflightAll({ cases, manifest, expected });
+  if (flags.json) {
+    console.log(JSON.stringify({ adapter: adapterName, results }, null, 2));
+  } else {
+    console.log(formatPreflight(results, { detail: flags.detail === true }));
+  }
+  return preflightExit(results);
 }
 
 
@@ -1757,6 +1792,7 @@ const HELP = `agent-web —— 给 Agent 写机器可判的集成测试
   agent-web mutants                           变异体目录：谁的坏法、怎么抓、怎么投稿
   agent-web align <参照视图> <目标视图> [--out=align.yml]  跨命名体系的字段映射提议
   agent-web negatives <案例或目录> --adapter=SPEC  按声明派生负例候选（全部 disputed，只出审阅表）
+  agent-web preflight <案例或目录> --adapter=SPEC  跑之前预检：预测 ready / unknown / fail，与预期对账
   agent-web audit <真实.jsonl> <候选.jsonl>    假绿审计：拿真实后端当尺子量候选实现
   agent-web traps <结果.jsonl> --cases=DIR    陷阱普查：这批判决有多少是盲的
   agent-web knowledge                         事故档案：这个仓库踩过的 ${ENTRIES.length} 个坑
@@ -1823,6 +1859,8 @@ async function main() {
         return await cmdAlign(args, flags);
       case 'negatives':
         return await cmdNegatives(args, flags);
+      case 'preflight':
+        return await cmdPreflight(args, flags);
       case 'mutants':
         return cmdMutants(args, flags);
       case 'drill':
