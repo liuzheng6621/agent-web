@@ -137,6 +137,12 @@ function deriveVerdict(baseVerdict, flat, results) {
   }
   if (goalFailed) return { status: 'fail', reason_code: 'assertion_false' };
   if (invFailed) return { status: 'fail', reason_code: 'invariant_violated' };
+  // pass 的前提是**所有断言都成立**。变异体把某个断言需要的事实删掉之后，
+  // 那条断言会变成 unknown（看不见），此时判决必须是 unknown 而不是 pass——
+  // 重放路径就是这么判的，快路径照抄这个语义才不会两边打架。
+  // （m-drop-create-event 删掉 order.created 之后，timeliness 找不到起点事件）
+  const blind = results.find((r) => r?.status === 'unknown');
+  if (blind) return { status: 'unknown', reason_code: blind.code || 'missing_observation' };
   return { status: 'pass', reason_code: baseVerdict?.reason_code ?? null };
 }
 

@@ -48,6 +48,9 @@ test('缺了金额与流水断言的案例，会漏掉两个变异体', async ()
   const stripped = JSON.parse(JSON.stringify(c));
   stripped.task.goal_assertions = stripped.task.goal_assertions.filter((a) => a.path !== 'totalAmount');
   stripped.task.invariants = stripped.task.invariants.filter((a) => a.selector?.collection !== 'status_log');
+  // timeliness 也读 status_log：留着它，删掉流水就变成 unknown 而不是漏网，
+  // 这条测试的立论（「没有流水断言就会漏掉流水变异」）就不成立了。
+  stripped.task.goal_assertions = stripped.task.goal_assertions.filter((a) => a.kind !== 'timeliness');
 
   const report = await certify({
     cases: [stripped],

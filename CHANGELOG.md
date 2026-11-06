@@ -6,6 +6,16 @@
 CI 也在查。这条规则是买来的：这个仓库曾经同时存在 `package.json` 0.16、README 0.9、
 Gitee Release v0.6.0 三个数，谁看都是三个项目。
 
+## 0.48.1
+
+快路径与重放路径的一处语义分歧（CI run #77 在「快路径必须与重放逐格相同」那步红的）。
+
+- **现象**：`scripts/state-equivalence.mjs` 报 `happy-path.json m-drop-create-event 判决不同：重放 unknown/missing_observation 变换 pass/ok`。
+- **根因**：`deriveVerdict` 只检查「有没有断言变假」，没检查「有没有断言看不见」。变异体删掉 `order.created` 之后 `timeliness` 找不到起点事件 → 该断言 `unknown`；重放路径按「有 unknown 就整体 unknown」判，快路径却因为「没有 false」判成 pass。两条路径对同一条案例给出不同判决，等于同一份证据两个结论。
+- **修法**：`deriveVerdict` 在「无 false」之后先查 `unknown`，有则返回 `unknown` + 该断言的 `code`。语义与重放路径对齐：**pass 的前提是所有断言都成立，看不见不算成立**。
+- **连带**：`test/certify.test.mjs` 里「缺了金额与流水断言的案例会漏掉两个变异体」那条，剥断言时要把 `timeliness` 一起去掉——它读 `status_log`，留着它删流水只会变 `unknown`，测试的立论就不成立了。
+- `m-shipment-late` 没有 `tamper`（只改 `observe` 返回），快路径复现不了它，退回重放；这是边界，已在变异体文件里写明。
+
 ## 0.48.0
 
 第 18 种断言 `timeliness`：用真实时间戳判「多久之内必须做完」，这是步号坐标永远说不出来的事。

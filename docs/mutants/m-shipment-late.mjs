@@ -14,6 +14,8 @@ export const meta = {
   applies_to: { collections: ['status_log'] },
 };
 
+// 它只改 observe 的返回，不碰 state 本体，所以没有 tamper 可声明：
+// 快路径（直接变换 ctx）复现不了它，会退回重放。这是边界，不是漏洞。
 export function wrap(inner, options = {}) {
   const lateBy = options.lateBy ?? 25 * 3600000; // 25 小时
   const targetType = options.targetType ?? 'order.picked';
