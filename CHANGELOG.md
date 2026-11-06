@@ -6,6 +6,15 @@
 CI 也在查。这条规则是买来的：这个仓库曾经同时存在 `package.json` 0.16、README 0.9、
 Gitee Release v0.6.0 三个数，谁看都是三个项目。
 
+## 0.52.1
+
+CI run #82 红在「单元测试」——不是断言写错，是**脚本本身在 CI 上拿不到完整数据**。
+
+- **现象**：`scripts/certify-baseline.mjs` 报 `SyntaxError: Unterminated string in JSON at position 143204`。本地 377/377 全绿，CI 上直接崩。
+- **根因**：用 `execFileSync` 调 `certify`，而 `certify` 在有漏网时退出码为 1 → `execFileSync` 抛异常 → 走 `catch (e)` 读 `e.stdout`。这份 stdout 在 CI 上被截断过（143KB 的 JSON 只拿到半截），`JSON.parse` 就炸了。本地不崩是因为本地 stdout 走得快、没被截。
+- **修法**：改用 `spawnSync`——它不抛异常，`stdout` 永远是完整那份，退出码自己判。`maxBuffer` 提到 64MB。解析失败时不再只丢一句 `SyntaxError`，而是打出拿到多少字节 + 结尾 120 字节，下次再截断能一眼看出截在哪。
+- 顺带把 `test/limits.test.mjs` 里 L5 的比对收窄到前四项：第五项是百分比，四舍五入会让 95.05 与 95.1 打架，那不是漂移。
+
 ## 0.52.0
 
 P5 变异体扩容：算子表从 8 个扩到 13 个，采纳 9 个生成的变异体进正式目录（47 → **56**）。

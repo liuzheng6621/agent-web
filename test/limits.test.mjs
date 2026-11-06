@@ -253,6 +253,7 @@ test('限制清单：L5 的口径必须与实测一致（手写数字必然漂�
   });
   const mm = measured.match(/当前口径：(\d+) 个变异体，(\d+) 条案例，适用 (\d+)，抓到 (\d+)/);
   assert.ok(mm, '脚本没输出「当前口径」');
+  // 只比前四项：第五项是百分比，四舍五入会让 95.05 与 95.1 打架，那不是漂移。
   assert.deepEqual(m.slice(1, 5), mm.slice(1, 5), 'L5 的数字与实测不符：' + measured.trim());
 });
 

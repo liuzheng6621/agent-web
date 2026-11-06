@@ -7,7 +7,7 @@
  * 也不能悄悄消失**：多漏一个，说明新加的变异体和案例都失守；少漏一个而不改基线，
  * 说明有人补了断言却没更新记录。
  */
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -25,21 +25,29 @@ const KNOWN_SURVIVORS = [
   'm-unsorted-orders',
 ];
 
+// 用 spawnSync 而不是 execFileSync：certify 在存在漏网时退出码为 1，
+// execFileSync 会抛异常，而它 error.stdout 在 CI 上被截断过
+// （Unterminated string in JSON at position 143204 —— 一份 143KB 的 JSON 只拿到半截）。
+// spawnSync 不抛，stdout 永远是完整的那一份，退出码自己判。
+const run = spawnSync(
+  process.execPath,
+  [path.join(ROOT, 'bin/agent-web.mjs'), 'certify', 'cases/coffee', '--adapter=memory', '--json'],
+  { cwd: ROOT, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 },
+);
+const out = run.stdout ?? '';
+if (out.trim() === '') {
+  console.error('准入基线：certify 没有输出，无法建立基线');
+  if (run.stderr) console.error(run.stderr.trim().slice(0, 400));
+  process.exit(1);
+}
 let report;
 try {
-  const out = execFileSync(
-    process.execPath,
-    [path.join(ROOT, 'bin/agent-web.mjs'), 'certify', 'cases/coffee', '--adapter=memory', '--json'],
-    { cwd: ROOT, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 },
-  );
   report = JSON.parse(out);
 } catch (e) {
-  // certify 在存在漏网时退出码为 1，但 stdout 仍有完整 JSON：不要因此判为解析失败。
-  if (!e.stdout) {
-    console.error('准入基线：certify 没有输出，无法建立基线');
-    process.exit(1);
-  }
-  report = JSON.parse(e.stdout);
+  // 解析失败要能诊断：说清拿到多少字节、结尾是什么，别只丢一句 SyntaxError。
+  console.error(`准入基线：certify 的输出不是完整 JSON（${out.length} 字节）：${e.message}`);
+  console.error('结尾 120 字节：' + JSON.stringify(out.slice(-120)));
+  process.exit(1);
 }
 
 // --emit-limits：把实测口径输出成 LIMITS.md 该贴的那一行。
