@@ -21,15 +21,15 @@ README 的「现在做不到什么」是这份清单的摘要。**两边条目�
 | # | 限制 | status | 验收命令 |
 |---|---|---|---|
 | L1 | 写操作的语义仍然要人给 | `mitigated` | `node bin/agent-web.mjs discover URL --writes` |
-| L2 | 字段映射靠人 | `open` | 尚无 |
+| L2 | 字段映射靠人 | `mitigated` | `node bin/agent-web.mjs align test/fixtures/align/ref-view.json test/fixtures/align/renamed-view.json` |
 | L3 | 只判合法性，不判质量 | `by-design` | 见 L3 正文 |
 | L4 | 负例得人来补 | `open` | 尚无 |
 | L5 | 变异体仍有盲区 | `mitigated` | `node bin/agent-web.mjs breed cases/coffee --adapter=memory` |
 | L6 | 等价变异体问题没有解决 | `by-design` | `node bin/agent-web.mjs certify cases/coffee --adapter=memory` |
-| L7 | 断言表达能力仍有缺口 | `open` | 尚无 |
+| L7 | 断言表达能力仍有缺口 | `mitigated` | `node scripts/kind-necessity.mjs` |
 | L8 | 适配器可以撒谎 | `open` | `node bin/agent-web.mjs probe cases/coffee --adapter=FILE` |
 | L9 | 并发被撤回了 | `withdrawn` | `grep -rn -- "--jobs" bin src` 必须为空 |
-| L10 | 难度标签只是统计 | `open` | 尚无 |
+| L10 | 难度标签只是统计 | `mitigated` | `node bin/agent-web.mjs drill stats --min-attempts=5` |
 | L11 | 只在三个域上验过 | `continuous` | `node bin/agent-web.mjs compare cases/<域> --adapters=A,B` |
 
 ## L1 写操作的语义仍然要人给
@@ -59,14 +59,6 @@ README 的「现在做不到什么」是这份清单的摘要。**两边条目�
 验收：`node bin/agent-web.mjs align test/fixtures/align/ref-view.json test/fixtures/align/renamed-view.json`。
 
 
-规范视图的映射写在适配器里，跨命名体系（`order_sn` ↔ `orderId` ↔ `order-id`）要人一条条对。
-可用的信号是齐全的：名称归一（camel/snake/kebab + 同义词）、类型、唯一性与基数、枚举重叠、
-跨步共变、引用关系（`orderId` 指向 `orders[].id`）——缺的是把它们做成一个带置信度的候选表。
-
-要做的话规则是：低置信度不猜（进 `unresolved`），高置信度给 top-3 与证据，
-`align.yml` 必须人签才生效。验收标准是「改名 fixture 恢复 ≥90% 字段、0 条高置信度错配、
-回放后视图契约与参考适配器逐字相同」。
-
 ## L3 只判合法性，不判质量
 
 `status: by-design`
@@ -82,8 +74,8 @@ README 的「现在做不到什么」是这份清单的摘要。**两边条目�
 `status: open`
 
 `draft` 会把该写负例的地方列成待办，但标准是「应该允许什么」，照实际抄等于放水——
-所以它不自动写。可机械派生的四类是：越权、非法状态迁移、缺参/非法值、重复提交；
-判据来自**声明**（必填缺失→4xx、枚举越界→4xx、无 token→401），不是来自「上次实际返回了什么」。
+所以它不自动写。可作为候选输入的四类是：越权、非法状态迁移、缺参/非法值、重复提交；
+目前还没有通用负例生成器。未来若从声明自动派生候选，判据应来自**声明**（必填缺失→4xx、枚举越界→4xx、无 token→401），不是来自「上次实际返回了什么」，并且生成物必须标为待审核。
 
 每条负例还要配一条 `window` 断言「被拒之后不许留下半条记录」，否则负例只证明了「被拒」，
 没证明「没副作用」。
@@ -113,15 +105,14 @@ README 的「现在做不到什么」是这份清单的摘要。**两边条目�
 
 `status: mitigated`
 
-三种缺口补了两种（15 种 kind）：
+现有能力已覆盖：
 
-- **时间窗** `window`：`unchanged` / `count_delta` / `field_equals` / `entity_exists` 只能看全程，
-  看不到「被拒之后那一段」。账本域的 `reject-unbalanced` 就是被这个卡住的。
-- **每步求值** `every_step`：终态类不变量只在结尾检查，「中途坏、结尾修好」抓不到。
-- **分页** `pagination`：跨页重复、边界丢行、翻页乱序、`total` 说谎 —— 单页永远看不出来。
+- **时间窗** `window`：对步骤区间单独求 `unchanged` / `count_delta` / `field_equals` / `entity_exists`。
+- **每步求值** `every_step`：检查中途状态，抓「中途坏、结尾修好」。
+- **分页** `pagination`：检查跨页重复、边界丢行、翻页乱序和 `total`。
+- **跨实体关联** `linkage`：检查集合之间引用存在性、字段约束与关联数量。
 
-还缺「跨实体的时序约束」（例如「发货必须在付款后 24 小时内」），这需要时间语义而不只是步号，
-属于新的一层，不在现有 kind 里硬塞。
+仍缺基于真实时间的约束，例如「发货必须在付款后 24 小时内」。这需要明确事件时间戳、时钟来源、时区、缺失时间与边界比较语义，不能只用轨迹步号代替。
 
 新增 kind 的门槛照旧：**必须能杀掉至少一个现有断言杀不掉的变异体**
 （`node scripts/kind-necessity.mjs` 逐种验），否则就是装饰，按判据准入宪法不许入库。
@@ -151,19 +142,19 @@ Node 权限模型，默认禁 fs/网络/子进程），并且文档必须写清�
 快 9 倍但答案会变的评估器，比慢的那个更没用。代码已撤，**不提供 `--jobs`**，
 原始记录见 `knowledge/k04-parallel-verdict-drift.mjs` 与 `docs/SPEC.md` 12.9.2。
 
-真要恢复，前提是先有 `--jobs=1` 与 `--jobs=N` 逐字相同的门（`scripts/jobs-determinism.mjs`），
-且只并行 `state` 层纯函数；执行层需要适配器显式声明 `concurrency.safe`。
+恢复前的验收门槛：建立可重复的串行/并行对照测试，要求 `--jobs=1` 与 `--jobs=N` 的 verdict、失败断言和证据逐字一致；先只并行纯计算。执行层必须等每个任务拥有独立状态命名空间、夹具和资源配额后，再由适配器显式声明并发安全。
 
 ## L10 难度标签只是统计
 
 `status: mitigated`
 
-原先三个缺口都已收口：
+已落地的统计链路：
 - **跨批次可比**：`drill grade --record` 追加 `.agent-web/drills.jsonl`，只存题号、状态、每格的判定、提交指纹——不存提交内容；
 - **区间**：`drill stats` 给 Wilson 95% 区间，`n < 5` 一律 `insufficient_data`，不给一个看起来像结论的百分比；
-- **题面**：从 `KINDS` 插值（12 种），`test/drill.test.mjs` 有守卫。
+- **经验排序**：`drill --order=empirical` 按解出率排序，样本不足的排后面；
+- **题面**：从 `KINDS` 插值（当前 17 种），`test/drill.test.mjs` 有守卫。
 
-仍不解决的是：样本量依赖人跑。没有外部提交，台账里只有自己的答案，难度标签是「自测难度」。
+仍不解决的是：样本量依赖真实、独立的批改记录。没有外部提交者，台账里的难度只代表自测难度，不可推广为一般用户难度。
 
 验收：`node bin/agent-web.mjs drill stats --min-attempts=5`。
 
