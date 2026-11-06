@@ -1,0 +1,80 @@
+{
+  "schema_version": "agent-web/0.1",
+  "id": "labaccess/borrow-stock",
+  "environment": {
+    "adapter": "labaccess"
+  },
+  "task": {
+    "natural_goal": "借出器材扣可借数量，归还后恢复",
+    "goal_assertions": [
+      {
+        "kind": "count_delta",
+        "selector": {
+          "collection": "borrows"
+        },
+        "delta": 1
+      },
+      {
+        "kind": "field_equals",
+        "selector": {
+          "collection": "equipment",
+          "index": 0
+        },
+        "path": "availableQuantity",
+        "value": 5
+      },
+      {
+        "kind": "window",
+        "from_step": 1,
+        "to_step": 2,
+        "of": {
+          "kind": "field_equals",
+          "selector": {
+            "collection": "equipment",
+            "index": 0
+          },
+          "path": "availableQuantity",
+          "value": 3
+        }
+      }
+    ],
+    "invariants": []
+  },
+  "reference_trajectory": [
+    {
+      "id": "s1",
+      "capability": "borrow.create",
+      "as": "student",
+      "arguments": {
+        "quantity": 2
+      },
+      "expected_outcome": "applied"
+    },
+    {
+      "id": "s2",
+      "capability": "borrow.approve",
+      "as": "teacher",
+      "arguments": {
+        "requestId": "$s1.requestId"
+      },
+      "expected_outcome": "applied"
+    },
+    {
+      "id": "s3",
+      "capability": "borrow.return",
+      "as": "teacher",
+      "arguments": {
+        "requestId": "$s1.requestId"
+      },
+      "expected_outcome": "applied"
+    }
+  ],
+  "observability": {
+    "declared_scopes": [
+      "labs",
+      "reservations",
+      "equipment",
+      "borrows"
+    ]
+  }
+}

@@ -1,4 +1,4 @@
-# agent-web v0.56.0
+# agent-web v0.57.0
 
 <p align="center">
   <img src="docs/media/hero.png" alt="agent-web：给 Agent 写机器可判的集成测试" width="100%">
@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <b>当前版本 0.56.0</b> · 19 种断言 · 31 条命令 · 56 个变异体
+  <b>当前版本 0.57.0</b> · 19 种断言 · 31 条命令 · 56 个变异体
 </p>
 
 <p align="center">
@@ -325,6 +325,8 @@ $ agent-web align our-view.json their-view.json --out=align.yml
 | 复式记账 | 两个自造实现（整数分 vs 两位小数字符串） | 内部表示完全不同，视图逐字相同；借贷平衡这类不变式能表达 |
 | 词库检索 `cases/lexicon` | 两个自造实现（字典树 + 贪心分词 / 二分 + 反向 DP） | 900 条数据、每页 10 条翻三页：跨页重复、边界丢行、`total` 说谎这三种坏法只有在这个规模上才真的暴露，[细节](docs/domains/lexicon.md) |
 | RealWorld 契约 `cases/realworld` | 两份独立实现（`fake-server.mjs` 用 Map，`fake-server-b.mjs` 用数组） | 一份 OpenAPI 契约 + 13 个官方 hurl 套件原样转成案例：100% 判决一致；把 B 故意弄坏之后，`compare` 立刻指出是哪一条案例分歧 |
+
+**另外还接过第六个真实后端**：实验室预约平台（`cases/labaccess`，Spring Boot 3 + MySQL）。它带来前五个域都没有的形状——**状态被时间推着走**：时段有容量，批准才发凭证，凭证只能在 `startAt <= now < endAt` 里签得出来，有效期还被预约结束时间截断。但只有一份实现、没有 `compare`，按 L11 的门槛**不计入「验过的域」**，[细节](docs/domains/labaccess.md)。
 
 第三个域逼出了一个机制：变异体可以声明 `applies_to`。
 账本域的变异体在咖啡域是「不适用」，不进分母——否则抓获率会被无关变异体砸成假坑。

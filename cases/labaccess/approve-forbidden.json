@@ -1,0 +1,20 @@
+{
+  "schema_version": "agent-web/0.1",
+  "id": "labaccess/approve-forbidden",
+  "environment": { "adapter": "labaccess" },
+  "task": {
+    "natural_goal": "学生不能自己批准自己的预约",
+    "goal_assertions": [
+      { "kind": "count_delta", "selector": { "collection": "reservations" }, "delta": 1 },
+      { "kind": "field_equals", "selector": { "collection": "reservations", "index": 0 }, "path": "status", "value": "pending" }
+    ],
+    "invariants": [
+      { "kind": "unchanged", "scopes": ["equipment"] }
+    ]
+  },
+  "reference_trajectory": [
+    { "id": "s1", "capability": "reservations.create", "as": "student", "arguments": { "startsInMinutes": 180, "durationMinutes": 30 }, "expected_outcome": "applied" },
+    { "id": "s2", "capability": "reservations.approve", "as": "student", "arguments": { "reservationId": "$s1.reservationId" }, "expected_outcome": "rejected" }
+  ],
+  "observability": { "declared_scopes": ["labs", "reservations", "equipment", "borrows"] }
+}

@@ -67,6 +67,15 @@ const BUILTINS = {
   // 配套服务在 examples/realworld/fake-server-b.mjs。
   // 它存在的唯一目的是让 `compare --adapters=realworld,realworld-b` 有意义 ——
   // 两个适配器打两份独立实现，判决必须一致；只换适配器不换实现是自证。
+  // 第六个域的真实后端：实验室「预约 — 审批 — 限时门禁凭证 — 器材借用」。
+  // 它带来前五个域都没有的形状：**时间推着状态走**（时段/容量/凭证有效期），
+  // 所以 state_machine、timeliness、relation 三种断言在这里才有真对手。
+  // 地址取 LABACCESS_BASE_URL（默认 http://127.0.0.1:8182），管理员密码取
+  // LABACCESS_ADMIN_PASSWORD（从该项目 services/backend/.env 注入，不入库）。
+  labaccess: async () => {
+    const m = await import('./labaccess.mjs');
+    return m.createLabAccessAdapter();
+  },
   'realworld-b': async () => {
     const m = await import('./realworld.mjs');
     return m.createRealWorldAdapter({
