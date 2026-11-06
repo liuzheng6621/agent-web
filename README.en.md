@@ -1,4 +1,4 @@
-# agent-web v0.54.1
+# agent-web v0.54.2
 
 <p align="center">
   <img src="docs/media/hero.png" alt="agent-web: integration tests an agent can be judged on" width="100%">
@@ -18,7 +18,7 @@
 </p>
 
 <p align="center">
-  <b>v0.54.1</b> · 19 assertion kinds · 31 commands · 56 mutants
+  <b>v0.54.2</b> · 19 assertion kinds · 31 commands · 56 mutants
 </p>
 
 <p align="center">
@@ -397,10 +397,15 @@ For compatibility with a real implementation, point `REALWORLD_BASE_URL` at that
 
 Two layers. These capabilities already have code and tests and should not be counted as "not implemented":
 
-- `align` proposes evidence-backed cross-schema mappings; low-confidence matches require human acceptance.
-- `window` / `every_step` / `pagination` / `linkage` cover temporal windows, per-step state, paging and cross-entity relations.
-- `drill grade --record` / `drill stats` provide a ledger, Wilson 95% intervals and empirical ordering; an item needs at least five attempts before it gets a difficulty band.
-- `negatives` derives candidate negative cases from the manifest's declarations (missing required args, role violations, wrong types, absent entities, duplicate submits); everything stays `disputed` and only a review sheet is produced.
+- **19 assertion kinds** (full list in [docs/SPEC.md](docs/SPEC.md) chapter 4). Among them
+  `window` / `every_step` / `pagination` / `linkage` / `payload` / `timeliness` / `state_machine`
+  were once written down as "missing capabilities" — each now exists and has a mutant **only it can kill** (`kind-necessity` checks this).
+- **`align`** proposes evidence-backed cross-schema mappings, including nested-array drill-down and semantic-overlap detection; low-confidence matches require human acceptance.
+- **`crosscheck`** re-fetches through a channel that bypasses the adapter's own `fetch` and compares response fingerprints.
+- **`breed`** generates mutants from view shape, 13 operators; a generated mutant must pass `certify` before it enters the catalog.
+- **`drill grade --record` / `drill stats`** provide a ledger, Wilson 95% intervals and empirical ordering; an item needs at least five attempts before it gets a difficulty band.
+- **`negatives`** derives candidate negative cases from the manifest's declarations (missing required args, role violations, wrong types, boundary violations, absent entities, duplicate submits); everything stays `disputed` and only a review sheet is produced.
+- **`discover` / `tap` / `learn` / `import hurl`** grow adapters and case drafts from a URL, recorded traffic, or an existing suite.
 
 The remaining boundaries are numbered to match L1–L11 in [docs/LIMITS.md](docs/LIMITS.md).
 **Each entry states only the unsolved part** — what already works is in the list above and is not repeated here:
@@ -409,13 +414,13 @@ The remaining boundaries are numbered to match L1–L11 in [docs/LIMITS.md](docs
 2. **Field mappings still need review (L2).** Nested-array leaves and same-name/different-meaning fields across collections cannot be decided by machine; a human must sign.
 3. **No universal flow-quality score (L3).** Define domain goals, metrics and weights first; keep quality scoring separate from legality verdicts.
 4. **Negative expectations still need a human signature (L4).** Whether a request *should* be rejected is a business decision; candidates only produce a review sheet and never enter verdicts.
-5. **Mutant coverage is incomplete (L5).** `breed` mainly generates view-shape faults; execution- and business-layer mutants still need domain-specific examples and distinguishability evidence.
+5. **Mutant coverage is incomplete (L5).** `breed` only faults **observed shape** (13 operators, 56 mutants, 39/41 caught). Execution- and business-layer faults (oversell, refund above paid amount, skipped approval) still need submissions — the generator knows shape, not semantics.
 6. **Arbitrary mutant equivalence is undecidable in general (L6).** Finite-state or bounded scenarios can be proved or exhaustively checked; otherwise report "not distinguished within budget," never "equivalent."
-7. **Real-time semantics are still missing (L7).** "Ship within 24 hours after payment" needs explicit timestamps, clock and timezone semantics; step indices cannot express wall-clock time.
-8. **Adapters can still lie (L8).** `probe` now checks nine mechanical properties (including "declared but missing", "role ignored", "reads that write"), but it cannot catch a liar that watches the prober; isolation is still not implemented and `probe` is not a sandbox.
+7. **Cross-entity ordering is still missing (L7).** Single-chain timing is covered — `timeliness` compares two event timestamps, requires a declared `timezone`, and reports `unknown` rather than false when a timestamp is absent (v0.48.0). What is missing is **across entities**: "the order must be created before stock is locked", "a refund must follow the original payment" need a domain with a dependency graph.
+8. **Adapters can still lie (L8).** `probe` checks nine mechanical properties and `crosscheck` (v0.54.0) re-fetches through an independent channel, so together they catch "declared but missing", "role ignored", "reads that write" and "tampering with the response body". What they still cannot catch is a liar that watches the prober, or one that replaces the whole `globalThis.fetch`; process isolation is not implemented, and it would not be a security boundary anyway.
 9. **Parallel execution stays disabled for now (L9).** There is no parallel executor; re-enabling it requires byte-identical verdicts, failure causes and per-step receipts between serial and parallel runs.
 10. **Difficulty estimates depend on sample sources (L10).** Multiple independent submitters/batches are needed to interpret the result as external difficulty rather than self-test performance.
-11. **Real-backend validation covers only four domains (L11).** `cases/realworld` is verified 13/13 but has a single implementation, so cross-implementation agreement cannot be checked and it is not counted. A domain needs two implementations, positive/negative cases, domain mutants, `compare` agreement and a passing `probe`.
+11. **Real-backend validation covers only four domains (L11).** The threshold is two independent implementations plus 100% `compare` agreement. The fifth directory `cases/realworld` is 13/13 pass and wired into CI, but has a single implementation, so it is not counted (see the section above).
 <!-- limits:end -->
 
 ## Docs

@@ -1,6 +1,6 @@
 {
   "name": "agent-web",
-  "version": "0.54.1",
+  "version": "0.54.2",
   "description": "给 Agent 写机器可判的集成测试：一份案例，多个实现，判决必须一致。",
   "type": "module",
   "bin": {
@@ -40,7 +40,7 @@
     "./crosscheck": "./src/crosscheck.mjs"
   },
   "scripts": {
-    "test": "node --test test/engine.test.mjs test/traps.test.mjs test/museum.test.mjs test/certify.test.mjs test/drill.test.mjs test/relation.test.mjs test/probe.test.mjs test/recall.test.mjs test/discover.test.mjs test/breed.test.mjs test/shape.test.mjs test/animal-tracking.test.mjs test/help.test.mjs test/tap-learn.test.mjs test/limits.test.mjs test/drill-ledger.test.mjs test/align.test.mjs test/window.test.mjs test/pagination.test.mjs test/cli-flags.test.mjs test/domain-animal.test.mjs test/import-hurl.test.mjs test/linkage.test.mjs test/breed-manifest.test.mjs test/determinism.test.mjs test/negatives.test.mjs test/preflight.test.mjs test/lexicon.test.mjs test/timeliness.test.mjs test/negatives-observed.test.mjs test/state-machine.test.mjs test/breed-ops.test.mjs test/roadmap.test.mjs test/crosscheck.test.mjs",
+    "test": "node --test test/engine.test.mjs test/traps.test.mjs test/museum.test.mjs test/certify.test.mjs test/drill.test.mjs test/relation.test.mjs test/probe.test.mjs test/recall.test.mjs test/discover.test.mjs test/breed.test.mjs test/shape.test.mjs test/animal-tracking.test.mjs test/help.test.mjs test/tap-learn.test.mjs test/limits.test.mjs test/drill-ledger.test.mjs test/align.test.mjs test/window.test.mjs test/pagination.test.mjs test/cli-flags.test.mjs test/domain-animal.test.mjs test/import-hurl.test.mjs test/linkage.test.mjs test/breed-manifest.test.mjs test/determinism.test.mjs test/negatives.test.mjs test/preflight.test.mjs test/lexicon.test.mjs test/timeliness.test.mjs test/negatives-observed.test.mjs test/state-machine.test.mjs test/breed-ops.test.mjs test/roadmap.test.mjs test/crosscheck.test.mjs test/readme-boundary.test.mjs",
     "selftest": "node bin/agent-web.mjs selftest",
     "compare": "node bin/agent-web.mjs compare cases/coffee --adapters=memory,taixianglian",
     "gh-proxy": "node scripts/gh-proxy.mjs",

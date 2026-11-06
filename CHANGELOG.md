@@ -6,6 +6,29 @@
 CI 也在查。这条规则是买来的：这个仓库曾经同时存在 `package.json` 0.16、README 0.9、
 Gitee Release v0.6.0 三个数，谁看都是三个项目。
 
+## 0.54.2
+
+README 的「边界：已实现与仍未解决」整节重写。原来那一层列的四个东西（`align` / `window` 系列 /
+`drill` / `negatives`）停在 v0.32 左右的口径，后面八个版本加的机制一个都没提，读者据此会以为它们没做。
+
+- **已实现层**：改成点名 19 种断言（含七个「曾经被写成缺的能力」：`window` / `every_step` /
+  `pagination` / `linkage` / `payload` / `timeliness` / `state_machine`），并补上 `crosscheck`、`breed`、
+  `discover` / `tap` / `learn` / `import hurl`。
+- **L5 写准**：`breed` 只从观测形状造故障（13 算子、56 变异体、抓到 39/41）；执行层与业务层仍靠投稿。
+- **L7 写准**：单条链路的时间已经能判了（`timeliness` 比真实时间戳、强制声明时区、缺时间戳记 `unknown`）；
+  缺的是**跨实体**时序（「订单必须在库存锁定之前创建」）。
+- **L8 写准**：`probe` 九项 + `crosscheck` 独立通道复核，两件加起来能抓四种谎；仍抓不到会看探测器的骗子，
+  以及把整个 `globalThis.fetch` 换掉。
+- **L11 写准**：门槛是「两个独立实现 + `compare` 100%」，第五个目录只有一份实现所以不计入。
+
+新增 `test/readme-boundary.test.mjs` 三道门，防这一节再次腐烂：
+- 断言总数必须等于 `KINDS.length`（数字对不上就红）；
+- **七种「曾经缺」的断言必须逐个点名**——这七种正是旧文档最容易骗人的地方；
+- `align` / `crosscheck` / `breed` / `negatives` / `drill grade` / `discover` 必须出现在清单里；
+- 十一条与 L1–L11 编号一一对应且不重复。
+
+这一节的毛病和 L5 那行数字一样：**手写的清单会腐烂**。区别是数字腐烂能被脚本抓，散文腐烂要靠测试。
+
 ## 0.54.1
 
 只改口径，不改代码。起因是我把 `examples/realworld/FIX-PLAN.md` 当成了待办交给用户，
