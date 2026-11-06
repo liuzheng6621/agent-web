@@ -368,27 +368,29 @@ Keep the status scopes separate: importer unit tests are **15/15**. The checked-
 
 For compatibility with a real implementation, point `REALWORLD_BASE_URL` at that service (see `examples/realworld/README.md`).
 
-## What it does not do
+<!-- limits:start -->
+## Boundaries: implemented vs. still open
 
-Separate the implemented mechanisms from the remaining limits. These capabilities already have code and tests and should not be described as “not implemented”:
+Two layers. These capabilities already have code and tests and should not be counted as "not implemented":
 
 - `align` proposes evidence-backed cross-schema mappings; low-confidence matches require human acceptance.
 - `window` / `every_step` / `pagination` / `linkage` cover temporal windows, per-step state, paging and cross-entity relations.
 - `drill grade --record` / `drill stats` provide a ledger, Wilson 95% intervals and empirical ordering; an item needs at least five attempts before it gets a difficulty band.
 
-Remaining boundaries (L1–L11 in `docs/LIMITS.md`):
+The remaining boundaries are numbered to match L1–L11 in [docs/LIMITS.md](docs/LIMITS.md):
 
-1. **L1 Write semantics still need a human.** `tap` records what the app did, but cannot infer that “insufficient stock must be rejected”; a domain owner must approve the rule.
-2. **L2 Field mappings still need review.** `align` proposes mappings; nested-array leaves and same-name/different-meaning fields across collections remain unresolved.
-3. **L3 No universal flow-quality score.** Define domain goals, metrics and weights first; keep quality scoring separate from legality verdicts.
-4. **L4 Negative expectations still need approval.** Boundary requests can be generated as candidates, but observed responses alone cannot determine what should be accepted or rejected.
-5. **L5 Mutant coverage is incomplete.** `breed` mainly generates view-shape faults; execution- and business-layer mutants still need domain-specific examples and distinguishability evidence.
-6. **L6 Arbitrary mutant equivalence is undecidable in general.** Finite-state or bounded scenarios can be proved or exhaustively checked; otherwise report “not distinguished within budget,” never “equivalent.”
-7. **L7 Real-time semantics are still missing.** Step windows, per-step checks, pagination and linkage exist; “ship within 24 hours after payment” needs explicit timestamps, clock and timezone semantics.
-8. **L8 Adapters need process isolation.** `probe` is not a security sandbox; use a read-only filesystem, resource/time limits and restricted network egress.
-9. **L9 Parallel execution stays disabled for now.** Parallelize pure calculations first. Consider adapter concurrency only with isolated data spaces and byte-identical serial/parallel verdicts and evidence.
-10. **L10 Difficulty estimates depend on sample sources.** The ledger and statistics work; multiple independent submitters/batches are needed to interpret the result as external difficulty rather than self-test performance.
-11. **L11 Real-backend validation covers only three domains.** Add domains using two implementations, positive/negative cases, domain mutants, `compare` agreement and a passing `probe`.
+1. **Write semantics still need a human (L1).** `tap` records what the app did, but cannot infer that "insufficient stock must be rejected"; a domain owner must approve the rule.
+2. **Field mappings still need review (L2).** `align` proposes mappings; nested-array leaves and same-name/different-meaning fields across collections remain unresolved.
+3. **No universal flow-quality score (L3).** Define domain goals, metrics and weights first; keep quality scoring separate from legality verdicts.
+4. **Negative expectations still need approval (L4).** Boundary requests can be generated as candidates, but observed responses alone cannot determine what should be accepted or rejected.
+5. **Mutant coverage is incomplete (L5).** `breed` mainly generates view-shape faults; execution- and business-layer mutants still need domain-specific examples and distinguishability evidence.
+6. **Arbitrary mutant equivalence is undecidable in general (L6).** Finite-state or bounded scenarios can be proved or exhaustively checked; otherwise report "not distinguished within budget," never "equivalent."
+7. **Real-time semantics are still missing (L7).** Step windows, per-step checks, pagination and linkage exist; "ship within 24 hours after payment" needs explicit timestamps, clock and timezone semantics.
+8. **Adapters need process isolation (L8).** `probe` is not a security sandbox; use a read-only filesystem, resource/time limits and restricted network egress.
+9. **Parallel execution stays disabled for now (L9).** Parallelize pure calculations first. Consider adapter concurrency only with isolated data spaces and byte-identical serial/parallel verdicts and evidence.
+10. **Difficulty estimates depend on sample sources (L10).** The ledger and statistics work; multiple independent submitters/batches are needed to interpret the result as external difficulty rather than self-test performance.
+11. **Real-backend validation covers only three domains (L11).** Add domains using two implementations, positive/negative cases, domain mutants, `compare` agreement and a passing `probe`.
+<!-- limits:end -->
 
 ## Docs
 

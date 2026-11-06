@@ -8,13 +8,16 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..');
 const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
 
+// 章节标题会改，锚点不改。用 `<!-- limits:start -->` / `<!-- limits:end -->` 切块，
+// 这样重写标题不会误伤守卫，删掉整节则一定红。
 function readmeItems(lang) {
   const s = read(lang === 'zh' ? 'README.md' : 'README.en.md');
-  const i = s.indexOf(lang === 'zh' ? '## 现在做不到什么' : '## What it does not do');
-  assert.ok(i >= 0, 'README 缺限制章节');
-  const body = s.slice(i);
-  const end = body.indexOf('\n## ', 3);
-  const block = end > 0 ? body.slice(0, end) : body;
+  const start = s.indexOf('<!-- limits:start -->');
+  const end = s.indexOf('<!-- limits:end -->');
+  assert.ok(start >= 0, (lang === 'zh' ? 'README.md' : 'README.en.md') + ' 缺 limits:start 锚点');
+  assert.ok(end > start, (lang === 'zh' ? 'README.md' : 'README.en.md') + ' 缺 limits:end 锚点');
+  const block = s.slice(start, end);
+  assert.ok(/^## /m.test(block), 'limits 块里必须有二级标题');
   return block.split('\n')
     .filter((l) => /^\d+\.\s/.test(l))
     .map((l) => l.replace(/^\d+\.\s+/, ''));
