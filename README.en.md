@@ -1,4 +1,4 @@
-# agent-web v0.45.0
+# agent-web v0.46.0
 
 <p align="center">
   <img src="docs/media/hero.png" alt="agent-web: integration tests an agent can be judged on" width="100%">
@@ -18,7 +18,7 @@
 </p>
 
 <p align="center">
-  <b>v0.45.0</b> · 17 assertion kinds · 30 commands · 45 mutants
+  <b>v0.46.0</b> · 17 assertion kinds · 30 commands · 45 mutants
 </p>
 
 <p align="center">
@@ -367,7 +367,7 @@ Everything it writes is an **unconfirmed draft**; no verdict until `accept`. The
 
 **The local fixture is included**: `examples/realworld/fake-server.mjs` is a zero-dependency 19-endpoint implementation, and the adapter lives at `src/adapter/realworld.mjs`. It validates the importer and verdict pipeline; it does not prove compatibility with a real RealWorld implementation.
 
-Keep the status scopes separate: importer unit tests are **15/15**. The checked-in `cases/realworld/*.json` are historical generated artifacts (kept unchanged by design); their current run is **10 pass / 2 fail / 1 unknown**. Two old cases encode DELETE actions differently from the fixed importer. To test current conversion behavior, regenerate into a temporary directory from `examples/realworld/hurl/`, review the drafts and confirm them before verification.
+Keep the status scopes separate: `cases/realworld/*.json` are **derived files** produced by `import hurl` (every assertion comes from the official hurl text and must not be hand-edited). Their current run is **13/13 pass**, and they are in CI. All green proves the converter, the adapter and the fixture agree with each other; it does not prove any particular RealWorld implementation is correct.
 
 For compatibility with a real implementation, point `REALWORLD_BASE_URL` at that service (see `examples/realworld/README.md`).
 

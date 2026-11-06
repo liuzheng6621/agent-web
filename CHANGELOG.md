@@ -6,6 +6,16 @@
 CI 也在查。这条规则是买来的：这个仓库曾经同时存在 `package.json` 0.16、README 0.9、
 Gitee Release v0.6.0 三个数，谁看都是三个项目。
 
+## 0.46.0
+
+RealWorld 的 13 个官方 hurl 套件转出的案例，从 **pass 3 / fail 9 / unknown 1** 变成 **13/13 全绿**，并进 CI。
+
+- **能力名推导按路由位置取参数**：`PUT /api/articles/some-slug` 里 `some-slug` 是字面量 slug，早期实现把整段当成资源名，推出 `some-slug.update` 这种不存在的能力。现在 `articles/` 第二段一律识别为 slug，字面量与 `{{slug}}` 走同一条路。
+- **token 变量名不等于身份**：`updated_token` 是同一个人换了张票，早期实现把它当第二个人，于是「改自己的资料」被判成越权。
+- **夹具补上业务语义**：`favorited` / `following` 按当前用户算，`feed` 按 following 过滤，401 回 `{errors:{token:['is missing']}}`、越权回 `forbidden`、评论到不存在的文章回 `{errors:{article:['not found']}}`、重复注册 422/409 与契约一致。
+- **新增 CI 步骤**：起夹具 → 跑 `verify cases/realworld --adapter=realworld`，证明「转换器 + 适配器 + 夹具」三者仍然自洽。
+- `examples/realworld/README.md` 与中英 README 的状态口径同步改写：13/13 只证明三者自洽，不证明某个 RealWorld 实现是对的。
+
 ## 0.45.0
 
 第四个验证域：词库检索。加它不是为了「再一个业务」，是为了补一个前三个域都没有的**数据形状**——

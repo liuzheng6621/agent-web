@@ -255,7 +255,7 @@
     },
     {
       "id": "s12",
-      "capability": "profiles.follow",
+      "capability": "profiles.unfollow",
       "as": "user",
       "expected_outcome": "applied",
       "arguments": {
@@ -271,6 +271,6 @@
     "generated_by": "agent-web import hurl",
     "note": "11 处需要人看，见同目录的 .todo.md",
     "reviewed_by": "阿蓝",
-    "reviewed_at": "2026-11-05T13:54:04.201Z"
+    "reviewed_at": "2026-11-06T01:45:50.167Z"
   }
 }

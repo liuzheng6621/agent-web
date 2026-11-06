@@ -36,18 +36,21 @@ for f in cases/realworld/*.json; do node bin/agent-web.mjs accept "$f" --by=你�
 node bin/agent-web.mjs verify cases/realworld --adapter=realworld --detail
 ```
 
-## 当前状态（2026-11-06，v0.43.0）
+## 当前状态（2026-11-06，v0.46.0）
 
-| 指标 | 数字 |
-|---|---|
-| 官方 Hurl 套件 | 13 |
-| 请求步数 / 原始 Hurl 断言 | 157 / 296 |
-| 导入器单测 | **15 / 15 pass** |
-| 仓库内历史生成案例实测 | **10 pass / 2 fail / 1 unknown** |
+**13 条案例全绿：pass 13 / fail 0 / unknown 0，与预期标签一致 100.0%（13/13）。**
 
-`cases/realworld/expected.json` 是**目标标签**，不是实测结果。按不改案例文件的约束，当前案例 JSON 保持原样；它们是修复 importer 之前生成的历史产物。最新 importer 的动作映射变更不会反向改写这些文件。重新导入后先逐条审核草稿及 `.todo.md`，再由人 `accept`，最后跑 `verify`。
+这一组是**派生文件**：断言逐条来自官方 hurl 原文，不许手改。全绿的含义是
+「转换器 + 适配器 + 夹具三者自洽」，不是「某个 RealWorld 实现是对的」——
+要验真实实现，把 `REALWORLD_BASE_URL` 指向目标服务再跑同一条命令。
 
-该夹具用于检查 importer、适配器和判决链路，不代表真实 RealWorld 服务的兼容性。**因此语料仍不进 CI**：CI 只跑 `cases/coffee` 与 `cases/animal` 的闸门。
+修复过程中转绿的两个根因（都记在 `docs/museum/`）：
+
+- **能力名推导丢了参数**：`PUT /api/articles/some-slug` 里 `some-slug` 是**字面量 slug**，
+  早期实现把它当成资源名的一部分，推出 `some-slug.update` 这种不存在的能力。
+  现在按路由位置识别（`articles/` 第二段一定是 slug），与 `{{slug}}` 走同一条路。
+- **token 变量名不等于身份**：`updated_token` 是同一个人换了张票，早期实现把它当第二个人，
+  于是「改自己的资料」被判成越权。
 
 ## 仍留在历史案例产物中的差异
 

@@ -184,3 +184,14 @@ jobs:
         run: |
           node bin/agent-web.mjs verify cases/ledger --adapter=ledger-a
           node bin/agent-web.mjs compare cases/ledger --adapters=ledger-a,ledger-b
+      # RealWorld 的案例是 import hurl 从官方 13 个套件生成的派生文件：
+      # 断言来自 hurl 原文，不许手改。这条步骤证明「转换器 + 适配器 + 夹具」三者仍然自洽。
+      - name: RealWorld：官方 hurl 套件转出的 13 条案例必须全绿
+        run: |
+          node examples/realworld/fake-server.mjs 8299 --allow-reset &
+          for i in $(seq 1 40); do
+            curl -sf http://127.0.0.1:8299/api/tags > /dev/null && break
+            sleep 0.25
+          done
+          node bin/agent-web.mjs verify cases/realworld --adapter=realworld
+

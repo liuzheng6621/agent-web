@@ -140,18 +140,22 @@
     },
     {
       "id": "s3",
-      "capability": "some-slug.update",
+      "capability": "articles.update",
       "as": "anonymous",
       "expected_outcome": "rejected",
       "arguments": {
-        "body": "test"
+        "body": "test",
+        "slug": "some-slug"
       }
     },
     {
       "id": "s4",
-      "capability": "some-slug.delete",
+      "capability": "articles.delete",
       "as": "anonymous",
-      "expected_outcome": "rejected"
+      "expected_outcome": "rejected",
+      "arguments": {
+        "slug": "some-slug"
+      }
     },
     {
       "id": "s5",
@@ -161,15 +165,21 @@
     },
     {
       "id": "s6",
-      "capability": "some-slug.favorite",
+      "capability": "articles.favorite",
       "as": "anonymous",
-      "expected_outcome": "rejected"
+      "expected_outcome": "rejected",
+      "arguments": {
+        "slug": "some-slug"
+      }
     },
     {
       "id": "s7",
-      "capability": "some-slug.favorite",
+      "capability": "articles.unfavorite",
       "as": "anonymous",
-      "expected_outcome": "rejected"
+      "expected_outcome": "rejected",
+      "arguments": {
+        "slug": "some-slug"
+      }
     },
     {
       "id": "s8",
@@ -258,7 +268,7 @@
     },
     {
       "id": "s16",
-      "capability": "articles.favorite",
+      "capability": "articles.unfavorite",
       "as": "user",
       "expected_outcome": "rejected",
       "arguments": {
@@ -311,6 +321,6 @@
     "generated_by": "agent-web import hurl",
     "note": "1 处需要人看，见同目录的 .todo.md",
     "reviewed_by": "阿蓝",
-    "reviewed_at": "2026-11-05T13:54:02.044Z"
+    "reviewed_at": "2026-11-06T01:45:48.447Z"
   }
 }

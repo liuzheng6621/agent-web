@@ -68,7 +68,7 @@
     },
     {
       "id": "s3",
-      "capability": "profiles.follow",
+      "capability": "profiles.unfollow",
       "as": "anonymous",
       "expected_outcome": "rejected",
       "arguments": {
@@ -97,7 +97,7 @@
     },
     {
       "id": "s6",
-      "capability": "profiles.follow",
+      "capability": "profiles.unfollow",
       "as": "user",
       "expected_outcome": "rejected",
       "arguments": {
@@ -113,6 +113,6 @@
     "generated_by": "agent-web import hurl",
     "note": "全部请求与断言都转成了案例结构",
     "reviewed_by": "阿蓝",
-    "reviewed_at": "2026-11-05T13:54:03.479Z"
+    "reviewed_at": "2026-11-06T01:45:49.557Z"
   }
 }

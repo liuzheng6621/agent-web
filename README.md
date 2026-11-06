@@ -1,4 +1,4 @@
-# agent-web v0.45.0
+# agent-web v0.46.0
 
 <p align="center">
   <img src="docs/media/hero.png" alt="agent-web：给 Agent 写机器可判的集成测试" width="100%">
@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <b>当前版本 0.45.0</b> · 17 种断言 · 30 条命令 · 45 个变异体
+  <b>当前版本 0.46.0</b> · 17 种断言 · 30 条命令 · 45 个变异体
 </p>
 
 <p align="center">
@@ -404,7 +404,7 @@ node bin/agent-web.mjs verify cases/realworld --adapter=realworld --detail
 
 **本地夹具已经内置**：`examples/realworld/fake-server.mjs` 提供零依赖的 19 端点实现，适配器位于 `src/adapter/realworld.mjs`。它便于验证导入器与判决链路；不能替代对真实 RealWorld 实现的兼容性测试。
 
-状态口径要分清：修复后的 importer 单测为 **15/15**；仓库里提交的 `cases/realworld/*.json` 仍是历史生成物（遵守不改案例文件的约束），当前实测 **10 pass / 2 fail / 1 unknown**。其中旧案例的 DELETE 动作映射与新导入器行为不一致。需要复测最新转换逻辑时，从 `examples/realworld/hurl/` 重新生成到临时目录并人工检查、确认；不要把旧 JSON 的判决当成最新转换器结果。
+状态口径要分清：`cases/realworld/*.json` 是 `import hurl` 的**派生文件**（断言逐条来自官方 hurl 原文，不许手改），当前实测 **13/13 pass**，并已进 CI。全绿只证明「转换器 + 适配器 + 夹具」自洽，不证明某个 RealWorld 实现是对的。
 
 夹具只证明「转换器 + 适配器 + 判决链路是通的」，不证明「某个 RealWorld 实现是对的」——要验证真实实现，把 `REALWORLD_BASE_URL` 指向目标服务（详见 `examples/realworld/README.md`）。
 
