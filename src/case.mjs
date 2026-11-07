@@ -12,6 +12,7 @@
  */
 
 import { validateAssertions, PHASE_MATRIX } from './assert/index.mjs';
+import { CLOCK_POLICIES } from './adapter/contract.mjs';
 import { getPath } from './values.mjs';
 
 export const SCHEMA_VERSION = 'agent-web/0.1';
@@ -162,6 +163,26 @@ export function validateCase(c) {
   if (c.observability !== undefined) {
     if (!Array.isArray(c.observability.declared_scopes)) {
       errors.push('observability.declared_scopes 必须是数组');
+    }
+  }
+
+  // environment 只认三个键：adapter / seed / clock_policy。
+  // 以前它完全不校验，于是 `clock_policy` 成了三不管字段 —— runner 把它
+  // 传给适配器、适配器不读、规范没写、案例不用，谁也发现不了。
+  // 现在写错一个值就是 invalid_case，而不是默默按默认值跑。
+  if (c.environment !== undefined) {
+    if (typeof c.environment !== 'object' || c.environment === null || Array.isArray(c.environment)) {
+      errors.push('environment 必须是对象');
+    } else {
+      const known = ['adapter', 'seed', 'clock_policy'];
+      for (const k of Object.keys(c.environment)) {
+        if (!known.includes(k)) {
+          errors.push(`environment.${k} 不是环境项（只认 ${known.join('/')}）`);
+        }
+      }
+      if (c.environment.clock_policy !== undefined && !CLOCK_POLICIES.includes(c.environment.clock_policy)) {
+        errors.push(`environment.clock_policy 必须是 ${CLOCK_POLICIES.join('/')}，收到 ${JSON.stringify(c.environment.clock_policy)}`);
+      }
     }
   }
 

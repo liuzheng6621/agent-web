@@ -7,6 +7,7 @@ export const MANIFEST = {
   adapter: 'ledger-b',
   adapter_version: '1.0.0',
   reset_strategy: 'snapshot',
+  clock_policies: ['frozen'],   // 纯计算，没有时间维度
   description: '复式记账账本（字符串表示，分录挂在账户上，余额增量维护）',
   scopes: ['accounts', 'transactions', 'trial'],
   roles: ['clerk'],

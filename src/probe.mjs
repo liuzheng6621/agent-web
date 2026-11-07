@@ -140,6 +140,34 @@ export async function probeAdapter({ adapter, adapterName = 'unknown', timeoutMs
     add('reset-idempotent', '复位幂等', FAIL, FAIL, String(e && e.message));
   }
 
+  // ---- 声明了 frozen 的适配器，时钟必须真的冻住 ----
+  // 这一项只做单向判定：两次同 seed 复位指纹相同**不证明**它冻住了（可能刚好
+  // 落在同一毫秒），但指纹不同就**证明**它在撒谎。所以「相同」时给 pass 并把
+  // 这条局限写在 detail 里，不假装验过了。
+  const claims = Array.isArray(manifest.clock_policies) ? manifest.clock_policies : [];
+  if (!claims.includes('frozen')) {
+    add('clock-honest', '声明 frozen 的适配器时钟真的冻住', 'skipped', WARN,
+      `manifest 没声明 frozen（声明的是 ${claims.length ? claims.join('/') : '空，按 wall 处理'}），无从验证`);
+  } else {
+    try {
+      const seed = { clock_start: 1767225600000 };
+      const a = await snapshot(adapter, (await withTimeout(adapter.reset({ seed, clockPolicy: 'frozen' }))).runId);
+      const b = await snapshot(adapter, (await withTimeout(adapter.reset({ seed, clockPolicy: 'frozen' }))).runId);
+      add(
+        'clock-honest',
+        '声明 frozen 的适配器时钟真的冻住',
+        a.fingerprint === b.fingerprint ? PASS : FAIL,
+        FAIL,
+        a.fingerprint === b.fingerprint
+          ? '同一 seed 两次复位视图逐字相同（这只证明「没有随机漂移」，不证明时间真的被冻结）'
+          : `同一 seed 两次复位得到不同视图（${a.fingerprint} vs ${b.fingerprint}）—— `
+            + '它声明了 frozen 却在读真实时钟，任何时间断言都会随机红',
+      );
+    } catch (e) {
+      add('clock-honest', '声明 frozen 的适配器时钟真的冻住', FAIL, FAIL, String(e && e.message));
+    }
+  }
+
   return finish();
 
   async function finish() {

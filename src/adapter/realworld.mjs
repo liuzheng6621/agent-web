@@ -69,6 +69,7 @@ export function createRealWorldAdapter(opts = {}) {
         adapter: 'realworld',
         adapter_version: '1.0.0',
         reset_strategy: 'identity',
+  clock_policies: ['wall'],   // 真实后端，时间戳由服务端生成，冻不住
         canonical_view: 'agent-web/canonical-view-1',
         description: 'RealWorld 契约（19 个端点）：一份案例可以在 990+ 个实现上重跑',
         scopes: ['articles', 'tags', 'comments'],

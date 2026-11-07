@@ -127,6 +127,7 @@ const MANIFEST = {
   adapter: 'animal',
   adapter_version: '1.0.0',
   reset_strategy: 'identity',
+  clock_policies: ['wall'],   // 真实后端，时间戳由服务端生成，冻不住
   canonical_view: CANONICAL_VIEW,
   description: '流浪动物保护追踪系统（Spring Boot 3 + MySQL）：动物档案 / 领养审批 / 用户与积分',
   scopes: ['animals', 'adoption_applications', 'users'],

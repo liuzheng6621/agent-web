@@ -38,6 +38,7 @@ const MANIFEST = {
   adapter: 'memory',
   adapter_version: '1.0.0',
   reset_strategy: 'snapshot',
+  clock_policies: ['frozen'],   // 确定性内存实现：时钟由 seed.clock_start 起算，每次写 +1s
   description: '确定性内存业务系统：菜单 / 订单五态 / 角色 / 状态流水',
   scopes: ['menu', 'orders', 'status_log'],
   roles: ['customer', 'customer2', 'staff'],

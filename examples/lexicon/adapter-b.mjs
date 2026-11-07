@@ -15,6 +15,7 @@ export const MANIFEST = {
   adapter: 'lexicon-b',
   adapter_version: '1.0.0',
   reset_strategy: 'snapshot',
+  clock_policies: ['frozen'],   // 纯计算，没有时间维度
   description: '合成词库（有序数组二分前缀 + 反向 DP 分词）',
   scopes: ['entries', 'segments'],
   roles: ['reader'],

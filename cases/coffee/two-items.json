@@ -2,13 +2,7 @@
   "schema_version": "agent-web/0.1",
   "id": "coffee/two-items",
   "environment": {
-    "adapter": "memory",
-    "reset_strategy": "identity",
-    "scopes": [
-      "orders",
-      "menu",
-      "status_log"
-    ]
+    "adapter": "memory"
   },
   "task": {
     "allowed_capabilities": [

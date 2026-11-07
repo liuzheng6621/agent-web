@@ -1,4 +1,4 @@
-# agent-web v0.63.1
+# agent-web v0.64.0
 
 <p align="center">
   <img src="docs/media/hero.png" alt="agent-web: integration tests an agent can be judged on" width="100%">
@@ -18,7 +18,7 @@
 </p>
 
 <p align="center">
-  <b>v0.63.1</b> · 20 assertion kinds · 32 commands · 63 mutants
+  <b>v0.64.0</b> · 20 assertion kinds · 32 commands · 63 mutants
 </p>
 
 <p align="center">

@@ -2,7 +2,7 @@
 
 这个目录收藏的**不是功能演示，是假通过**。
 
-每件展品记录一种「判决看起来没问题、实际什么也没证明」的情形。它们不是假想的：十件里有九件来自这个仓库自己踩过的坑，另一件（01）是真实事故的完整复现。
+每件展品记录一种「判决看起来没问题、实际什么也没证明」的情形。它们不是假想的：十一件里有十件来自这个仓库自己踩过的坑，另一件（01）是真实事故的完整复现。
 
 ## 为什么单独给它一个目录
 
@@ -38,6 +38,7 @@
 | 08 | 同一个洞的第二个地方 | `pass` | `unknown` / `contract_violation` | 分类语义抽成一份 · 结构守卫扫源码 |
 | 09 | 文档里的退出码 | `pass` | `fail` / `doc_code_mismatch` | 第 8 章的表与代码对账（`test/exit-codes.test.mjs`） |
 | 10 | 环境没起来却报了抓获率 | `pass` | `fail` / `unusable_run_reported_as_zero` | `certify` 的 `allUnusable` 判据 + 退出码 2 |
+| 11 | 没人读的幽灵字段 | `pass` | `unknown` / `invalid_environment` | `environment` 封闭键集 + `manifest.clock_policies` 对账 |
 
 ## 01 · 身份塌缩
 
@@ -190,3 +191,34 @@ assert.equal(r.exitCode, 2);   // test/ingest.test.mjs
 **为什么这组码不能只写 `infrastructure_error`。** v0.60.0 加了 `contract_violation`，v0.61.0 加了 `effect_uncertain`，它们同样表示「这一次执行本身不可信」。判据必须写成**集合**，而且反例不能错杀：`missing_observation` 是**真盲区**（跑起来了、断言看不出来），它必须留在分母里。这条判据在 `src/traps.mjs` 与 `certify` 之间只有一份实现，`test/outcome-contract.test.mjs` 有反例测试盯着。
 
 **它顺带说明了一件事**：`0.0%` 和 `null` 在报表里长得差不多（都让人不想看），但前者会让人去补断言，后者会让人去起服务。工具在分不清的时候，宁可少说一句，也不能说反。
+
+## 11 · 没人读的幽灵字段
+
+`clock_policy` 从 v0.30.0 起就被 `src/runner.mjs` 读出来传给 `adapter.reset({ clockPolicy })`。
+四十多个版本过去，全仓 46 条案例没有一条声明过它，`docs/SPEC.md` 第 2 章没写这个键，
+`validateCase` 完全不校验 `environment`，11 个适配器里没有一个读过 `clockPolicy`。
+
+它从出生那天起就是空的。而这条路上**没有任何地方会报错**：写错的键、拼错的键、
+早就废弃的键，全都是「合法 JSON，安静地躺在那儿」。崩溃会有人修，安静没人管。
+
+同一个 `environment` 里还挂着两个同样的幽灵键，就在 `cases/coffee/two-items.json`：
+
+```json
+"environment": {
+  "adapter": "memory",
+  "reset_strategy": "identity",
+  "scopes": ["orders", "menu", "status_log"]
+}
+```
+
+这条案例的判决一直是 `pass`。它没错，只是后两行从来不代表任何东西。
+
+更麻烦的是 `clock_policy` 不是纯装饰：一个适配器可以「看起来支持 frozen」——
+它把时间戳写进视图，取的是 `Date.now()`。案例声明 frozen，判决照样 `pass`，
+因为没有任何断言在比时间戳。等到某天有人加了一条 `timeliness`，它会随机红，
+而且只在慢机器上红。
+
+判据有三条：`environment` 是**封闭**键集（`adapter` / `seed` / `clock_policy`），多一个键就是
+`invalid_case`；适配器用 `manifest.clock_policies` 声明真支持哪几种；两边对不上在**开跑之前**
+判 `unknown / invalid_environment`。`probe` 第 12 项再查一遍「声明 frozen 的适配器两次同 seed
+复位指纹相同」——这一项只做单向判定，措辞里写明局限：相同**不证明**时间被冻结。

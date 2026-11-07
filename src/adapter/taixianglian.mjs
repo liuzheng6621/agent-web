@@ -30,6 +30,7 @@ const MANIFEST = {
   adapter: 'taixianglian',
   adapter_version: '1.0.0',
   reset_strategy: 'identity',
+  clock_policies: ['wall'],   // 真实后端，时间戳由服务端生成，冻不住
   canonical_view: CANONICAL_VIEW,
   description: '咖啡店后台（Spring Boot）：菜单 / 订单五态 / 顾客与店员 / 状态流水',
   scopes: ['menu', 'orders', 'status_log'],

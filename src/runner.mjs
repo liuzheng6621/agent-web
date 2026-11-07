@@ -14,7 +14,7 @@
  */
 
 import { validateCase, validateSteps, resolveArguments, deriveLabels, BindingError, draftBlocker } from './case.mjs';
-import { validateManifest } from './adapter/contract.mjs';
+import { validateManifest, DEFAULT_CLOCK_POLICY } from './adapter/contract.mjs';
 import { classifyStepOutcome } from './step-outcome.mjs';
 import { resolveUnknownReason } from './unknown-reason.mjs';
 import { checkStateAgainstView } from './view.mjs';
@@ -111,8 +111,25 @@ async function judgeInner({ case: c, adapter, adapterName = 'unknown', trajector
     });
   }
 
+  // 时钟策略必须两边对得上。案例声明 frozen 而适配器只能 wall，意味着
+  // 「同一份 seed 得到同一份时间戳」这个前提是假的 —— 判决照样可能 pass，
+  // 但只要案例里有一条 timeliness，它就会随机红，而且只在慢机器上红。
+  // 这种谎不能留到断言层去发现，必须在开跑之前拦住。
+  const wantClock = c.environment?.clock_policy;
+  if (wantClock !== undefined) {
+    const supported = Array.isArray(manifest.clock_policies) ? manifest.clock_policies : [DEFAULT_CLOCK_POLICY];
+    if (!supported.includes(wantClock)) {
+      return makeVerdict(base, 'unknown', 'invalid_environment', {
+        detail: `案例要求时钟 ${wantClock}，但适配器 ${manifest.adapter} 只支持 ${supported.join('/')}`
+          + '—— 这条案例的时间前提不成立，跑出来的任何结论都不算数',
+        timing_ms: Date.now() - startedAt,
+      });
+    }
+  }
+
   base.adapter = manifest.adapter;
   base.adapter_version = manifest.adapter_version;
+  base.clock_policy = wantClock ?? DEFAULT_CLOCK_POLICY;
   base.labels = deriveLabels(c, manifest);
 
   const scopes = c.observability?.declared_scopes ?? manifest.scopes;

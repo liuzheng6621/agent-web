@@ -54,6 +54,24 @@ export const EVIDENCE_LEVELS = Object.freeze(['observed', 'inferred', 'validated
  */
 export const RESET_STRATEGIES = Object.freeze(['snapshot', 'reseed', 'identity']);
 
+/**
+ * 时钟策略。案例用 `environment.clock_policy` 声明，适配器用
+ * `manifest.clock_policies` 声明自己支持哪几种，两边必须对得上。
+ *
+ *   frozen  适配器自己掌管时间：同一 seed 下重放，所有时间戳逐字相同
+ *   wall    用真实时钟：时间戳每次都不同，`timeliness` 靠真实耗时
+ *
+ * 为什么必须两边都声明：一个适配器可以「看起来支持 frozen」——它把时间戳
+ * 写进视图，但取的是 `Date.now()`。案例声明 frozen、判决照样 pass，
+ * 因为没有任何断言在比时间戳。等到某天有人加了一条 `timeliness`，
+ * 它会随机红——而且只在慢机器上红。这个谎必须在契约层拦，不能靠断言。
+ *
+ * 不声明 `clock_policies` 的适配器按只支持 `wall` 处理：这是保守默认值，
+ * 因为「能冻结时间」是额外能力，不能假设。
+ */
+export const CLOCK_POLICIES = Object.freeze(['frozen', 'wall']);
+export const DEFAULT_CLOCK_POLICY = 'wall';
+
 export function validateManifest(m) {
   const errors = [];
   if (!m || typeof m !== 'object') return ['manifest 必须是对象'];
@@ -62,6 +80,17 @@ export function validateManifest(m) {
   }
   if (m.reset_strategy && !RESET_STRATEGIES.includes(m.reset_strategy)) {
     errors.push(`manifest.reset_strategy 必须是 ${RESET_STRATEGIES.join('/')}`);
+  }
+  if (m.clock_policies !== undefined) {
+    if (!Array.isArray(m.clock_policies) || m.clock_policies.length === 0) {
+      errors.push(`manifest.clock_policies 必须是非空数组（只认 ${CLOCK_POLICIES.join('/')}）`);
+    } else {
+      for (const p of m.clock_policies) {
+        if (!CLOCK_POLICIES.includes(p)) {
+          errors.push(`manifest.clock_policies 里有 ${JSON.stringify(p)}，只认 ${CLOCK_POLICIES.join('/')}`);
+        }
+      }
+    }
   }
   if (m.events_types !== undefined && m.events_types !== null) {
     if (!Array.isArray(m.events_types) || m.events_types.some((t) => typeof t !== 'string')) {

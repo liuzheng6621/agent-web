@@ -424,7 +424,10 @@ export function buildWriteCases({ adapterName, baseUrl, capabilities, writePlan 
     const doc = {
       schema_version: 'agent-web/0.1',
       id: `discovered/${resource}-create`,
-      environment: { adapter: adapterName, seed: 1, clock_policy: 'frozen' },
+      // 不写 clock_policy：生成出来的是真实 HTTP 后端，它读的是墙上时钟。
+      // 以前这里写死 'frozen'，而生成的适配器根本没声明过 clock_policies ——
+      // 等于替一个冻不住时间的后端签名担保。默认值 wall 才是真话。
+      environment: { adapter: adapterName, seed: 1 },
       task: {
         natural_goal: `创建一条 ${resource}，检查列表是不是真的多了一条（由 ${baseUrl} 推断生成）`,
         allowed_capabilities: [id],
@@ -497,7 +500,10 @@ export function buildCaseDocs({ adapterName, baseUrl, capabilities, confirmedBy 
     const doc = {
       schema_version: 'agent-web/0.1',
       id: `discovered/${resource}-readonly`,
-      environment: { adapter: adapterName, seed: 1, clock_policy: 'frozen' },
+      // 不写 clock_policy：生成出来的是真实 HTTP 后端，它读的是墙上时钟。
+      // 以前这里写死 'frozen'，而生成的适配器根本没声明过 clock_policies ——
+      // 等于替一个冻不住时间的后端签名担保。默认值 wall 才是真话。
+      environment: { adapter: adapterName, seed: 1 },
       task: {
         natural_goal: `读一次 ${resource}，不该改变任何东西（由 ${baseUrl} 探测生成）`,
         allowed_capabilities: [read.capability],

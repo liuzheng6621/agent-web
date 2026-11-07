@@ -102,6 +102,7 @@ export function createLabAccessAdapter(options = {}) {
         adapter_version: '1',
         baseUrl: base,
         reset_strategy: 'identity',
+  clock_policies: ['wall'],   // 真实后端，时间戳由服务端生成，冻不住
         // 这后端只有审计日志，没有「实体事件流」；写 false 就不会有人拿事件断言去查它。
         events_complete: false,
         roles: ['admin', 'teacher', 'student'],

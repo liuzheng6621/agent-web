@@ -9,8 +9,9 @@ import * as e07 from './e07-contract-violation.mjs';
 import * as e08 from './e08-second-place.mjs';
 import * as e09 from './e09-doc-drift.mjs';
 import * as e10 from './e10-unusable-run.mjs';
+import * as e11 from './e11-ghost-field.mjs';
 
-export const exhibits = [e01, e02, e03, e04, e05, e06, e07, e08, e09, e10];
+export const exhibits = [e01, e02, e03, e04, e05, e06, e07, e08, e09, e10, e11];
 
 export async function runAll() {
   const out = [];

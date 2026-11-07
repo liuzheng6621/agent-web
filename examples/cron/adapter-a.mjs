@@ -12,6 +12,7 @@ export const MANIFEST = {
   adapter: 'cron-a',
   adapter_version: '1.0.0',
   reset_strategy: 'snapshot',
+  clock_policies: ['frozen'],   // 槽位时间由案例给的 from/every 算出，不读真实时钟
   description: '定时任务调度（数组 + 槽位集合，逐槽补齐）',
   scopes: ['jobs', 'runs'],
   roles: ['operator', 'viewer'],
