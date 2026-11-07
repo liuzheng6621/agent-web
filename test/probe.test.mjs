@@ -171,11 +171,11 @@ test('探针：读偷偷写必须被抓', async () => {
   assert.match(c.detail, /note\.list/);
 });
 
-test('探针：内置适配器九项全过', async () => {
+test('探针：内置适配器十项全过', async () => {
   const { createMemoryAdapter } = await import('../src/adapter/memory.mjs');
   const r = await probeAdapter({ adapter: createMemoryAdapter() });
   assert.equal(r.summary.failed, 0);
-  for (const id of ['declared-vs-behavior', 'role-effective', 'read-no-side-effect']) {
+  for (const id of ['declared-vs-behavior', 'role-effective', 'read-no-side-effect', 'outcome-contract']) {
     assert.ok(r.checks.some((c) => c.id === id), `缺检查项 ${id}`);
   }
 });
