@@ -33,7 +33,7 @@
   <a href="#should-you-use-this-thirty-seconds">Thirty seconds</a> ·
   <a href="#sixty-seconds">Sixty seconds</a> ·
   <a href="#three-verdicts-not-two">Three verdicts</a> ·
-  <a href="#validated-across-five-domains">Five domains</a> ·
+  <a href="#validated-across-six-domains">Six domains</a> ·
   <a href="#commands">Commands</a> ·
   <a href="#boundaries-implemented-vs-still-open">Boundaries</a> ·
   <a href="#docs">Docs map</a>
@@ -317,7 +317,7 @@ value multiset agreement (survives shuffled rows), enum overlap, cardinality. Di
 The renamed fixture recovers 17/17 with zero mismatches; after shuffling rows, renaming `totalAmount`
 to `x9` and deleting `pickupNo` it recovers 15/17 and **still zero mismatches** — the other two are
 reported as needing a human signature. A wrong mapping makes a case pass on a field that only looks right.
-## Validated across five domains
+## Validated across six domains
 
 | Domain | Implementation | What it proved |
 |---|---|---|
@@ -327,6 +327,7 @@ reported as needing a human signature. A wrong mapping makes a case pass on a fi
 | Lexicon search `cases/lexicon` | Two custom implementations (trie + greedy segmentation / sorted array + reverse DP) | 900 rows, 10 per page, three pages: cross-page duplicates, boundary drops and lying `total` only show up at this scale — [details](docs/domains/lexicon.md) |
 
 | RealWorld contract `cases/realworld` | Two independent implementations (`fake-server.mjs` is Map-backed, `fake-server-b.mjs` is array-backed) | One OpenAPI contract plus 13 official hurl suites converted verbatim: 100% verdict agreement — and when B is deliberately broken, `compare` names the exact case that disagrees |
+| Scheduled jobs `cases/cron` | Two custom implementations (array + slot Set with stored nextDue / slot-key Map with lastSlot) | Time is a slot sequence, not a scalar: `recurrence` catches double-fires, drift and gaps; 3/3 verdict agreement — [details](docs/domains/cron.md) |
 
 The third domain forced a mechanism: mutants can declare `applies_to`. A ledger-domain mutant in the coffee domain is "not applicable", not counted — otherwise the catch rate gets smashed by irrelevant mutants into a false pit.
 
@@ -462,7 +463,7 @@ The remaining boundaries are numbered to match L1–L11 in [docs/LIMITS.md](docs
 8. **Adapters can still lie (L8).** `probe` checks nine mechanical properties and `crosscheck` (v0.54.0) re-fetches through an independent channel, so together they catch "declared but missing", "role ignored", "reads that write" and "tampering with the response body". What they still cannot catch is a liar that watches the prober, or one that replaces the whole `globalThis.fetch`; process isolation is not implemented, and it would not be a security boundary anyway.
 9. **Parallel execution stays disabled for now (L9).** There is no parallel executor; re-enabling it requires byte-identical verdicts, failure causes and per-step receipts between serial and parallel runs.
 10. **Difficulty estimates depend on sample sources (L10).** Multiple independent submitters/batches are needed to interpret the result as external difficulty rather than self-test performance.
-11. **Real-backend validation covers only five domains (L11).** The threshold is two independent implementations plus 100% `compare` agreement. The first four domains each got a second implementation; the fifth (RealWorld) got one in v0.55.0. Adding a sixth is still manual work.
+11. **Real-backend validation covers only six domains (L11).** The threshold is two independent implementations plus 100% `compare` agreement. The first four domains each got a second implementation; the fifth (RealWorld) arrived in v0.55.0, the sixth (scheduled jobs) in v0.60.0. Adding more is still manual work.
 <!-- limits:end -->
 
 ## Docs

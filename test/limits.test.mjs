@@ -274,3 +274,55 @@ test('限制清单：每条给的验收命令都得是真命令', () => {
     assert.ok(re.test(help), `台账里的验收命令 ${cmd} 不在 --help 里`);
   }
 });
+
+
+// ── 台账互锁：三份文档写同一件事，就会漂 ─────────────────────────
+// docs/LIMITS.md 总表、docs/ROADMAP.md 第 0 节「台账状态」行、README 边界节，
+// 是同一份 11 条状态的三次手抄。实测漂过：ROADMAP 行把 L10 写成「依赖外部」，
+// 而 LIMITS 总表里 L10 早已是 `mitigated` —— 没有测试拦着，两处各说各话。
+// 守卫：ROADMAP 那行必须能从 LIMITS 总表机械重组出来，一个字不许自由发挥。
+
+const STATUS_ORDER = ['mitigated', 'by-design', 'withdrawn', 'open', 'ongoing'];
+
+function limitsStatusMap() {
+  const { raw, ids } = limitsEntries();
+  const map = {};
+  for (const id of ids) {
+    const i = raw.indexOf('## ' + id + ' ');
+    const block = raw.slice(i, raw.indexOf('\n## ', i + 4));
+    map[id] = block.match(/`status:\s*([a-z-]+)`/)[1];
+  }
+  return map;
+}
+
+test('限制清单：ROADMAP 台账状态行必须与 LIMITS 总表逐条互锁（手抄必漂）', () => {
+  const map = limitsStatusMap();
+  const groups = {};
+  for (let i = 1; i <= 11; i++) {
+    const id = 'L' + i;
+    (groups[map[id]] ||= []).push(id);
+  }
+  const want = STATUS_ORDER
+    .filter((s) => groups[s])
+    .map((s) => groups[s].join('/') + ' ' + s)
+    .join(' · ');
+  const road = read('docs/ROADMAP.md');
+  const row = road.match(/\| 台账状态 \| (.+?) \|/);
+  assert.ok(row, 'ROADMAP 第 0 节找不到「台账状态」行');
+  const got = row[1].replace(/\*\*/g, '');
+  assert.equal(got, want,
+    'ROADMAP 的台账状态行与 docs/LIMITS.md 总表不一致（改状态时两处都要动）：\n' +
+    '  ROADMAP: ' + got + '\n' +
+    '  LIMITS:  ' + want);
+});
+
+test('限制清单：L11 标题里的域数与 README 域表格行数互锁', () => {
+  const m = read('docs/LIMITS.md').match(/^## L11 只在(.)个域上验过/m);
+  assert.ok(m, 'LIMITS.md 找不到「## L11 只在N个域上验过」标题');
+  const want = NUM_ZH[m[1]];
+  assert.ok(want, 'L11 标题里的数字认不出来：' + m[1]);
+  const zhRows = tableRows(read('README.md'), /^## 在.个域上验过/m);
+  assert.ok(zhRows && zhRows.length > 0, '中文 README 域表格没有数据行');
+  assert.equal(want, zhRows.length,
+    'LIMITS 的 L11 标题与 README 域表格行数不一致 —— 加域时 LIMITS 也要改');
+});

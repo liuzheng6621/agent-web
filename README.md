@@ -32,7 +32,7 @@
   <a href="#三十秒判断该不该用">三十秒判断</a> ·
   <a href="#六十秒上手">六十秒上手</a> ·
   <a href="#判决只有三种">三种判决</a> ·
-  <a href="#在五个域上验过">五个域</a> ·
+  <a href="#在六个域上验过">六个域</a> ·
   <a href="#命令一览">命令</a> ·
   <a href="#边界已实现与仍未解决">边界</a> ·
   <a href="#文档">文档地图</a>
@@ -346,7 +346,7 @@ $ agent-web align our-view.json their-view.json --out=align.yml
 `recall` 在跑批后比对指纹：第一次命中只提醒，**第二次犯同一条就 exit 1 拦下**。
 加深记忆不是靠自觉，是靠退出码。
 
-## 在五个域上验过
+## 在六个域上验过
 
 | 域 | 实现 | 它证明了什么 |
 |---|---|---|
@@ -356,8 +356,9 @@ $ agent-web align our-view.json their-view.json --out=align.yml
 | 词库检索 `cases/lexicon` | 两个自造实现（字典树 + 贪心分词 / 二分 + 反向 DP） | 900 条数据、每页 10 条翻三页：跨页重复、边界丢行、`total` 说谎这三种坏法只有在这个规模上才真的暴露，[细节](docs/domains/lexicon.md) |
 
 | RealWorld 契约 `cases/realworld` | 两份独立实现（`fake-server.mjs` 用 Map，`fake-server-b.mjs` 用数组） | 一份 OpenAPI 契约 + 13 个官方 hurl 套件原样转成案例：100% 判决一致；把 B 故意弄坏之后，`compare` 立刻指出是哪一条案例分歧 |
+| 定时任务调度 `cases/cron` | 两个自造实现（数组 + 槽位 Set + 存 nextDue / 槽位键 Map + lastSlot 现算） | 时间是槽位序列，不是标量：`recurrence` 抓重复跑、跑偏、漏跑；3/3 判决一致，[细节](docs/domains/cron.md) |
 
-**另外还接过第六个真实后端**：实验室预约平台（`cases/labaccess`，Spring Boot 3 + MySQL）。它带来前五个域都没有的形状——**状态被时间推着走**：时段有容量，批准才发凭证，凭证只能在 `startAt <= now < endAt` 里签得出来，有效期还被预约结束时间截断。但只有一份实现、没有 `compare`，按 L11 的门槛**不计入「验过的域」**，[细节](docs/domains/labaccess.md)。
+**另外还接过一个真实后端**：实验室预约平台（`cases/labaccess`，Spring Boot 3 + MySQL）。它带来六个域都没有的形状——**状态被时间推着走**：时段有容量，批准才发凭证，凭证只能在 `startAt <= now < endAt` 里签得出来，有效期还被预约结束时间截断。但只有一份实现、没有 `compare`，按 L11 的门槛**不计入「验过的域」**，[细节](docs/domains/labaccess.md)。
 
 第三个域逼出了一个机制：变异体可以声明 `applies_to`。
 账本域的变异体在咖啡域是「不适用」，不进分母——否则抓获率会被无关变异体砸成假坑。
@@ -502,7 +503,7 @@ node bin/agent-web.mjs verify cases/realworld --adapter=realworld --detail
 8. **适配器仍可撒谎（L8）。** `probe` 查十二项机械性质，`crosscheck`（v0.54.0）再用独立通道复核响应，两件加起来能抓「声明了却不存在」「忽略角色」「读偷偷写」「返回体做手脚」。仍抓不到的是**会看探测器的骗子**，以及「把整个 `globalThis.fetch` 换掉」；进程隔离未做，且它不是安全边界。
 9. **并发暂不开放（L9）。** 没有并行执行器；恢复前要证明串行与并行的判决、死因、逐步回执逐字一致。
 10. **难度仍受样本来源限制（L10）。** 需要多个独立提交者/批次，才可把统计解释为外部难度，而不只是自测结果。
-11. **真实后端只覆盖五个领域（L11）。** 门槛是「两个独立实现 + `compare` 一致率 100%」。前四个域各自补上了第二实现，第五个（RealWorld）在 v0.55.0 补齐；再往上加域仍然是手工活。
+11. **真实后端只覆盖六个领域（L11）。** 门槛是「两个独立实现 + `compare` 一致率 100%」。前四个域各自补上了第二实现，第五个（RealWorld）在 v0.55.0 补齐，第六个（定时任务）在 v0.60.0 补齐；再往上加域仍然是手工活。
 <!-- limits:end -->
 
 ## 文档

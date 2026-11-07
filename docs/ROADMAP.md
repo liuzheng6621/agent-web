@@ -18,7 +18,7 @@
 | 测试 | 533 条 | `npm test` |
 | 判据准入 | 适用 41 / 抓到 39（95.1%） | `node scripts/certify-baseline.mjs --emit-limits` |
 | 计入的域 | **6 个** | `docs/LIMITS.md` L11 的计数判据 |
-| 台账状态 | L1/L2/L4/L5/L7/L8/**L11** mitigated · L3/L6 by-design · L9 withdrawn · L10 依赖外部 | `grep status docs/LIMITS.md` |
+| 台账状态 | L1/L2/L4/L5/L7/L8/L10/**L11** mitigated · L3/L6 by-design · L9 withdrawn | `grep status docs/LIMITS.md` |
 
 **v0.54.0 起台账上不再有 `open` 的条目。**这不是说其余十条解决了，是说它们都降到了
 「有明确边界、有验收命令、边界写在文档里」的状态。
