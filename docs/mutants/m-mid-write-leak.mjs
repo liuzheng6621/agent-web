@@ -10,7 +10,8 @@ export const meta = {
   // 它靠「第几步」下药：observe 包装给不出步号，所以只能在快路径（变换）里复现。
   requires_trace: true,
   catch_hint: '把窗口缩到「那一步之后」（window），盯住中间那段',
-};
+
+  applies_to: { collections: ["status_log"] },};
 
 export function wrap(adapter) {
   const tamper = (state, index, count) => {

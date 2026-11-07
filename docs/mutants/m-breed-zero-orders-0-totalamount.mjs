@@ -10,6 +10,7 @@ export const meta = {
   symptom: "orders[0].totalAmount 从 122 变成 0",
   mechanism: "把这个数值置为 0",
   catch_hint: "一条 field_equals 断言 orders[0].totalAmount；只断言状态或数量抓不到",
+  applies_to: { collections: ["orders"] },
   generated: true,
   breed_version: "agent-web/breed-1",
 };

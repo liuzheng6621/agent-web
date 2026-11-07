@@ -10,6 +10,7 @@ export const meta = {
   symptom: "orders[0].status 从 \"PICKED\" 变成 \"picked\"",
   mechanism: "把这个字符串转成小写",
   catch_hint: "一条 field_equals 断言 orders[0].status；只断言状态或数量抓不到",
+  applies_to: { collections: ["orders"] },
   generated: true,
   breed_version: "agent-web/breed-1",
 };

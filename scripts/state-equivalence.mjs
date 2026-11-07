@@ -59,11 +59,12 @@ for (const file of files) {
 }
 
 if (skippedTrace.length) {
-  console.log('跳过 ' + skippedTrace.length + ' 个需要轨迹下标的变异体（只在快路径里复现）：' + [...new Set(skippedTrace)].join(', '));
+  const uniqTrace = [...new Set(skippedTrace)];
+  console.log('跳过 ' + uniqTrace.length + ' 个需要轨迹下标的变异体（只在快路径里复现）：' + uniqTrace.join(', '));
 }
 
 if (noTamper.length) {
-  console.log('没有声明 tamper 的 state 变异体（会退回重放）：' + noTamper.join(', '));
+  console.log('没有声明 tamper 的 state 变异体（会退回重放）：' + [...new Set(noTamper)].join(', '));
 }
 console.log('对比 ' + compared + ' 组（其中 ' + reused + ' 组会走快路径），不一致 ' + bad.length + ' 处。');
 for (const line of bad.slice(0, 12)) console.log('  ! ' + line);

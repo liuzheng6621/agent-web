@@ -10,6 +10,7 @@ export const meta = {
   symptom: "menu 从 共 3 条 变成 少 1 条（丢头）",
   mechanism: "返回前把这个集合的第一个元素删掉",
   catch_hint: "一条 sorted 断言，或 count_delta 加首元素 field_equals；只断言数量抓不到",
+  applies_to: { collections: ["menu"] },
   generated: true,
   breed_version: "agent-web/breed-1",
 };

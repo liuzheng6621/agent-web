@@ -17,6 +17,7 @@ import { evalAssertions } from './assert/index.mjs';
 import { MUTATIONS, mutate } from './mutate.mjs';
 import { stableStringify } from './values.mjs';
 import { resolveUnknownReason } from './unknown-reason.mjs';
+import { UNUSABLE_CODES } from './traps.mjs';
 
 const TRUE_STATUS = 'pass';
 
@@ -102,7 +103,7 @@ function dupValue(v) {
  * 因此它观察到的 s_i 序列与 P⁺ 逐项相同 ⇒ 两边 tamper 的输入相同、输出相同。
  * 前提是 tamper 为纯函数（变异体目录第 1 条要求：只坏一处、不留隐藏状态）。
  */
-function transformCtx(baseCtx, tamper) {
+export function transformCtxProbe(baseCtx, tamper) {
   const ctx = {
     ...baseCtx,
     initial: dupValue(baseCtx.initial),
@@ -115,8 +116,9 @@ function transformCtx(baseCtx, tamper) {
   // 传下标与总长：这样变异体才能只坏「中间某一步」——
   // 「中途坏掉、结尾修好」是现有断言全靠看不出来的那一类。
   const count = ctx.trace.length + 2;
-  tamper(ctx.initial, 0, count);
-  tamper(ctx.final, count - 1, count);
+  // 没跑起来就没有状态可变换：直接放过，别把「环境没起来」变成「变异体写错了」。
+  if (ctx.initial !== undefined) tamper(ctx.initial, 0, count);
+  if (ctx.final !== undefined) tamper(ctx.final, count - 1, count);
   for (let i = 0; i < ctx.trace.length; i += 1) tamper(ctx.trace[i].stateAfter, i + 1, count);
   return ctx;
 }
@@ -150,7 +152,7 @@ export function deriveVerdict(baseVerdict, flat, results) {
 /** 不重放轨迹，直接用变换后的 ctx 求值断言。 */
 export function fastProbe(caseObj, base, tamper) {
   const flat = flatAssertions(caseObj);
-  const ctx = transformCtx(base.ctx, tamper);
+  const ctx = transformCtxProbe(base.ctx, tamper);
   const results = flat.map(({ assertion }) => evalAssertions([assertion], ctx).results[0]);
   return {
     verdict: deriveVerdict(base.verdict, flat, results),
@@ -218,7 +220,13 @@ export async function certifyCase(caseObj, adapterFactory, { adapterName = 'unkn
     // assertion_false 之后，意味着断言变假时真判决会翻成 fail，fastProbe 推不出来。
     // 数量很少，直接退回重放。
     const wrapped = m.wrap(await adapterFactory());
+    // base 根本没跑起来时（环境连不上、适配器违约、可能已生效），ctx.initial / ctx.final 是
+    // undefined。快路径拿它去变换，变异体第一行读 state.xxx 就 TypeError，整个 certify 当场
+    // 崩掉，报出来的是「Cannot read properties of undefined」而不是「环境没起来」。
+    // 这种情况只能退回重放：重放同样跑不通，但 probe 会把异常收成 unknown，照实报。
+    const ctxUsable = Boolean(base.ctx) && base.ctx.initial !== undefined && base.ctx.final !== undefined;
     const reusable = process.env.AGENT_WEB_CERTIFY_SLOW !== '1'
+      && ctxUsable
       && m.layer === 'state'
       && typeof wrapped._agentWebStateFn === 'function'
       && !(base.verdict?.status === 'unknown' && base.verdict?.reason_code === 'missing_observation');
@@ -265,7 +273,15 @@ export async function certifyCase(caseObj, adapterFactory, { adapterName = 'unkn
       suggestionBlocked: suggestions.length === 0 && witnesses.length > 0,
     });
   }
-  return { caseId: caseObj.id, base, armed, rows };
+  return {
+    caseId: caseObj.id,
+    base,
+    armed,
+    rows,
+    // 这一条案例的「正确实现」自己就没跑起来。此时 rows 里所有变异体都造不出差异，
+    // 全落 undetermined —— 把它当成「一个都没抓住」报出去，等于拿环境故障当成绩。
+    baseUnusable: UNUSABLE_CODES.has(base.verdict?.reason_code),
+  };
 }
 
 /** 把两份规范视图摊平，找出所有取值不同的叶子路径。 */
@@ -474,6 +490,11 @@ export async function certify({ cases, adapterFactory, adapterName = 'unknown', 
     };
   });
 
+  // 一条案例都没跑起来时，抓住率是 null 而不是 0：0 是「跑了，一个都没抓住」，
+  // 两者对读者的含义完全相反。
+  const unusableCases = per.filter((p) => p.baseUnusable).map((p) => p.caseId);
+  const allUnusable = per.length > 0 && unusableCases.length === per.length;
+
   const applicable = mutationsSummary.filter((m) => m.status !== 'not_applicable').length;
   const caught = mutationsSummary.filter((m) => m.caught).length;
   const killable = mutationsSummary.filter((m) => m.status === 'killable').length;
@@ -488,7 +509,9 @@ export async function certify({ cases, adapterFactory, adapterName = 'unknown', 
     killable,
     undetermined,
     suggestions: mutationsSummary.reduce((n, m) => n + (m.caught ? 0 : m.suggestionCount), 0),
-    caughtRate: applicable === 0 ? null : caught / applicable,
+    caughtRate: applicable === 0 || allUnusable ? null : caught / applicable,
+    unusableCases,
+    allUnusable,
   };
   const base = { version: 'agent-web/certify-1', adapter: adapterName, cases: per.map((p) => ({ caseId: p.caseId, verdict: p.base.verdict.status, traceOk: p.base.traceOk })), assertions, mutations: mutationsSummary, summary };
   return certificate(base);
@@ -511,6 +534,8 @@ function flatAssertionsOf(cases, cr, sink) {
 }
 
 export function certifyExit(report, { strict = false } = {}) {
+  // 一条都没跑起来时退 2（用法或环境错误），不是退 0。退 0 等于告诉 CI「查过了，没问题」。
+  if (report.summary.allUnusable) return 2;
   if (report.summary.survived > 0) return 1;
   if (strict && report.assertions.some((a) => !a.unarmed && a.kills.length === 0)) return 1;
   return 0;
@@ -581,6 +606,17 @@ export function formatCertify(report, { detail = false } = {}) {
   if (report.minimal.uncovered.length > 0) L.push(`  覆盖不到：${report.minimal.uncovered.join(' ')}`);
   L.push('');
 
+  if (s.allUnusable) {
+    L.push('这一跑不成立：所有案例的正确实现都没跑起来，下面这些数字一个都不能用。');
+    L.push(`  ${s.unusableCases.join(' ')}`);
+    L.push('  先让环境起来（或修好适配器），再谈抓获率 —— 环境故障不是成绩，也不是缺陷。');
+    return L.join(String.fromCharCode(10));
+  }
+  if (s.unusableCases.length > 0) {
+    L.push(`注意：${s.unusableCases.length} 条案例的正确实现没跑起来（${s.unusableCases.join(' ')}），`);
+    L.push('  它们上面的变异体全落「说不清」，不计入下面的分子分母。');
+    L.push('');
+  }
   const rate = s.caughtRate === null ? '—（分母为 0）' : `${(s.caughtRate * 100).toFixed(1)}%`;
   L.push(`变异体抓获率 ${s.caught}/${s.applicable} = ${rate}（目录共 ${s.mutations} 个，${s.notApplicable} 个不适用）`);
   if (s.survived > 0) L.push(`漏网 ${s.survived} 个：${report.mutations.filter((m) => !m.caught && m.status !== 'not_applicable').map((m) => m.id).join(' ')}`);

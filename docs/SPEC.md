@@ -852,8 +852,29 @@ a(P⁺) = true   且   a(m) = false
 | 有变异体漏网 | 1 |
 | 全部抓到 | 0 |
 | `--strict` 且存在「能求值但抓不住任何东西」的断言 | 1 |
+| 所有案例的正确实现都没跑起来（`allUnusable`） | **2** |
 
 默认不对空转断言判红：空转是正常的中间状态，一刀切会让人把命令整个关掉。
+
+**最后一档是 v0.63.1 补的，起因是一串连锁的假通过。** 8181 后端没起时，每条案例的
+`base.ctx.initial` 与 `base.ctx.final` 都是 `undefined`；state 层变异体走免重放快路径，
+拿 `undefined` 去 `tamper(state)`，变异体第一行读 `state.xxx` 就 `TypeError`，整个
+`certify` 当场崩掉——报出来的是 `Cannot read properties of undefined`，读者会以为变异体写错了。
+
+把崩溃修掉之后露出真正的问题：它改成报 `变异体抓获率 0/5 = 0.0%`，并退 0。那个 `0.0%`
+在读者眼里是「这些断言一条都抓不住变异体」，实际含义是「一条案例都没跑起来」——方向完全相反；
+退 0 则等于告诉 CI「查过了，没问题」。
+
+判据与 `traps` 的 `unusable` 共用一份（`src/traps.mjs` 的 `UNUSABLE_CODES`）：
+一条案例的 `base.verdict.reason_code` 落在
+`infrastructure_error` / `contract_violation` / `effect_uncertain` 里，就算这一跑不成立。
+全部不成立时：
+
+- `caughtRate` 是 `null`，不是 `0`（`0` 是「跑了，一个都没抓住」）
+- `formatCertify` 先印「这一跑不成立」，**并且不印抓获率那一行**
+- 退出码 2
+
+部分不成立时照常报率，但必须点名是哪几条没跑起来，且那几条上的变异体不计入分子分母。
 
 ### 12.9 三档状态与建议断言
 
@@ -938,6 +959,7 @@ export function wrap(adapter) {
 | `symptom` | 是 | 非空。写不出用户会怎么投诉，说明这个变异体不对应真故障 |
 | `mechanism` | 是 | 非空。改了什么，一句话 |
 | `catch_hint` | 是 | 非空。抓得住的与抓不住的都要写 |
+| `applies_to` | 是 | 见 12.8.1。**省略等于「所有域都适用」**，那个默认值会把每个新域的分母撑大 |
 | `wrap(adapter)` | 是 | 返回同契约的适配器 |
 
 `docs/mutants/index.mjs` 的 `validateMutants()` 在加载时校验上表，任何一条不满足就抛错
@@ -957,6 +979,36 @@ export function wrap(adapter) {
 
 新增变异体的验收标准不属于格式，属于评审：见 `docs/mutants/README.md` 的四条收稿标准。
 
+### 12.8.1 `applies_to`：变异体只对哪些域有意义
+
+一个变异体改的是「`orders` 里第一条的 `totalAmount`」。在账本域上跑它，
+`orders` 这个集合根本不存在——变异体一行都改不到，`certify` 只能判「说不清」（`undetermined`）。
+这不是缺陷，是**这条坏法在那个域上不存在**。把它算进分母，抓获率就被一批
+造不出差异的条目稀释了：一个已经验得不错的域会被报成烂域。
+
+```js
+applies_to: { capabilities: ['order.cancel'], collections: ['orders'] }
+```
+
+判据（`src/certify.mjs` 的 `appliesTo`）：声明的能力全在 `manifest.capabilities` 里、
+声明的集合全在 `manifest.scopes` 里，才判适用。两个字段都可省略，**全空 = 所有域都适用**。
+
+三个约定：
+
+1. **跨域通病写空对象 `{}`，不省略。** `m-no-reject`（该拒的不拒）在任何有负例步的域上都适用。
+   写 `{}` 是为了跟「忘了写」区分开——省略是默认值，`{}` 是声明。
+2. **省略是危险的默认值。** 它等于「对所有域适用」，而写变异体的人通常只想着自己那个域。
+   v0.63.1 之前 14 个变异体没写（4 个手写 + 9 个 `m-breed-*` + 生成器模板本身），
+   结果是账本域 6/21、词库域 10/25、定时任务域 4/19；补全后是 6/9、10/13、4/7。
+   **分母虚高不是「尺子不够长」，是根本没在量。**
+3. **生成器必须自己写。** `breed` 的 `renderMutant` 知道 `target.collection`，却一度没写进模板，
+   于是每跑一次就往目录里灌一批「所有域都适用」的变异体。现在模板自带
+   `applies_to: { collections: [<它改的那个集合>] }`，`test/certify-applicability.test.mjs`
+   直接对生成结果做正则断言。
+
+不适用（`not_applicable`）的变异体不进分母，也不进「漏网」清单——它是第三个数，
+不是第三种失败。
+
 ### 12.7 为什么单独一条命令
 
 `audit` 需要两个独立实现才知道真假；`certify` 只需要一个正确实现加一组坏法。
@@ -972,9 +1024,11 @@ certify 对每个变异体本来要跑一遍完整轨迹。真实后端上这是
 
 对这类变异体，重放是不必要的。它的 `wrap` 把 tamper 函数挂在 `_agentWebStateFn` 上，certify 直接拿正确实现的 ctx 变换一份：
 
+`base.ctx.initial` 或 `base.ctx.final` 是 `undefined`（这一跑根本没跑起来）时不走快路径，退回重放——拿 `undefined` 去变换会让变异体当场 `TypeError`，报出来的错指向变异体，实际指向环境。
+
 | 变异体 | 执行结局 | ctx 从哪来 |
 |---|---|---|
-| state 层 | 与正确实现逐项相同 | `transformCtx(base.ctx, tamper)` |
+| state 层 | 与正确实现逐项相同 | `transformCtxProbe(base.ctx, tamper)` |
 | execute 层 | 可能不同 | 必须真重放 |
 
 **等价性**：变异体重放时第 i 次 `observe` 返回 `tamper(clone(s_i))`，`s_i` 是正确实现第 i 次 `observe` 的返回值；`wrapState` 只包 `observe`，内部执行逻辑与正确实现相同 ⇒ 观察到的序列逐项相同 ⇒ tamper 的输入相同、输出相同。**前提是 tamper 为纯函数**，这也是变异体目录第 1 条要求（只坏一处、不留隐藏状态）的原因。

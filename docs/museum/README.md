@@ -2,7 +2,7 @@
 
 这个目录收藏的**不是功能演示，是假通过**。
 
-每件展品记录一种「判决看起来没问题、实际什么也没证明」的情形。它们不是假想的：九件里有八件来自这个仓库自己踩过的坑，另一件（01）是真实事故的完整复现。
+每件展品记录一种「判决看起来没问题、实际什么也没证明」的情形。它们不是假想的：十件里有九件来自这个仓库自己踩过的坑，另一件（01）是真实事故的完整复现。
 
 ## 为什么单独给它一个目录
 
@@ -37,6 +37,7 @@
 | 07 | 契约外的 outcome | `pass` | `unknown` / `contract_violation` | `OUTCOMES` 白名单 + `probe` 第 6 项 |
 | 08 | 同一个洞的第二个地方 | `pass` | `unknown` / `contract_violation` | 分类语义抽成一份 · 结构守卫扫源码 |
 | 09 | 文档里的退出码 | `pass` | `fail` / `doc_code_mismatch` | 第 8 章的表与代码对账（`test/exit-codes.test.mjs`） |
+| 10 | 环境没起来却报了抓获率 | `pass` | `fail` / `unusable_run_reported_as_zero` | `certify` 的 `allUnusable` 判据 + 退出码 2 |
 
 ## 01 · 身份塌缩
 
@@ -163,3 +164,29 @@ assert.equal(r.exitCode, 2);   // test/ingest.test.mjs
 `checkDocAgainstCode()` 是纯函数，所以展品能直接喂它**修之前那张旧表**，证明它真的抓得住。喂当前表必须绿——这是反向验证，机制不是见谁都咬。
 
 **这条也顺手把「文档漂移」变成了可检的类别。** 在此之前，`docs/` 里所有数字（断言数、命令数、变异体数、测试数）都靠 `scripts/status-line.mjs` 一个脚本管；退出码这张表恰好不在它的射程内，于是漏了四十个版本。漏的原因不是没人写检查，是**没人列出「哪些文档内容属于断言」**。
+
+## 10 · 环境没起来却报了抓获率
+
+补 `applies_to` 的时候顺手撞出来的，比 `applies_to` 本身严重得多。
+
+先是 animal 域的 `certify` 直接崩：`Cannot read properties of undefined (reading 'adoption_applications')`。查下去是两件事叠在一起——8181 后端没起，每条案例的 `base.ctx.initial` 与 `base.ctx.final` 都是 `undefined`；而 state 层变异体走「免重放」快路径，拿 `undefined` 去 `tamper(state)`，变异体第一行读 `state.adoption_applications` 就 `TypeError`。
+
+报错文本把人往错方向带：它说 `Cannot read properties of undefined`，读者会以为变异体写错了。实际是环境没起来。
+
+**修掉崩溃之后露出了真正的问题。** 它不崩了，改成报 `变异体抓获率 0/5 = 0.0%`。那个 `0.0%` 在读者眼里是「这些断言一条都抓不住变异体」，实际含义是「一条案例都没跑起来」——两件事的方向完全相反。而且它退 0（`survived === 0` 时不触发 `return 1`），等于告诉 CI「查过了，没问题」。
+
+**为什么它算假通过**：这里被换掉的测量对象是「被测的东西」。`certify` 问的是「断言够不够狠」，可它实际测的是「这台机器上有没有后端在跑」。回答这个问题不需要任何断言，所以任何断言都会显得一样没用——`0.0%` 就是这么来的。它不是成绩，也不是缺陷，是**问题没被问出来**。
+
+**机制**：两层。
+
+第一层是别崩。`certifyCase` 里加 `ctxUsable`：`base.ctx.initial` 与 `base.ctx.final` 只要有一个是 `undefined`，就不走快路径，退回重放。`transformCtxProbe` 自己也加了一道 `if (ctx.initial !== undefined)`——别人直接调它时同样不该把「环境没起来」变成「变异体写错了」。
+
+第二层是别把「没测」报成「没抓住」。`src/traps.mjs` 的 `UNUSABLE_CODES`（`infrastructure_error` / `contract_violation` / `effect_uncertain`）现在被 `certify` 也用上了：一条案例的 `base.verdict.reason_code` 落在这组码里，就记进 `summary.unusableCases`；全部落进去则 `allUnusable = true`，此时——
+
+- `caughtRate` 是 `null`，不是 `0`
+- `formatCertify` 先印「这一跑不成立」，**并且不印抓获率那一行**
+- `certifyExit` 退 **2**（用法或环境错误），不是 0
+
+**为什么这组码不能只写 `infrastructure_error`。** v0.60.0 加了 `contract_violation`，v0.61.0 加了 `effect_uncertain`，它们同样表示「这一次执行本身不可信」。判据必须写成**集合**，而且反例不能错杀：`missing_observation` 是**真盲区**（跑起来了、断言看不出来），它必须留在分母里。这条判据在 `src/traps.mjs` 与 `certify` 之间只有一份实现，`test/outcome-contract.test.mjs` 有反例测试盯着。
+
+**它顺带说明了一件事**：`0.0%` 和 `null` 在报表里长得差不多（都让人不想看），但前者会让人去补断言，后者会让人去起服务。工具在分不清的时候，宁可少说一句，也不能说反。

@@ -43,12 +43,14 @@ node bin/agent-web.mjs certify cases/labaccess --adapter=labaccess
 |---|---|
 | `probe` | 当时 9 项 8 通过 1 跳过（跳过项是「没有只允许部分角色的写能力」，给能力标了 `roles` 之后不再跳过）；v0.61.0 起探针是 11 项 |
 | `verify` | **6/6 与预期标签一致**，可判定率 100%，p50 ≈ 1.4s |
-| `certify` | 抓到 7 / 适用 20 = **35.0%**（四个实验室变异体全抓），40 个变异体不适用 |
+| `certify` | 适用 8（四个本域 + 四个跨域通病）。v0.58.0 时抓到 7/20 = 35.0%，分母里掺了 13 个咖啡域老变异体；v0.63.1 补全 `applies_to` 后分母降到 8，但这一跑要先把 8182 后端起来 |
 
-`certify` 的分母要打个折看：适用的 20 个里有 13 个是咖啡域专用的老变异体，它们没声明
+v0.63.1 之前 `certify` 的分母是 20，其中 13 个是咖啡域专用的老变异体，它们没声明
 `applies_to`，工具只能按「适用」算，而它们在实验室适配器上连差异都造不出来。
-真正与本域相关的 7 个全被抓住，其中 3 个是跨域通病（`m-no-reject`、`m-exec-role-ignore`、
-`m-exec-drop-intermediate`），4 个是本域专属（下一节）。
+补全声明后适用只剩 8 个：4 个本域专属（下一节）+ 4 个跨域通病（`m-no-reject`、
+`m-exec-role-ignore`、`m-exec-duplicate-write`、`m-exec-drop-intermediate`）。
+**这 8 个里没有一个能在这个域上被安全地判「抓住了」——除非后端在跑。**
+后端不在时 certify 退 2 并明说「这一跑不成立」，不会印一个 0.0% 让人误读成「尺子不够长」。
 
 ## 六条案例
 
@@ -107,4 +109,4 @@ node bin/agent-web.mjs certify cases/labaccess --adapter=labaccess
 
 - 只覆盖「预约—审批—口令」和「借用—批准—归还」两条链；课表导入、权限申报、设备事件、人脸登记都没接。
 - 没有第二个实现，所以 `compare` 用不上——按 L11 的门槛（两个独立实现 + `compare` 100%），它**不算一个"验过的域"**，只算一次真实后端验证。台账里 L11 仍写五个域。
-- 13 个老变异体缺 `applies_to`，会虚增每个新域的分母（见 `docs/mutants/README.md`）。
+- 本域适用 8 个变异体（四个 `m-lab-*` + 四个跨域通病）。v0.63.1 之前有 13 个老变异体没声明 `applies_to`，把分母灌到 20；补全后不再虚增（见 `docs/mutants/README.md`）。

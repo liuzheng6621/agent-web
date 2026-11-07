@@ -26,7 +26,7 @@ const FINAL_KINDS = new Set(['entity_exists', 'field_equals', 'count_delta', 'un
  * 把「没测」报成「测了但看不出来」，方向正好相反。
  * 判据：这个码是否说明**这一次执行本身不可信**，与产品无关。
  */
-const UNUSABLE_CODES = new Set([
+export const UNUSABLE_CODES = new Set([
   'infrastructure_error',
   'contract_violation',
   'effect_uncertain',

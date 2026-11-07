@@ -235,6 +235,9 @@ export const meta = {
   symptom: ${JSON.stringify(where + ' 从 ' + before + ' 变成 ' + after)},
   mechanism: ${JSON.stringify(op.mechanism)},
   catch_hint: ${JSON.stringify(catchHint)},
+  // 它只在这个集合上才有意义：换个域连这个集合都没有，谈「抓没抓住」是无意义的。
+  // 这一步以前漏了，害得每个新域的分母里都混进一堆造不出差异的老变异体。
+  applies_to: { collections: [${JSON.stringify(target.collection)}] },
   generated: true,
   breed_version: ${JSON.stringify(BREED_VERSION)},
 };

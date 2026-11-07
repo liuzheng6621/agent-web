@@ -10,6 +10,7 @@ export const meta = {
   symptom: "menu 从 共 3 条 变成 每个字段都是 null",
   mechanism: "返回前把每个元素的每个字段置 null",
   catch_hint: "一条 sorted 断言，或 count_delta 加首元素 field_equals；只断言数量抓不到",
+  applies_to: { collections: ["menu"] },
   generated: true,
   breed_version: "agent-web/breed-1",
 };

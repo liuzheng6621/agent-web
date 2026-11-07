@@ -10,6 +10,7 @@ export const meta = {
   symptom: "status_log[0].type 从 \"order.created\" 变成 \"order.create\"",
   mechanism: "去掉最后一个字符",
   catch_hint: "一条 field_equals 断言 status_log[0].type；只断言状态或数量抓不到",
+  applies_to: { collections: ["status_log"] },
   generated: true,
   breed_version: "agent-web/breed-1",
 };
