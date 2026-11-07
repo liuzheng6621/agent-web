@@ -6,6 +6,24 @@
 CI 也在查。这条规则是买来的：这个仓库曾经同时存在 `package.json` 0.16、README 0.9、
 Gitee Release v0.6.0 三个数，谁看都是三个项目。
 
+## 0.69.0 — 2026-11-08
+
+L2 写后事实层的 **S2 闭环**：coffee-sql 三案例 + 四变异体，`m-sql-phantom-success` 从造不出来到被杀。
+
+- 新案例目录 `cases/coffee-sql/`（3 条，全部跑在 `taixianglian-sql` 通道上）：
+  `write-landed`（下单必须真落库：行数/状态/总额/明细行五处对账）、
+  `log-chain`（接单流水必须留痕：who/from/to/role 四处对账）、
+  `price-truth`（三处金额自洽：明细行 count×unitPrice=subTotal、ΣsubTotal=totalAmount，relation 两条）。
+- 四个 SQL 通道变异体（`docs/mutants/`，登记进 index，目录 63 → 67）：
+  `m-sql-phantom-success`（execute 报 applied 但不落库——幽灵成功，L2 定义性敌人）、
+  `m-sql-cross-user-leak`（SQL 观测忘属主过滤，他人单抢占列表头）、
+  `m-sql-log-type-flip`（流水谎报迁移终点 making→ready）、
+  `m-sql-total-drift`（总额单位漂移 ×10）。
+  四条在 taixianglian-sql 与 memory 两个域**全部抓到**；certify-baseline 实测随之刷新：
+  67 个变异体、适用 45、抓到 43（95.6%）。
+- 一个教训写进变异体注释：`count_delta` 对「初态也注水」的观测变异**天然无感**（delta 仍是 1），
+  身份塌缩类变异必须让假行抢占列表头，index 型断言才踩得到。
+
 ## 0.68.0 — 2026-11-07
 
 第二观测通道 `taixianglian-sql`：L2 写后事实层的地基（三层验证栈 S1）。

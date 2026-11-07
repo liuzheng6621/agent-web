@@ -1,0 +1,5 @@
+{
+  "coffee-sql/write-landed": "pass",
+  "coffee-sql/log-chain": "pass",
+  "coffee-sql/price-truth": "pass"
+}

@@ -7,14 +7,14 @@
 
 ---
 
-## 0. 现在的实际状态（v0.68.0，全部实测）
+## 0. 现在的实际状态（v0.69.0，全部实测）
 
 | 项 | 数字 | 怎么核 |
 |---|---|---|
-| 版本 | 0.68.0 | `node bin/agent-web.mjs version` |
+| 版本 | 0.69.0 | `node bin/agent-web.mjs version` |
 | 断言 | 20 种 | `--help` 里的断言表 |
 | 命令 | 32 条 | 同上 |
-| 变异体 | 63 个 | `node bin/agent-web.mjs mutants` |
+| 变异体 | 67 个 | `node bin/agent-web.mjs mutants` |
 | 测试 | 533 条 | `npm test` |
 | 判据准入 | 适用 41 / 抓到 39（95.1%） | `node scripts/certify-baseline.mjs --emit-limits` |
 | 计入的域 | **6 个** | `docs/LIMITS.md` L11 的计数判据 |

@@ -1,0 +1,67 @@
+{
+  "schema_version": "agent-web/0.1",
+  "id": "coffee-sql/log-chain",
+  "environment": {
+    "adapter": "taixianglian-sql",
+    "seed": {}
+  },
+  "task": {
+    "natural_goal": "店员接单之后，数据库流水必须留下那一跳：谁（角色）、从哪来、到哪去。",
+    "goal_assertions": [
+      {
+        "kind": "field_equals",
+        "selector": { "collection": "orders", "index": 0 },
+        "path": "status",
+        "value": "MAKING"
+      },
+      {
+        "kind": "field_equals",
+        "selector": { "collection": "status_log", "index": 0 },
+        "path": "type",
+        "value": "order.making"
+      },
+      {
+        "kind": "field_equals",
+        "selector": { "collection": "status_log", "index": 0 },
+        "path": "from",
+        "value": "PENDING"
+      },
+      {
+        "kind": "field_equals",
+        "selector": { "collection": "status_log", "index": 0 },
+        "path": "to",
+        "value": "MAKING"
+      },
+      {
+        "kind": "field_equals",
+        "selector": { "collection": "status_log", "index": 0 },
+        "path": "role",
+        "value": "STAFF"
+      }
+    ],
+    "invariants": []
+  },
+  "reference_trajectory": [
+    {
+      "id": "s1",
+      "capability": "order.create",
+      "as": "customer",
+      "expected_outcome": "applied",
+      "arguments": {
+        "items": [
+          { "dishName": "拿铁", "qty": 1 }
+        ]
+      }
+    },
+    {
+      "id": "s2",
+      "capability": "kitchen.accept",
+      "as": "staff",
+      "expected_outcome": "applied",
+      "bindings": { "orderId": "$s1.orderId" }
+    }
+  ],
+  "observability": {
+    "declared_scopes": ["menu", "orders", "status_log"]
+  }
+}

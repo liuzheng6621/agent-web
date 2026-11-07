@@ -68,6 +68,10 @@ import * as cronSkipSlot from './m-cron-skip-slot.mjs';
 import * as cronDoubleFire from './m-cron-double-fire.mjs';
 import * as cronDrift from './m-cron-drift.mjs';
 import * as labApproveNotPending from './m-lab-approve-not-pending.mjs';
+import * as sqlPhantomSuccess from './m-sql-phantom-success.mjs';
+import * as sqlCrossUserLeak from './m-sql-cross-user-leak.mjs';
+import * as sqlLogTypeFlip from './m-sql-log-type-flip.mjs';
+import * as sqlTotalDrift from './m-sql-total-drift.mjs';
 
 const ENTRIES = [
   ['m-money-off-by-cent', moneyOffByCent],
@@ -135,6 +139,12 @@ const ENTRIES = [
   ['m-cron-skip-slot', cronSkipSlot],
   ['m-cron-double-fire', cronDoubleFire],
   ['m-cron-drift', cronDrift],
+
+  // 咖啡店第二观测通道（taixianglian-sql）：L2 写后事实层的敌人。
+  ['m-sql-phantom-success', sqlPhantomSuccess],
+  ['m-sql-cross-user-leak', sqlCrossUserLeak],
+  ['m-sql-log-type-flip', sqlLogTypeFlip],
+  ['m-sql-total-drift', sqlTotalDrift],
 
 ];
 
