@@ -59,6 +59,7 @@ import { deriveNegatives, renderNegativeSheet, formatNegativeSummary, writeNegat
 import { preflightAll, formatPreflight, preflightExit } from '../src/preflight.mjs';
 import { crosscheck } from '../src/crosscheck.mjs';
 import { formatCrosscheck } from '../src/assert/crosscheck.mjs';
+import { ingestReport, formatIngest, ingestExit } from '../src/ingest.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..');
@@ -755,6 +756,30 @@ function cmdLearn(args, flags) {
   console.log(`  3 agent-web verify ${path.join(out, 'cases')} --adapter=${path.join(out, 'twin.json')}   # 孪生对照`);
   if (!flags.accept) console.log('  案例默认是草稿：agent-web accept <id> --by=<名字> 之后才出判决');
   return 0;
+}
+
+async function cmdIngest(args, flags) {
+  const file = args[0];
+  if (!file) {
+    console.error('用法：agent-web ingest <外部报告.json> [--from=e2e] [--json]');
+    console.error('      把别家的测试报告翻成 pass / fail / unknown，并数出「跑绿了但什么都没证明」的比例。');
+    console.error('      只翻译判决词汇，不冒充「外部测试等于本仓库的案例」。');
+    return 2;
+  }
+  let doc;
+  try {
+    doc = JSON.parse(fs.readFileSync(file, 'utf8'));
+  } catch (e) {
+    console.error(`读不了 ${file}：${e && e.message}`);
+    return 2;
+  }
+  const report = ingestReport(doc, { from: flags.from });
+  if (flags.json) {
+    console.log(JSON.stringify(report, null, 2));
+  } else {
+    console.log(formatIngest(report));
+  }
+  return ingestExit(report);
 }
 
 async function cmdCrosscheck(args, flags) {
@@ -1921,6 +1946,7 @@ const HELP = `agent-web —— 给 Agent 写机器可判的集成测试
   agent-web tap --target=URL                  录五分钟：流量长出适配器、孪生与案例
   agent-web learn <traffic.jsonl> --out=DIR  把录制学成四件东西（yaml/孪生/案例/认不出的）
   agent-web mutants                           变异体目录：谁的坏法、怎么抓、怎么投稿
+  agent-web ingest <报告.json> [--from=e2e]    把别家的测试报告翻成三值判决，数清机器判定占比
   agent-web align <参照视图> <目标视图> [--out=align.yml]  跨命名体系的字段映射提议
   agent-web negatives <案例或目录> --adapter=SPEC  按声明派生负例候选（全部 disputed，只出审阅表）
   agent-web preflight <案例或目录> --adapter=SPEC  跑之前预检：预测 ready / unknown / fail，与预期对账
@@ -2006,6 +2032,8 @@ async function main() {
       return cmdKnowledge(flags);
     case 'recall':
       return cmdRecall(args, flags);
+    case 'ingest':
+      return cmdIngest(args, flags);
     case 'crosscheck':
         return await cmdCrosscheck(args, flags);
     case 'discover':

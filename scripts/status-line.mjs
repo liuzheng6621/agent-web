@@ -16,7 +16,9 @@ const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
 
 const version = JSON.parse(read('package.json')).version;
 const bin = read('bin/agent-web.mjs');
-const commands = new Set([...bin.matchAll(/case '([a-z]+)':/g)].map((m) => m[1])).size;
+// 命令名允许数字与连字符：原来的 [a-z]+ 会把 case 'e2e': 这类名字静默漏掉，
+// 于是状态行少报一条命令，而没有任何测试会因此变红。
+const commands = new Set([...bin.matchAll(/case '([a-z0-9-]+)':/g)].map((m) => m[1])).size;
 
 const zh = `当前版本 ${version}</b> · ${KINDS.length} 种断言 · ${commands} 条命令 · ${mutants.length} 个变异体`;
 const en = `<b>v${version}</b> · ${KINDS.length} assertion kinds · ${commands} commands · ${mutants.length} mutants`;

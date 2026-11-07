@@ -6,6 +6,24 @@
 CI 也在查。这条规则是买来的：这个仓库曾经同时存在 `package.json` 0.16、README 0.9、
 Gitee Release v0.6.0 三个数，谁看都是三个项目。
 
+## 0.59.0 — 2026-11-07
+
+- 新增 `ingest` 命令：把别家测试框架的报告翻成 `pass / fail / unknown / not_run`，并数出三个数
+  ——可判定率、机器判定占比、一条断言都没有的判决数。产物不进 `report --counts`。
+- 翻译表是穷举的：`flaky`/`timed-out`/`interrupted`/`skipped(explicit)` 一律 `unknown`，
+  `skipped(filtered)` + `selected:false` 记 `not_run` 不进分母，表外状态 `unknown` 且退 2。
+  **没见过的状态绝不默认成 pass。**
+- 修可判定率的分母：运行层事故（`run.errors[]`）也进分母。把它们排除在外，
+  等于替产品把没跑的测试判成过。
+- `expectedFailure` 的 `passed` 记 `reason_code: 'expected_failure_still_present'` 并报警：
+  它绿的是「缺陷还在」，不是「产品正常」。
+- 新增 `docs/COMPARE-e2e.md`：与 tester-army/e2e 的判决词汇对齐表、两个陷阱、
+  以及**明确做不到的事**（拿我们的变异体打他们的套件要 Playwright 与模型，离线做不到，
+  不含糊其辞）。顺带记一笔外部佐证：三值判决是两边各自独立撞到的。
+- `scripts/status-line.mjs` 的命令名正则从 `[a-z]+` 放宽到 `[a-z0-9-]+`：
+  原写法会把 `case 'e2e':` 这类名字静默漏数，状态行少报一条命令而没有测试会红。
+- 测试 427 → 435（`test/ingest.test.mjs` 八条）。
+
 ## 0.58.0 — 2026-11-07
 
 实验室域补上它该有的坏法：两条新案例、四个本域变异体，`certify` 抓获率 **18.8% → 35.0%**。

@@ -1,0 +1,48 @@
+{
+  "schemaVersion": "report-1",
+  "run": {
+    "id": "aw-fixture",
+    "specVersion": 1,
+    "runner": { "name": "e2e", "version": "0.23.0" },
+    "status": "failed",
+    "exitCode": 1,
+    "startedAt": "2026-11-07T02:00:00.000Z",
+    "finishedAt": "2026-11-07T02:00:09.000Z",
+    "results": [
+      {
+        "id": "r0", "titlePath": ["checkout", "opens app"], "selected": true, "status": "passed",
+        "expectedFailure": { "reason": "known gap: the cart badge does not update" },
+        "attempts": [{ "id": "a0", "index": 0, "status": "passed", "durationMs": 900, "steps": [
+          { "id": "s0", "index": 0, "kind": "agent", "api": "agent.act", "status": "passed", "durationMs": 400 },
+          { "id": "s1", "index": 1, "kind": "agent", "api": "agent.assert", "status": "failed", "durationMs": 500 }
+        ] }]
+      },
+      {
+        "id": "r1", "titlePath": ["checkout", "shows total"], "selected": true, "status": "failed",
+        "attempts": [{ "id": "a1", "index": 0, "status": "failed", "durationMs": 1200, "steps": [
+          { "id": "s2", "index": 0, "kind": "locator", "api": "locator.click", "status": "passed", "durationMs": 200 },
+          { "id": "s3", "index": 1, "kind": "assertion", "api": "expect.toContainText", "status": "failed", "durationMs": 1000 }
+        ] }]
+      },
+      {
+        "id": "r2", "titlePath": ["checkout", "retries safely"], "selected": true, "status": "flaky",
+        "attempts": [
+          { "id": "a2", "index": 0, "status": "failed", "durationMs": 800, "steps": [] },
+          { "id": "a3", "index": 1, "status": "passed", "durationMs": 700, "steps": [] }
+        ]
+      },
+      {
+        "id": "r3", "titlePath": ["billing", "upgrades plan"], "selected": true, "status": "skipped",
+        "skip": { "cause": "explicit", "reason": "flaky in CI" }, "attempts": []
+      },
+      {
+        "id": "r4", "titlePath": ["billing", "prorates"], "selected": false, "status": "skipped",
+        "skip": { "cause": "filtered", "filter": "checkout" }, "attempts": []
+      }
+    ],
+    "errors": [
+      { "category": "hook", "code": "HOOK_FAILED", "message": "afterAll failed: teardown broke", "retryable": false, "phase": "afterAll" }
+    ],
+    "summary": { "discovered": 5, "selected": 4, "executed": 3, "passed": 1, "failed": 1, "interrupted": 0, "flaky": 1, "skipped": 2 }
+  }
+}

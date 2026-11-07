@@ -1,4 +1,4 @@
-# agent-web v0.58.0
+# agent-web v0.59.0
 
 <p align="center">
   <img src="docs/media/hero.png" alt="agent-web: integration tests an agent can be judged on" width="100%">
@@ -18,7 +18,7 @@
 </p>
 
 <p align="center">
-  <b>v0.58.0</b> · 19 assertion kinds · 31 commands · 60 mutants
+  <b>v0.59.0</b> · 19 assertion kinds · 32 commands · 60 mutants
 </p>
 
 <p align="center">
@@ -351,6 +351,7 @@ pass for an adapter that does nothing at all.
 | `crosscheck` | — | Re-fetch through an independent channel and compare responses: consistent / divergent / uncheckable |
 | `tap` / `learn` | Reverse-proxy records traffic, grows adapter / twin / case drafts |
 | `mutants` | Mutant directory: whose fault, how to catch, how to submit |
+| `ingest` | Translate another tool's test report into three-valued verdicts, and count what "green" really proved |
 | `audit` | False-green audit: use the real backend as a ruler |
 | `traps` | Trap census: how many verdicts in this batch are blind |
 | `knowledge` / `recall` | Incident archive / recidivism detection (second hit exits 1) |

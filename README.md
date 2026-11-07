@@ -1,4 +1,4 @@
-# agent-web v0.58.0
+# agent-web v0.59.0
 
 <p align="center">
   <img src="docs/media/hero.png" alt="agent-web：给 Agent 写机器可判的集成测试" width="100%">
@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <b>当前版本 0.58.0</b> · 19 种断言 · 31 条命令 · 60 个变异体
+  <b>当前版本 0.59.0</b> · 19 种断言 · 32 条命令 · 60 个变异体
 </p>
 
 <p align="center">
@@ -387,6 +387,7 @@ REALWORLD_B_BASE_URL=http://127.0.0.1:8297 node bin/agent-web.mjs compare cases/
 | `import hurl` | 把 hurl 套件转成案例草稿（不联网、不执行） |
 | `tap` / `learn` | 反向代理录一段流量，长出适配器 / 孪生 / 案例草稿 |
 | `mutants` | 变异体目录：谁的坏法、怎么抓、怎么投稿 |
+| `ingest` | 把别家的测试报告翻成三值判决，数清「跑绿了但什么都没证明」的比例 |
 | `audit` | 假绿审计：拿真实后端当尺子量候选实现 |
 | `traps` | 陷阱普查：这批判决有多少是盲的 |
 | `knowledge` / `recall` | 事故档案 / 重犯检测（第二次 exit 1） |
