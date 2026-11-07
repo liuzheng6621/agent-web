@@ -14,7 +14,8 @@
  */
 
 import { validateCase, validateSteps, resolveArguments, deriveLabels, BindingError, draftBlocker } from './case.mjs';
-import { validateManifest, OUTCOMES } from './adapter/contract.mjs';
+import { validateManifest } from './adapter/contract.mjs';
+import { classifyStepOutcome } from './step-outcome.mjs';
 import { checkStateAgainstView } from './view.mjs';
 import { evalAssertions, firstFailure, TRUE, FALSE, UNKNOWN } from './assert/index.mjs';
 import { getPath } from './values.mjs';
@@ -248,55 +249,11 @@ async function judgeInner({ case: c, adapter, adapterName = 'unknown', trajector
       });
 
       // ---- step 4: 结果分类 ----
-      // 契约外的 outcome 必须先被拦下。适配器返回 'success' / 'ok' / 拼错的 'applied '
-      // 时，下面每一条 if 都不命中，于是这一步既不算失败也不算 unknown ——
-      // 它会一路滑到终态断言，而终态断言可能正好成立，判决就 pass 了。
-      // 这不是适配器写错，这是**判定权威被悄悄换掉**：验的不再是「这一步做成了」，
-      // 而是「这一步没被拦下」。所以按 infra_error 处理，不按 rejected 处理。
-      if (!OUTCOMES.includes(res.outcome)) {
-        aborted = {
-          status: 'unknown',
-          code: 'contract_violation',
-          at: i,
-          detail: `适配器返回了契约外的 outcome ${JSON.stringify(res.outcome)}，`
-            + `只认 ${OUTCOMES.join(' / ')}。这一步到底做成了没有，无法判断`,
-        };
-        break;
-      }
-      if (res.outcome === 'unsupported') {
-        aborted = { status: 'unknown', code: 'coverage_gap', at: i, detail: `适配器演不了 ${step.capability}` };
-        break;
-      }
-      if (res.outcome === 'infra_error') {
-        aborted = { status: 'unknown', code: 'infrastructure_error', at: i, detail: res.error?.message ?? '适配器故障' };
-        break;
-      }
-      // 「可能已经生效」与「没发生」是两条相反的重放指令，必须分开报。
-      // 判 unknown 是一样的（看不见结果），但理由码不同：
-      // infrastructure_error 说「可以重试」，effect_uncertain 说「不许重试，先去看状态」。
-      // 合成一个码，重放器只能猜，猜错就是把已经扣了的钱再扣一次。
-      if (res.outcome === 'may_have_committed') {
-        aborted = {
-          status: 'unknown',
-          code: 'effect_uncertain',
-          at: i,
-          detail: `${step.capability} 可能已经生效但结果没回来`
-            + `（${[res.error?.code, res.error?.message].filter(Boolean).join(' ') || '适配器未给原因'}）`
-            + '：这一步不许重放，先观测再决定',
-        };
-        break;
-      }
-      if (step.expected_outcome === 'applied' && res.outcome === 'rejected') {
-        aborted = {
-          status: 'fail',
-          code: 'unexpected_rejection',
-          at: i,
-          detail: `${step.capability} 被拒绝：${res.error?.code} ${res.error?.message}`,
-        };
-        break;
-      }
-      if (step.expected_outcome === 'rejected' && res.outcome === 'applied') {
-        aborted = { status: 'fail', code: 'expected_rejection', at: i, detail: `${step.capability} 应被拒绝，实际被执行` };
+      // 语义只有一份实现（src/step-outcome.mjs）。这里曾经手写四五个 if，
+      // draft.mjs 里另抄一份，v0.60.0 只修了这里，那一份带着同一个洞活了一个版本。
+      const cls = classifyStepOutcome({ res, step, index: i });
+      if (cls) {
+        aborted = cls;
         break;
       }
 

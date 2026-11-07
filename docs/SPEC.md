@@ -651,6 +651,10 @@ manifest 校验失败 → `unknown / invalid_environment`。
 所以它判 `unknown`（这一步做成了没有，无法判断），不是 `rejected`。
 现场证据见 `docs/museum/e07-contract-violation.mjs`。
 
+**注意 11 的落点必须是唯一一份实现。** 上表第 11 至 14 条合起来就是「一步的结局分类」，它只能有一份代码（`src/step-outcome.mjs` 的 `classifyStepOutcome()`），判决路径（`src/runner.mjs`）与录制回放路径（`src/draft.mjs`）都调它。这条要求写进规范，是因为它已经违反过一次：v0.60.0 只修了判决路径，回放路径里的手抄副本带着同一个洞活了一个版本，`test/step-outcome.test.mjs` 现在会扫两个文件的源码把这件事钉住。现场证据见 `docs/museum/e08-second-place.mjs`。
+
+同一条道理适用于**「哪些理由码算作判决不成立」**：这个判据必须写成集合，不能写成「等于某一个码」。`traps` 原先把 `unusable` 写成「`reason_code === 'infrastructure_error'`」，新加的两个未知码因此被算进盲区——把「这一次什么都没测成」报成「测了但看不出来」，方向正好相反。
+
 注意 5 与 16 的不对称：**前置条件为假判 unknown 而不是 fail**。初态不干净是环境问题，不是被测系统的错。把环境问题记成 fail，会把噪声算进被测对象头上。
 
 注意 2：**未确认草稿不判 pass 也不判 fail，判 unknown**。它还不是一张考卷，没有资格得分。让机器生成的案例直接进判决，等于让写案例的模型给自己出题。
@@ -740,11 +744,13 @@ node bin/agent-web.mjs audit <可信结果.jsonl> <被审结果.jsonl> [--detail
 | `absent` | 案例结构上碰不到这个陷阱 |
 | `guarded` | 碰到了，且判决带着可核对的凭据 |
 | `blind` | 碰到了，判决却是 `pass` / `fail` |
-| `unusable` | 判决本身无效（`reason_code: infrastructure_error`），不参与任何比率 |
+| `unusable` | 判决本身无效，不参与任何比率。判据是**这一次执行本身不可信**，与产品无关：`infrastructure_error`（环境故障）、`contract_violation`（适配器违约，判定权威不在）、`effect_uncertain`（可能已生效，结果不可知） |
 
 `guarded` 只表示「有据可查」，不表示「安全」：适配器可以谎报。规范不要求验证凭据的真伪，只要求把凭据留下来。
 
 探测器自身抛错时按 `blind` 记录并附原因，不得静默跳过——探测器坏了和风险未覆盖是同一件事。
+
+`unusable` 的判据必须写成**集合**，不能写成「等于 `infrastructure_error`」。每加一个表示「这一次什么都没测成」的理由码，都要同步这个集合——漏掉就会被算进 `blind`，于是把「没测」报成「测了但看不出来」，方向正好相反。反例不能错杀：`missing_observation` 是**真盲区**（看得见接口，看不见内容），必须留在 `blind` 里。
 
 ### 11.2 四个陷阱
 

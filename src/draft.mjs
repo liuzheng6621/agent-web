@@ -23,6 +23,7 @@ import { fingerprint, getPath, deepEqual } from './values.mjs';
 import { selectEntities } from './select.mjs';
 import { discoverRelations } from './relations.mjs';
 import { SCHEMA_VERSION, resolveArguments, BindingError } from './case.mjs';
+import { classifyStepOutcome } from './step-outcome.mjs';
 
 /**
  * 环境相关字段：换一次 reset、换一个适配器就会变。
@@ -323,16 +324,15 @@ export async function replayTrajectory({ adapter, steps, scopes, seed, clockPoli
         stateAfter: after?.state ?? null,
       });
 
-      if (res.outcome === 'unsupported') { aborted = { code: 'coverage_gap', at: i, detail: '适配器演不了 ' + step.capability }; break; }
-      if (res.outcome === 'infra_error') { aborted = { code: 'infrastructure_error', at: i, detail: res.error?.message ?? '适配器故障' }; break; }
-      if (step.expected_outcome === 'applied' && res.outcome === 'rejected') {
-        aborted = { code: 'unexpected_rejection', at: i, detail: step.capability + ' 被拒绝：' + res.error?.code + ' ' + res.error?.message };
+      // 分类语义与判决路径共用一份实现（src/step-outcome.mjs）。
+      // 这里曾经是 runner 那段 if 链的手抄副本，runner 修好了它没修 —— 于是同一个洞
+      // 在录制路径上又活了一个版本。抄一遍就是埋一次。
+      const cls = classifyStepOutcome({ res, step, index: i, verb: '录' });
+      if (cls) {
+        aborted = cls;
         break;
       }
-      if (step.expected_outcome === 'rejected' && res.outcome === 'applied') {
-        aborted = { code: 'expected_rejection', at: i, detail: step.capability + ' 应被拒绝，实际被执行' };
-        break;
-      }
+
       if (res.outcome === 'applied') outputs.set(step.id, res.payload ?? null);
     }
 

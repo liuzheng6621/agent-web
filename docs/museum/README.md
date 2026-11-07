@@ -2,7 +2,7 @@
 
 这个目录收藏的**不是功能演示，是假通过**。
 
-每件展品记录一种「判决看起来没问题、实际什么也没证明」的情形。它们不是假想的：六件里有五件来自这个仓库自己踩过的坑，另一件（01）是真实事故的完整复现。
+每件展品记录一种「判决看起来没问题、实际什么也没证明」的情形。它们不是假想的：八件里有七件来自这个仓库自己踩过的坑，另一件（01）是真实事故的完整复现。
 
 ## 为什么单独给它一个目录
 
@@ -35,6 +35,7 @@
 | 05 | 卡住的适配器 | 挂死，无判决 | `unknown` / `infrastructure_error` | `judge` 外层超时 |
 | 06 | 角色单射被破坏 | `pass` | `unknown` / `invalid_environment` | 复位后 `roleBindings` 检查 |
 | 07 | 契约外的 outcome | `pass` | `unknown` / `contract_violation` | `OUTCOMES` 白名单 + `probe` 第 6 项 |
+| 08 | 同一个洞的第二个地方 | `pass` | `unknown` / `contract_violation` | 分类语义抽成一份 · 结构守卫扫源码 |
 
 ## 01 · 身份塌缩
 
@@ -96,7 +97,7 @@ node --test test/museum.test.mjs
 
 ## 哪些展品能变成自动探测
 
-展品证明「这个坑存在」，但能不能在**每一条判决**上自动查出来，是另一件事。目前四条变成了 `agent-web traps` 的探测器：
+展品证明「这个坑存在」，但能不能在**每一条判决**上自动查出来，是另一件事。目前三条变成了 `agent-web traps` 的探测器（另有两条靠 `probe`，其余靠显式判决码）：
 
 | 展品 | 探测器 id | 能不能自动查 |
 |---|---|---|
@@ -107,6 +108,7 @@ node --test test/museum.test.mjs
 | e05 卡住的适配器 | — | 不能：它让判决作废，靠 `reason_code: infrastructure_error` 识别并另行统计 |
 | e06 角色单射被破坏 | — | 不能：同上，`invalid_environment` 已经是显式判决 |
 | e07 契约外的 outcome | `probe/outcome-contract` | 能，`probe` 第 6 项每次抽查都验 |
+| e08 同一个洞的第二个地方 | `probe/outcome-contract` + 源码结构守卫 | 能，两层：`probe` 第 6 项验行为，`test/step-outcome.test.mjs` 验「分类语义只有一份实现」 |
 
 另外 `traps` 里有一条 `terminal-only`（只看终态），它的展品还没写——这是一个已知空缺，留着就是因为不想让「有探测器没展品」变成常态。规则写进了 SPEC 第 12 章：**没有展品的陷阱不收。**
 
@@ -125,3 +127,15 @@ node --test test/museum.test.mjs
 **为什么值得单独一件** 这是唯一一件「适配器没有撒谎、断言没有写错、环境没有坏」的假通过。它坏在**枚举**上：契约说四选一，实现回了第五个。任何靠 `if` 串联的分类器都有这个洞——不是没写 `else`，是**没写 `else` 这件事本身不会报错**。
 
 **复现** `node -e "import('./docs/museum/e07-contract-violation.mjs').then(async m=>console.log(await m.run()))"`
+
+## 08 · 同一个洞的第二个地方
+
+**症状** `draft` 的录制回放路径上，适配器返回契约外的 `outcome`，这一步照样被承认，`replayTrajectory` 返回 `ok: true`。于是「录下来这段还能跑」这个结论，是在没验证那一步的前提下给出的。
+
+**为什么它是独立的一件** 07 修的是 `src/runner.mjs` 的 step-4 分支链，修得干净，测试也补了。而 `src/draft.mjs` 里那段 if 是它的**手抄副本**，一字不差地带着同一个洞活了一个版本。修的时候只修了看见的那一处——这不是手滑，是复制粘贴式复用必然会付的账。
+
+**谁抓住的** 把分类语义抽成 `src/step-outcome.mjs`，两处都调它；外加 `test/step-outcome.test.mjs` 里那条**结构守卫**：它扫两个文件的源码，只允许剩下 `res.outcome === 'applied'` 这一条手写分支，多一条就红。
+
+**这条守卫为什么要看源码而不是看行为** 两份实现行为一致的时候，恰恰是最难发现它们会一起烂掉的时候。行为测试只能证明「现在两边一样」，证明不了「以后不会分叉」。
+
+**复现** `node -e "import('./docs/museum/e08-second-place.mjs').then(async m=>console.log(await m.run()))"`

@@ -103,6 +103,60 @@ test('may_have_committed 时不许继续往下执行：后续步骤一次都不�
   assert.equal(calls, 1, '第一步结果不确定之后，第二步不该再跑 —— 那会拿一个不存在的 orderId 去取消');
 });
 
+test('录制路径（draft.replayTrajectory）有同一个洞，也要拦住', async () => {
+  // runner 修过之后 draft 里还留着同样四个分支。这条测试存在的理由就是：
+  // 「同一类问题，第二个地方」是最常见的回归形态 —— 修的时候只修了看见的那一处。
+  const { replayTrajectory } = await import('../src/draft.mjs');
+  const inner = createMemoryAdapter();
+  const bogus = {
+    ...inner,
+    async execute(runId, action) {
+      const x = await inner.execute(runId, action);
+      return { ...x, outcome: 'success' };
+    },
+  };
+  const r = await replayTrajectory({ adapter: bogus, steps: CASE.reference_trajectory, scopes: CASE.observability.declared_scopes });
+  assert.equal(r.ok, false);
+  assert.equal(r.aborted.code, 'contract_violation');
+  assert.match(r.aborted.detail, /只认/);
+});
+
+test('录制路径遇到 may_have_committed 就停，不拿不确定的产出继续', async () => {
+  const { replayTrajectory } = await import('../src/draft.mjs');
+  const inner = createMemoryAdapter();
+  let calls = 0;
+  const uncertain = {
+    ...inner,
+    async execute(runId, action) {
+      calls += 1;
+      if (action.capability === 'order.create') {
+        return { outcome: 'may_have_committed', error: { code: 'ETIMEDOUT' } };
+      }
+      return inner.execute(runId, action);
+    },
+  };
+  const r = await replayTrajectory({ adapter: uncertain, steps: CASE.reference_trajectory, scopes: CASE.observability.declared_scopes });
+  assert.equal(r.ok, false);
+  assert.equal(r.aborted.code, 'effect_uncertain');
+  assert.equal(calls, 1);
+});
+
+test('traps 把新加的未知码也算作「判决不成立」，不塞进盲区', async () => {
+  // 陷阱普查只认 infrastructure_error 时，effect_uncertain 会被算成「涉及但看不出来」——
+  // 那是「测了但没测出」的意思。实际是「这一次什么都没测成」。两者方向相反。
+  const { scanVerdict } = await import('../src/traps.mjs');
+  const caseObj = {
+    task: { goal_assertions: [{ kind: 'entity_exists', selector: { collection: 'orders' } }], invariants: [] },
+  };
+  for (const code of ['infrastructure_error', 'contract_violation', 'effect_uncertain']) {
+    const rows = scanVerdict({ status: 'unknown', reason_code: code }, caseObj);
+    assert.ok(rows.every((r) => r.state === 'unusable'), `${code} 应整条作废，实际 ${rows.map((r) => r.state).join(',')}`);
+  }
+  // 反例：普通的 unknown（比如看不见观测）不该被作废，那才是真盲区。
+  const rows = scanVerdict({ status: 'unknown', reason_code: 'missing_observation' }, caseObj);
+  assert.ok(rows.some((r) => r.state !== 'unusable'), 'missing_observation 是盲区，不该被作废');
+});
+
 test('白名单内的值照旧：unsupported 判 coverage_gap，applied 判 pass', async () => {
   const unsupported = await judge({ case: CASE, adapter: withOutcome('unsupported'), adapterName: 'memory' });
   assert.equal(unsupported.status, 'unknown');

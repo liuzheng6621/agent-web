@@ -8,7 +8,7 @@
  *   absent   结构上不涉及这个陷阱
  *   guarded  涉及，且判决带着可核对的凭据（有据可查，不等于绝对安全）
  *   blind    涉及，但判决看起来有结论，风险却无法从判决本身排除
- *   unusable 判决本身无效（环境故障），既不算抓住也不算盲区
+ *   unusable 判决本身无效（环境故障 / 契约违约），既不算抓住也不算盲区
  *
  * 这个工具的作用是让体检报告变难看。一份全是 pass 的判决列表，
  * 在这里会显出「其中有多少条其实什么也没证明」。
@@ -17,6 +17,20 @@
 export const TRAPS_VERSION = 'agent-web/traps-1';
 
 const FINAL_KINDS = new Set(['entity_exists', 'field_equals', 'count_delta', 'unchanged']);
+
+/**
+ * 哪些 reason_code 意味着「这条判决不成立」，而不是「这条判决发现不了问题」。
+ *
+ * 只列 infrastructure_error 是个坑：v0.60.0 / v0.61.0 又加了两个未知码，
+ * 它们同样表示「这一次什么都没测成」，漏掉就会被算进盲区——
+ * 把「没测」报成「测了但看不出来」，方向正好相反。
+ * 判据：这个码是否说明**这一次执行本身不可信**，与产品无关。
+ */
+const UNUSABLE_CODES = new Set([
+  'infrastructure_error',
+  'contract_violation',
+  'effect_uncertain',
+]);
 const TRACE_KINDS = new Set(['status_transition', 'event_absent']);
 
 function allAssertions(c) {
@@ -132,8 +146,13 @@ export const TRAPS = [
 
 /** 对单条判决跑全部陷阱。 */
 export function scanVerdict(verdict, caseObj) {
-  if (verdict && verdict.reason_code === 'infrastructure_error') {
-    return TRAPS.map((t) => ({ trap: t.id, state: 'unusable', detail: '判决本身无效（环境故障）' }));
+  if (verdict && UNUSABLE_CODES.has(verdict.reason_code)) {
+    const why = verdict.reason_code === 'infrastructure_error'
+      ? '环境故障'
+      : verdict.reason_code === 'contract_violation'
+        ? '适配器违约，判定权威不在'
+        : '可能已生效，结果不可知';
+    return TRAPS.map((t) => ({ trap: t.id, state: 'unusable', detail: `判决本身无效（${why}）` }));
   }
   return TRAPS.map((t) => {
     let r;
@@ -219,7 +238,7 @@ export function formatTraps(report, { detail = false } = {}) {
   lines.push('');
   lines.push(`  盲区风险点：${report.blind_total}/${report.applicable_total}   盲区率 ${pct(report.blind_rate)}`);
   if (report.unusable > 0) {
-    lines.push(`  作废判决：${report.unusable}/${report.total}（环境故障，本来就不该计分）`);
+    lines.push(`  作废判决：${report.unusable}/${report.total}（执行本身不可信，本来就不该计分）`);
   }
   if (detail) {
     const withDetails = report.traps.filter((t) => t.details.length > 0);
