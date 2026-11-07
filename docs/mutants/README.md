@@ -73,10 +73,13 @@ export function wrap(adapter) {
 | `m-lab-otp-window-ignore` | execute | 时段没到就发门禁口令（时间窗没判） |
 | `m-lab-borrow-stock-frozen` | state | 可借数量永远等于总量（借出不扣库存） |
 | `m-lab-approve-not-pending` | execute | 已经批过的还能再批（批准没查状态） |
+| `m-cron-skip-slot` | state | 每第 4 个槽位静默漏跑 |
+| `m-cron-double-fire` | state | 同一槽位记录出现两次（游标没随提交前进） |
+| `m-cron-drift` | state | 每个槽位都晚 20 分钟：次数全对、时刻全错 |
 
 看完整说明：`agent-web mutants`。
 
-**现在的战绩：咖啡域 17/19，账本域 4/5，实验室域 7/20。** 目录共 60 个变异体，其中 44 个声明了
+**现在的战绩：咖啡域 17/19，账本域 4/5，实验室域 7/20，定时任务域 4/19。** 目录共 63 个变异体，其中 47 个声明了
 `applies_to`——账本变异体在咖啡适配器上标记「不适用」，不进分母。 漏网的两个都记在 `scripts/certify-baseline.mjs` 的
 `KNOWN_SURVIVORS` 里，理由分别是「取餐号的 +100 偏移是各实现自有的约定」和
 「排序本来就没写进契约」——都不是尺子不够长，是这两样东西不该跨实现断言。
@@ -87,6 +90,11 @@ export function wrap(adapter) {
 预约时段排他、门禁口令时间窗、库存扣减、批准状态机各一个，外加三个跨域的通病
 （`m-no-reject` 该拒的不拒、`m-exec-role-ignore` 身份塌缩、`m-exec-drop-intermediate` 丢中间态）。
 这 13 个老变异体缺 `applies_to` 是笔明账，补它是独立的活儿。
+
+定时任务域同样打折：适用 19 里只有 3 个是本域的（`m-cron-*`），加上 `m-exec-duplicate-write`
+这个跨域通病共抓到 4 个。**这里有一个真结论**：`m-cron-drift`（每个槽位都晚 20 分钟）
+只有 `recurrence` 抓得住——摘掉这条断言，它就从 caught 掉回 killable（有差异、没断言）。
+`scripts/kind-necessity.mjs` 就是靠它判「第 20 种断言是否必要」的。
 
 新加的三个执行层变异体各自钉住了一种断言：`m-read-with-side-effect` 只有 `unchanged` 抓得住，
 `m-skip-intermediate` 靠 `status_transition` 的完整序列，`m-double-effect` 靠一条针对

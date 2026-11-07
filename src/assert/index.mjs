@@ -21,6 +21,7 @@ import { pagination as evalPagination } from './pagination.mjs';
 import { payload as evalPayload, PAYLOAD_OPS } from './payload.mjs';
 import { linkage as evalLinkage } from './linkage.mjs';
 import { timeliness as evalTimeliness, durationMs, TIMELINESS_VERSION } from './timeliness.mjs';
+import { recurrence as evalRecurrence, RECURRENCE_VERSION } from './recurrence.mjs';
 import { state_machine as evalStateMachine, STATE_MACHINE_VERSION } from './state_machine.mjs';
 
 export const KINDS = Object.freeze([
@@ -40,6 +41,7 @@ export const KINDS = Object.freeze([
   'linkage',
   'timeliness',
   'state_machine',
+  'recurrence',
 ]);
 
 export { WINDOW_INNER };
@@ -77,6 +79,9 @@ export const PHASE_MATRIX = Object.freeze({
   // 时间戳只活在终态视图的事件行上（trace 的中间快照里事件还没发生完），
   // 所以相位固定 final。想看「某一步之后还没发货」用 window 套它。
   timeliness: { default: 'final', allowed: ['final'] },
+  // 节律也只在终态求值：运行记录是累积的，中途那一段永远「还没跑完」，
+  // 按 trace 求值会把正常实现判红。想看「跑到第 3 步时已跑了几次」用 window 套它。
+  recurrence: { default: 'final', allowed: ['final'] },
   // 状态机看的是「走过的每一步」，所以固定 trace：只判终态等于只看终点，
   // 中途跳态（PENDING→PICKED 再没有别的）会被当成合法。
   state_machine: { default: 'trace', allowed: ['trace'] },
@@ -133,6 +138,23 @@ export function validateAssertion(a, at = 'assertion') {
     if (a.timezone === undefined) {
       errors.push(`${at}.timezone 必须显式声明（如 "UTC"）：时间比较不能靠猜时区`);
     }
+  }
+  if (a.kind === 'recurrence') {
+    if (durationMs(a.every ?? '') === null) {
+      errors.push(`${at}.every 必填，写法如 "1h" / "15m" / "24h"`);
+    }
+    if (a.from === undefined) errors.push(`${at}.from 必填（窗口起点，时间戳或毫秒）`);
+    if (a.to === undefined) errors.push(`${at}.to 必填（窗口终点，时间戳或毫秒）`);
+    if (a.timezone === undefined) {
+      errors.push(`${at}.timezone 必须显式声明（如 "UTC"）：节律比较不能靠猜时区`);
+    }
+    if (a.tolerance_ms !== undefined && !(Number.isFinite(a.tolerance_ms) && a.tolerance_ms >= 0)) {
+      errors.push(`${at}.tolerance_ms 必须是非负数`);
+    }
+    if (a.expect_count !== undefined && !(Number.isInteger(a.expect_count) && a.expect_count >= 0)) {
+      errors.push(`${at}.expect_count 必须是非负整数`);
+    }
+    if (a.selector !== undefined) errors.push(...validateSelector(a.selector, `${at}.selector`));
   }
   if (a.kind === 'window') {
     if (a.from_step !== undefined && !(Number.isInteger(a.from_step) && a.from_step >= 0)) {
@@ -310,6 +332,8 @@ export function evalAssertion(a, ctx, depth = 0) {
       return evalTimeliness(a, ctx);
     case 'state_machine':
       return evalStateMachine(a, ctx);
+    case 'recurrence':
+      return evalRecurrence(a, ctx);
     default:
       return { status: UNKNOWN, code: 'invalid_case', message: `未知断言 ${a.kind}` };
   }

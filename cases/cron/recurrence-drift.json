@@ -1,0 +1,34 @@
+{
+  "schema_version": "agent-web/0.1",
+  "id": "cron/recurrence-drift",
+  "environment": { "adapter": "cron-a", "seed": {} },
+  "task": {
+    "natural_goal": "每 30 分钟一次的任务，把时钟推到 2 小时：允许每次晚 1 分钟以内（真实调度器的启动开销），但绝不允许晚成第二个槽位。",
+    "goal_assertions": [
+      {
+        "kind": "recurrence",
+        "selector": { "collection": "runs", "where": [{ "field": "jobId", "eq": 1 }] },
+        "field": "scheduledFor",
+        "every": "30m",
+        "from": "2026-01-01T00:00:00Z",
+        "to": "2026-01-01T02:00:00Z",
+        "timezone": "UTC",
+        "tolerance_ms": 60000,
+        "expect_count": 5
+      },
+      {
+        "kind": "unique", "selector": { "collection": "runs" }, "path": "scheduledFor"
+      },
+      {
+        "kind": "count_delta", "selector": { "collection": "runs" }, "delta": 5
+      }
+    ]
+  },
+  "reference_trajectory": [
+    { "id": "s1", "capability": "job.create", "as": "operator", "expected_outcome": "applied",
+      "arguments": { "name": "同步", "everyMinutes": 30, "startsAt": "2026-01-01T00:00:00Z" } },
+    { "id": "s2", "capability": "scheduler.advance", "as": "operator", "expected_outcome": "applied",
+      "arguments": { "to": "2026-01-01T02:00:00Z" } }
+  ],
+  "observability": { "declared_scopes": ["jobs", "runs"] }
+}

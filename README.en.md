@@ -1,4 +1,4 @@
-# agent-web v0.59.0
+# agent-web v0.60.0
 
 <p align="center">
   <img src="docs/media/hero.png" alt="agent-web: integration tests an agent can be judged on" width="100%">
@@ -18,7 +18,7 @@
 </p>
 
 <p align="center">
-  <b>v0.59.0</b> · 19 assertion kinds · 32 commands · 60 mutants
+  <b>v0.60.0</b> · 20 assertion kinds · 32 commands · 63 mutants
 </p>
 
 <p align="center">
@@ -409,7 +409,7 @@ For compatibility with a real implementation, point `REALWORLD_BASE_URL` at that
 
 Two layers. These capabilities already have code and tests and should not be counted as "not implemented":
 
-- **19 assertion kinds** (full list in [docs/SPEC.md](docs/SPEC.md) chapter 4). Among them
+- **20 assertion kinds** (full list in [docs/SPEC.md](docs/SPEC.md) chapter 4). Among them
   `window` / `every_step` / `pagination` / `linkage` / `payload` / `timeliness` / `state_machine`
   were once written down as "missing capabilities" — each now exists and has a mutant **only it can kill** (`kind-necessity` checks this).
 - **`align`** proposes evidence-backed cross-schema mappings, including nested-array drill-down and semantic-overlap detection; low-confidence matches require human acceptance.
@@ -426,7 +426,7 @@ The remaining boundaries are numbered to match L1–L11 in [docs/LIMITS.md](docs
 2. **Field mappings still need review (L2).** Nested-array leaves and same-name/different-meaning fields across collections cannot be decided by machine; a human must sign.
 3. **No universal flow-quality score (L3).** Define domain goals, metrics and weights first; keep quality scoring separate from legality verdicts.
 4. **Negative expectations still need a human signature (L4).** Whether a request *should* be rejected is a business decision; candidates only produce a review sheet and never enter verdicts.
-5. **Mutant coverage is incomplete (L5).** `breed` only faults **observed shape** (13 operators, 60 mutants, 39/41 caught). Execution- and business-layer faults (oversell, refund above paid amount, skipped approval) still need submissions — the generator knows shape, not semantics.
+5. **Mutant coverage is incomplete (L5).** `breed` only faults **observed shape** (13 operators, 63 mutants, 39/41 caught). Execution- and business-layer faults (oversell, refund above paid amount, skipped approval) still need submissions — the generator knows shape, not semantics.
 6. **Arbitrary mutant equivalence is undecidable in general (L6).** Finite-state or bounded scenarios can be proved or exhaustively checked; otherwise report "not distinguished within budget," never "equivalent."
 7. **Cross-entity ordering is still missing (L7).** Single-chain timing is covered — `timeliness` compares two event timestamps, requires a declared `timezone`, and reports `unknown` rather than false when a timestamp is absent (v0.48.0). What is missing is **across entities**: "the order must be created before stock is locked", "a refund must follow the original payment" need a domain with a dependency graph.
 8. **Adapters can still lie (L8).** `probe` checks nine mechanical properties and `crosscheck` (v0.54.0) re-fetches through an independent channel, so together they catch "declared but missing", "role ignored", "reads that write" and "tampering with the response body". What they still cannot catch is a liar that watches the prober, or one that replaces the whole `globalThis.fetch`; process isolation is not implemented, and it would not be a security boundary anyway.
@@ -438,7 +438,7 @@ The remaining boundaries are numbered to match L1–L11 in [docs/LIMITS.md](docs
 ## Docs
 
 - [docs/GUIDE.md](docs/GUIDE.md) — Full guide: start from a URL, from logs to formal grading, connect your own app
-- [docs/SPEC.md](docs/SPEC.md) — Spec: case format, 17 assertion kinds and phases, verdict order table, per-mechanism rules
+- [docs/SPEC.md](docs/SPEC.md) — Spec: case format, 20 assertion kinds and phases, verdict order table, per-mechanism rules
 - [docs/ADAPTER-GUIDE.md](docs/ADAPTER-GUIDE.md) — Connect your own app: three-tier paths, change only four places, verification order
 - [CHANGELOG.md](CHANGELOG.md) — What each version did and why
 - [docs/LIMITS.md](docs/LIMITS.md) — Ledger of the 11 limits: status, acceptance command, why it stays

@@ -72,6 +72,16 @@ const BUILTINS = {
   // 所以 state_machine、timeliness、relation 三种断言在这里才有真对手。
   // 地址取 LABACCESS_BASE_URL（默认 http://127.0.0.1:8182），管理员密码取
   // LABACCESS_ADMIN_PASSWORD（从该项目 services/backend/.env 注入，不入库）。
+  // 定时任务域：两个独立实现，专门逼出「节律」这一维——
+  // 前六个域里时间是标量（有效期、时间窗），这里时间是槽位序列。
+  'cron-a': async () => {
+    const m = await import('../../examples/cron/adapter-a.mjs');
+    return m.createAdapter();
+  },
+  'cron-b': async () => {
+    const m = await import('../../examples/cron/adapter-b.mjs');
+    return m.createAdapter();
+  },
   labaccess: async () => {
     const m = await import('./labaccess.mjs');
     return m.createLabAccessAdapter();

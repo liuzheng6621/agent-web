@@ -73,6 +73,13 @@ function withGoal(id, assertions) {
   return { ...c, task: { ...c.task, goal_assertions: assertions } };
 }
 
+/** 换域的版本：cases/<dir>/<id>.json。节律只在 cron 域里说得清。 */
+function withGoalIn(dir, id, assertions) {
+  const raw = readFileSync(new URL(`../cases/${dir}/${id}.json`, import.meta.url), 'utf8');
+  const c = JSON.parse(raw);
+  return { ...c, task: { ...c.task, goal_assertions: assertions } };
+}
+
 const PAGED = {
   kind: 'pagination',
   caseId: 'paged-orders',
@@ -123,6 +130,29 @@ const STATE_MACHINE_SPEC = {
     ],
   },
   baseline: [{ kind: 'entity_exists', selector: { collection: 'orders' } }],
+};
+
+// 节律：只有它抓得住「次数全对、时刻全错」。
+// 去掉这条断言，m-cron-drift 就从 caught 变成 killable —— 有差异、没断言。
+// 注意这里换了个域（cron），因为节律要的是「槽位序列」，
+// 咖啡域的事件流表达不了「每 15 分钟一次」。
+const RECURRENCE_SPEC = {
+  kind: 'recurrence',
+  dir: 'cron',
+  caseId: 'recurrence-drift',
+  assertion: {
+    kind: 'recurrence',
+    selector: { collection: 'runs', where: [{ field: 'jobId', eq: 1 }] },
+    field: 'scheduledFor',
+    every: '30m',
+    from: '2026-01-01T00:00:00Z',
+    to: '2026-01-01T02:00:00Z',
+    timezone: 'UTC',
+    tolerance_ms: 60000,
+    expect_count: 5,
+  },
+  baseline: [{ kind: 'unique', selector: { collection: 'runs' }, path: 'scheduledFor' }],
+  adapter: 'cron-a',
 };
 
 const SHAPE = [
@@ -244,6 +274,29 @@ async function run() {
     console.log(`      能杀 ${kills.length} 个：${kills.map((m) => m.id).join(' ') || '—'}`);
     console.log(`      只有它能杀：${necessary.join(' ') || '—'}`);
   }
+  // 节律：与上面几个同一套口径，但案例与适配器都换到 cron 域。
+  {
+    const spec = RECURRENCE_SPEC;
+    const cronFactory = async () => loadAdapter(spec.adapter);
+    const withIt = await certify({
+      cases: [withGoalIn(spec.dir, spec.caseId, [...spec.baseline, spec.assertion])],
+      adapterFactory: cronFactory, adapterName: spec.adapter, mutations: pool,
+    });
+    const without = await certify({
+      cases: [withGoalIn(spec.dir, spec.caseId, [...spec.baseline])],
+      adapterFactory: cronFactory, adapterName: spec.adapter, mutations: pool,
+    });
+    const kills = withIt.mutations.filter((m) => (m.killedBy ?? []).some((k) => (typeof k === 'string' ? k : k.kind) === spec.kind));
+    const caughtWith = new Set(withIt.mutations.filter((m) => m.status === 'caught').map((m) => m.id));
+    const caughtWithout = new Set(without.mutations.filter((m) => m.status === 'caught').map((m) => m.id));
+    const necessary = [...caughtWith].filter((id) => !caughtWithout.has(id));
+    const ok = kills.length > 0 && necessary.length > 0;
+    if (!ok) failed += 1;
+    console.log(`${ok ? 'PASS' : 'FAIL'}  ${spec.kind}（案例 ${spec.dir}/${spec.caseId}）`);
+    console.log(`      能杀 ${kills.length} 个：${kills.map((m) => m.id).join(' ') || '—'}`);
+    console.log(`      只有它能杀：${necessary.join(' ') || '—'}`);
+  }
+
   for (const kind of shapeKinds) {
     const kills = full.mutations.filter((m) =>
       (m.killedBy ?? []).some((k) => (typeof k === 'string' ? k : k.kind) === kind),
@@ -257,7 +310,7 @@ async function run() {
   }
 
   console.log('\n' + (failed === 0
-    ? '形状四种 + 时序两种都换得回东西：去掉任何一条，都有变异体会漏网。'
+    ? '形状四种 + 时序三种都换得回东西：去掉任何一条，都有变异体会漏网。'
     : failed + ' 种没有独占战功 —— 按宪法不该进。'));
   return failed === 0 ? 0 : 1;
 }

@@ -1,0 +1,84 @@
+{
+  "schema_version": "agent-web/0.1",
+  "id": "cron/recurrence-full",
+  "environment": {
+    "adapter": "cron-a",
+    "seed": {}
+  },
+  "task": {
+    "natural_goal": "建一个每 15 分钟跑一次的任务，把调度时钟推到 6 小时后：这 6 小时里每一个槽位都必须跑满，一次不漏、一次不重、一刻不漂。",
+    "goal_assertions": [
+      {
+        "kind": "count_delta",
+        "selector": {
+          "collection": "runs"
+        },
+        "delta": 25
+      },
+      {
+        "kind": "recurrence",
+        "selector": {
+          "collection": "runs",
+          "where": [
+            {
+              "field": "jobId",
+              "eq": 1
+            }
+          ]
+        },
+        "field": "scheduledFor",
+        "every": "15m",
+        "from": "2026-01-01T00:00:00Z",
+        "to": "2026-01-01T06:00:00Z",
+        "timezone": "UTC",
+        "expect_count": 25
+      },
+      {
+        "kind": "field_equals",
+        "selector": {
+          "collection": "jobs",
+          "index": 0
+        },
+        "path": "nextDueAt",
+        "value": "2026-01-01T06:15:00.000Z"
+      },
+      {
+        "kind": "field_equals",
+        "selector": {
+          "collection": "jobs",
+          "index": 0
+        },
+        "path": "status",
+        "value": "active"
+      }
+    ]
+  },
+  "reference_trajectory": [
+    {
+      "id": "s1",
+      "capability": "job.create",
+      "as": "operator",
+      "expected_outcome": "applied",
+      "arguments": {
+        "name": "对账",
+        "everyMinutes": 15,
+        "startsAt": "2026-01-01T00:00:00Z"
+      }
+    },
+    {
+      "id": "s2",
+      "capability": "scheduler.advance",
+      "as": "operator",
+      "expected_outcome": "applied",
+      "arguments": {
+        "to": "2026-01-01T06:00:00Z"
+      }
+    }
+  ],
+  "observability": {
+    "declared_scopes": [
+      "jobs",
+      "runs"
+    ]
+  }
+}

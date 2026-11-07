@@ -94,7 +94,7 @@ memory                                   内置名
 }
 ```
 
-### 4.1 十九种 kind
+### 4.1 二十种 kind
 
 | kind | 必填参数 | 相位 |
 | --- | --- | --- |
@@ -110,6 +110,14 @@ memory                                   内置名
 | `type_of` | `selector`, `path`, `type` | final |
 | `subset` | `selector`, `path`, `values` | final |
 | `sorted_by` | `selector`, `path`, `order?`(`asc`/`desc`) | final |
+| `window` | `from_step`, `to_step`, `of` | trace（套内层） |
+| `every_step` | `of` | trace（套内层） |
+| `pagination` | `collection`, `steps`, `total`, `pageSize?`, `ordered_by?` | final |
+| `payload` | `step`, `path`, `op`, `value?` | trace |
+| `linkage` | `selector`, `expect` | final |
+| `timeliness` | `from`, `to`, `max`, `timezone` | final |
+| `state_machine` | `walk`, `selector`, `path`, `states`, `transitions` | trace |
+| `recurrence` | `selector`, `field`, `every`, `from`, `to`, `timezone`, `tolerance_ms?`, `expect_count?` | final |
 
 **没有 `llm_judge`，也不接受自定义扩展 kind。** 未知 kind 一律 `invalid_case`。
 
@@ -1708,6 +1716,46 @@ Postman 是 JSON 且层层嵌套，Bruno 是自有目录格式，转换成本更
 
 **键是参数路径**，支持点号与数组通配（`items[].qty` 会写进数组每一项）。
 校验期就拦三种错：`min > max`、空约束对象、不认识的约束项。
+
+### 4.3.5 recurrence：节律必须跑满
+
+`timeliness` 比的是**两个时刻**之间的间隔。但有一整类系统，它的正确性不在间隔上，
+而在**一串时刻**上：每 15 分钟一次的任务，少跑一次、多跑一次、每次都晚 20 分钟，
+是三种不同的坏法。`count_delta` 只看总数，在它眼里三者都是「数量不对」。
+
+```json
+{
+  "kind": "recurrence",
+  "selector": { "collection": "runs", "where": [{ "field": "jobId", "eq": 1 }] },
+  "field": "scheduledFor",
+  "every": "30m",
+  "from": "2026-01-01T00:00:00Z",
+  "to": "2026-01-01T02:00:00Z",
+  "timezone": "UTC",
+  "tolerance_ms": 60000,
+  "expect_count": 5
+}
+```
+
+判定顺序固定为 **重复 → 跑偏 → 漏跑 → 数量**，因为它们的修法完全不同：
+
+| 码 | 含义 | 为什么必须单独一个码 |
+| --- | --- | --- |
+| `recurrence_duplicated` | 同一槽位跑了两次 | 「多一条记录」和「同一个动作执行两遍」不是一回事，后者会让下游算两遍钱 |
+| `recurrence_drift` | 落在槽位容差外 | 次数全对、时刻全错；只看数量永远发现不了 |
+| `recurrence_gap` | 某个槽位没有对应记录 | 静默漏跑是最贵的坏法，它不报错 |
+| `recurrence_count_mismatch` | 命中数与 `expect_count` 不符 | 只有案例显式写了才判 |
+
+三条硬边界，与 `timeliness` 同源：
+
+1. **没声明 `timezone` → `unknown/missing_timezone`**。「每小时一次」在跨时区里没有意义。
+2. **记录缺 `field` 时间戳 → `unknown/missing_observation`**。看不见不等于没跑，不判假。
+3. **`tolerance_ms` 默认 0**。节律必须精确，除非案例显式放宽；容差同时放宽窗口边界
+   （00:45 那一跑晚到 00:50 仍属 00:45 槽位），否则「跑偏」会被误报成「漏跑」。
+
+窗口是**半开区间** `[from, to)`，且**窗口外的行不参与判定**：暂停把时间线切成两段时，
+两段窗口会把对方的行判成越界——那不是实现的问题，是断言的问题。
+多跑的那一次交给 `count_delta` 或 `event_absent`：**一条断言只回答一个问题**。
 
 ### 4.3.4 state_machine：只许走这些边
 

@@ -1,0 +1,127 @@
+{
+  "schema_version": "agent-web/0.1",
+  "id": "cron/recurrence-gap",
+  "environment": {
+    "adapter": "cron-a",
+    "seed": {}
+  },
+  "task": {
+    "natural_goal": "每 15 分钟一次的任务，中途暂停 30 分钟再恢复：暂停期间不补跑，时间线因此被切成两段，每段内部必须跑满，且没有任何槽位跑两次。",
+    "goal_assertions": [
+      {
+        "kind": "recurrence",
+        "selector": {
+          "collection": "runs",
+          "where": [
+            {
+              "field": "jobId",
+              "eq": 1
+            }
+          ]
+        },
+        "field": "scheduledFor",
+        "every": "15m",
+        "from": "2026-01-01T00:00:00Z",
+        "to": "2026-01-01T00:45:00Z",
+        "timezone": "UTC",
+        "expect_count": 4
+      },
+      {
+        "kind": "recurrence",
+        "selector": {
+          "collection": "runs",
+          "where": [
+            {
+              "field": "jobId",
+              "eq": 1
+            }
+          ]
+        },
+        "field": "scheduledFor",
+        "every": "15m",
+        "from": "2026-01-01T01:15:00Z",
+        "to": "2026-01-01T01:45:00Z",
+        "timezone": "UTC",
+        "expect_count": 3
+      },
+      {
+        "kind": "count_delta",
+        "selector": {
+          "collection": "runs"
+        },
+        "delta": 7
+      },
+      {
+        "kind": "unique",
+        "selector": {
+          "collection": "runs"
+        },
+        "path": "scheduledFor"
+      }
+    ]
+  },
+  "reference_trajectory": [
+    {
+      "id": "s1",
+      "capability": "job.create",
+      "as": "operator",
+      "expected_outcome": "applied",
+      "arguments": {
+        "name": "清理",
+        "everyMinutes": 15,
+        "startsAt": "2026-01-01T00:00:00Z"
+      }
+    },
+    {
+      "id": "s2",
+      "capability": "scheduler.advance",
+      "as": "operator",
+      "expected_outcome": "applied",
+      "arguments": {
+        "to": "2026-01-01T00:45:00Z"
+      }
+    },
+    {
+      "id": "s3",
+      "capability": "job.pause",
+      "as": "operator",
+      "expected_outcome": "applied",
+      "arguments": {
+        "jobId": 1
+      }
+    },
+    {
+      "id": "s4",
+      "capability": "scheduler.advance",
+      "as": "operator",
+      "expected_outcome": "applied",
+      "arguments": {
+        "to": "2026-01-01T01:15:00Z"
+      }
+    },
+    {
+      "id": "s5",
+      "capability": "job.resume",
+      "as": "operator",
+      "expected_outcome": "applied",
+      "arguments": {
+        "jobId": 1
+      }
+    },
+    {
+      "id": "s6",
+      "capability": "scheduler.advance",
+      "as": "operator",
+      "expected_outcome": "applied",
+      "arguments": {
+        "to": "2026-01-01T01:45:00Z"
+      }
+    }
+  ],
+  "observability": {
+    "declared_scopes": [
+      "jobs",
+      "runs"
+    ]
+  }
+}

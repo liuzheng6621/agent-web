@@ -64,6 +64,9 @@ import * as truncateLogType from './m-breed-truncate-status-log-0-type.mjs';
 import * as labSlotConflictIgnore from './m-lab-slot-conflict-ignore.mjs';
 import * as labOtpWindowIgnore from './m-lab-otp-window-ignore.mjs';
 import * as labBorrowStockFrozen from './m-lab-borrow-stock-frozen.mjs';
+import * as cronSkipSlot from './m-cron-skip-slot.mjs';
+import * as cronDoubleFire from './m-cron-double-fire.mjs';
+import * as cronDrift from './m-cron-drift.mjs';
 import * as labApproveNotPending from './m-lab-approve-not-pending.mjs';
 
 const ENTRIES = [
@@ -129,6 +132,9 @@ const ENTRIES = [
   ['m-lab-otp-window-ignore', labOtpWindowIgnore],
   ['m-lab-borrow-stock-frozen', labBorrowStockFrozen],
   ['m-lab-approve-not-pending', labApproveNotPending],
+  ['m-cron-skip-slot', cronSkipSlot],
+  ['m-cron-double-fire', cronDoubleFire],
+  ['m-cron-drift', cronDrift],
 
 ];
 

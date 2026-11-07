@@ -30,7 +30,7 @@ README 的「边界：已实现与仍未解决」是这份清单的摘要。**�
 | L8 | 适配器可以撒谎 | `mitigated` | `node bin/agent-web.mjs probe cases/coffee --adapter=FILE` |
 | L9 | 并发被撤回了 | `withdrawn` | `npm run determinism`；开关守卫见 `test/limits.test.mjs` |
 | L10 | 难度标签只是统计 | `mitigated` | `node bin/agent-web.mjs drill stats --min-attempts=5` |
-| L11 | 只在五个域上验过 | `mitigated` | `node bin/agent-web.mjs compare cases/<域> --adapters=A,B` |
+| L11 | 只在六个域上验过 | `mitigated` | `node bin/agent-web.mjs compare cases/<域> --adapters=A,B` |
 
 ## L1 写操作的语义仍然要人给
 
@@ -122,7 +122,7 @@ v0.52.0 采纳 9 个生成物进正式目录（47 → 56），但**采纳前补�
 `happy-path` 的反向 `linkage` 与中间行 `field_equals`、`readonly-menu` 的 `unique{dishName}`。
 这说明生成器在起作用：它逼出了原来没人写的那几条断言。
 
-当前口径：60 个变异体，12 条案例，适用 41，抓到 39（95.1%），欠账 2，不适用 19。
+当前口径：63 个变异体，12 条案例，适用 41，抓到 39（95.1%），欠账 2，不适用 22。
 这个数字**由脚本生成**：`node scripts/certify-baseline.mjs --emit-limits`，`test/limits.test.mjs` 会比对这一行与实测，手写的数字必然再漂一次（这行就漂过）。
 
 ## L6 等价变异体问题没有解决
@@ -243,7 +243,7 @@ npm run determinism:check    # 与基线比 —— 这才是串行 vs 并行的�
 
 验收：`node bin/agent-web.mjs drill stats --min-attempts=5`。
 
-## L11 只在五个域上验过
+## L11 只在六个域上验过
 
 `status: mitigated`
 
@@ -282,8 +282,17 @@ v0.58.0 给它补了四个本域变异体与两条案例（`verify` 6/6、`certi
 词库域还暴露了 `pagination` 的一个真盲区——它只数各页行数，从不读实现自己报的 `total`
 （补了 `pagination_total_reported`，见 `src/assert/pagination.mjs`）。
 
-**仍然只有五个。** 缺的是「长事务」「多租户」「异步回调」这三种形状，
-它们不是再加一个 CRUD 域就能覆盖的，需要新的断言 kind —— 这一步在 ROADMAP 的 P9。
+**v0.60.0 补上第六个域：定时任务调度**（`cron-a` / `cron-b`，两个独立实现，内部结构故意不同：
+数组 + 槽位 Set + 存 `nextDue` 时间戳 vs 槽位键 Map + 游标由 `lastSlot` 现算）。
+`compare` 3/3 判决一致、2 个集合逐字相同、`probe` 9/9、`certify` 抓到 4/19。
+它逼出的维度是前五个域都没有的：**时间是槽位序列**，不是标量。
+预约有时段、凭证有有效期，但那些都是「一个时刻」；「每隔 15 分钟必须跑一次」是「一串时刻」，
+`count_delta` 只能把漏跑、重复、漂移三种坏法混成同一个「数量不对」。
+为此加了第 20 种断言 `recurrence`，`kind-necessity` 实测：摘掉它，`m-cron-drift` 从 caught 变 killable。
+
+**仍然是六个。** 缺的是「长事务」「多租户」「异步回调」这三种形状，
+它们不是再加一个 CRUD 域就能覆盖的。定时任务域只解决了「节律」这一维，
+「异步回调」要的是「外部系统在我不知道的时候改了状态」，那是另一个方向。
 
 每加一个域的验收标准是：两个实现（或一个真实 + 一个孪生）、四类案例、三个域变异体、
 `compare` 判决一致率 100%、`probe` 通过、`certify` 基线不倒退。做不到就说明词汇还缺，

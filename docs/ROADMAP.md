@@ -7,17 +7,17 @@
 
 ---
 
-## 0. 现在的实际状态（v0.59.0，全部实测）
+## 0. 现在的实际状态（v0.60.0，全部实测）
 
 | 项 | 数字 | 怎么核 |
 |---|---|---|
-| 版本 | 0.59.0 | `node bin/agent-web.mjs version` |
-| 断言 | 19 种 | `--help` 里的断言表 |
+| 版本 | 0.60.0 | `node bin/agent-web.mjs version` |
+| 断言 | 20 种 | `--help` 里的断言表 |
 | 命令 | 32 条 | 同上 |
-| 变异体 | 60 个 | `node bin/agent-web.mjs mutants` |
-| 测试 | 435 条 | `npm test` |
+| 变异体 | 63 个 | `node bin/agent-web.mjs mutants` |
+| 测试 | 457 条 | `npm test` |
 | 判据准入 | 适用 41 / 抓到 39（95.1%） | `node scripts/certify-baseline.mjs --emit-limits` |
-| 计入的域 | **5 个** | `docs/LIMITS.md` L11 的五条门槛 |
+| 计入的域 | **6 个** | `docs/LIMITS.md` L11 的计数判据 |
 | 台账状态 | L1/L2/L4/L5/L7/L8/**L11** mitigated · L3/L6 by-design · L9 withdrawn · L10 依赖外部 | `grep status docs/LIMITS.md` |
 
 **v0.54.0 起台账上不再有 `open` 的条目。**这不是说其余十条解决了，是说它们都降到了
@@ -219,7 +219,7 @@ agent-web report .tmp-r.jsonl --counts   # 输出五个计数，没有第六个�
 
 ---
 
-## 5. P9 — 第五、第六个域（L11 的长期工作）✅ 已完成（v0.55.0 / v0.57.0）
+## 5. P9 — 第五、第六个域（L11 的长期工作）✅ 已完成（v0.55.0 / v0.57.0 / v0.60.0）
 
 P7 清完 RealWorld 是第五个域。第六个应该选**形状与前五个都不同**的：
 
@@ -268,7 +268,7 @@ agent-web certify cases/<新域> --adapter=<新域>
 | 1 | ~~P6 交叉复核~~ **已完成 v0.54.0** | 2 天 | L8 `open` → **`mitigated`** |
 | 2 | ~~P7 给 RealWorld 补第二个实现~~ **已完成 v0.55.0** | 3 天 | L11 `ongoing` → **`mitigated`**，五域 |
 | 3 | ~~P8 计数~~ **已完成 v0.56.0** | 1 天 | L3 仍 `by-design`，但「能数的都数了」 |
-| 4 | P9 定时任务域 | 3 天 | L7 的「跨实体时序」有真靶子 |
+| 4 | ~~P9 定时任务域~~ **已完成 v0.60.0** | 3 天 | L7 的「跨实体时序」有真靶子 |
 
 **P6 已完成**（v0.54.0）。它先做的理由成立：它是唯一 `open` 的。一条 `open` 挂在台账上超过两个版本，
 就会变成「大家都知道有问题但没人管」——那时候台账就不再是台账，是装饰。

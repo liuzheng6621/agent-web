@@ -6,6 +6,31 @@
 CI 也在查。这条规则是买来的：这个仓库曾经同时存在 `package.json` 0.16、README 0.9、
 Gitee Release v0.6.0 三个数，谁看都是三个项目。
 
+## 0.60.0 — 2026-11-07
+
+第七个域：**定时任务调度**。它逼出的维度是前六个域都没有的——时间是**槽位序列**，
+不是标量。预约有时段、凭证有有效期，但那些都是「一个时刻」；
+「每隔 15 分钟必须跑一次」是「一串时刻」，而现有断言只能数总数。
+
+- 新增第 20 种断言 `recurrence`：窗口内按节律跑满，无漏、无重、无漂。
+  三种坏法分开判：`recurrence_gap`（漏槽位）/ `recurrence_duplicated`（同槽位两次）/
+  `recurrence_drift`（次数全对、时刻全偏）。`count_delta` 只能把它们混成「数量不对」。
+- 新域 `cron-a` / `cron-b` 两个独立实现，内部结构故意不同（数组 + 槽位 Set vs
+  槽位键 Map + 游标现算），`compare` 3/3 判决一致、视图契约兼容——这才算第七个验过的域。
+- 三条案例：`recurrence-full`（24 槽位跑满）、`recurrence-gap`（暂停把时间线切成两段，
+  每段各自跑满且不补跑）、`recurrence-drift`（容差 60s 内允许晚到，超过就红）。
+- 三个本域变异体：`m-cron-skip-slot`（每第 4 个槽位静默漏跑）、
+  `m-cron-double-fire`（同槽位触发两次）、`m-cron-drift`（每个都晚 20 分钟）。
+  `certify` 抓到 4/19，其中 `m-cron-drift` **只有 `recurrence` 抓得住**：
+  摘掉这条断言它就变成 `killable`（有差异、没断言），这是 `kind-necessity` 判它必要的依据。
+- 一个被实测推翻的初始设计：`recurrence` 原本把「窗口外的行」当违规，结果是
+  暂停把时间线切成两段时，两段窗口互相把对方的行判成越界。改成「只判窗口内的行」，
+  多跑的那一次交给 `count_delta` 或 `event_absent`——一条断言只回答一个问题。
+- `cron` 适配器 `events_complete: false`：它没有独立事件流，`runs` 这份列表本身就是观察。
+  声明 `true` 等于谎称「事件记录完整」，`event_absent` 会据此判假——拿假前提判真结论。
+- `scripts/kind-necessity.mjs` 扩到时序三种（原「时序两种」），结论行随之改写。
+- 测试 435 → 457（`test/recurrence.test.mjs` 十四条 + `test/domain-cron.test.mjs` 八条）。
+
 ## 0.59.0 — 2026-11-07
 
 - 新增 `ingest` 命令：把别家测试框架的报告翻成 `pass / fail / unknown / not_run`，并数出三个数

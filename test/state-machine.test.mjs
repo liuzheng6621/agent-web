@@ -101,7 +101,7 @@ test('校验：states 给了就必须是非空字符串数组', () => {
 });
 
 test('注册表：第 19 种，相位固定 trace', () => {
-  assert.equal(KINDS.length, 19);
+  assert.equal(KINDS.length, 20);
   assert.ok(KINDS.includes('state_machine'));
   assert.deepEqual(PHASE_MATRIX.state_machine.allowed, ['trace']);
   assert.equal(phaseOf({ kind: 'state_machine' }), 'trace');
