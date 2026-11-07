@@ -1,4 +1,4 @@
-# agent-web v0.66.0
+# agent-web v0.67.0
 
 <p align="center">
   <img src="docs/media/hero.png" alt="agent-web: integration tests an agent can be judged on" width="100%">
@@ -19,7 +19,7 @@
 </p>
 
 <p align="center">
-  <b>v0.66.0</b> · 20 assertion kinds · 32 commands · 63 mutants
+  <b>v0.67.0</b> · 20 assertion kinds · 32 commands · 63 mutants
 </p>
 
 <p align="center">
@@ -28,6 +28,16 @@
 </p>
 
 ---
+
+<p align="center">
+  <a href="#should-you-use-this-thirty-seconds">Thirty seconds</a> ·
+  <a href="#sixty-seconds">Sixty seconds</a> ·
+  <a href="#three-verdicts-not-two">Three verdicts</a> ·
+  <a href="#validated-across-five-domains">Five domains</a> ·
+  <a href="#commands">Commands</a> ·
+  <a href="#boundaries-implemented-vs-still-open">Boundaries</a> ·
+  <a href="#docs">Docs map</a>
+</p>
 
 ## Should you use this? Thirty seconds
 
@@ -171,7 +181,7 @@ Three things it does not do: guess business rules (recording a successful delist
 
 ## Assertions say more than "row 0 equals 56"
 
-17 kinds, all machine-judgable, none of them "let the model eyeball it":
+20 kinds, all machine-judgable, none of them "let the model eyeball it":
 
 | kind | What it says |
 |---|---|
@@ -189,6 +199,7 @@ Three things it does not do: guess business rules (recording a successful delist
 | `linkage` | Check entity links and cardinality across collections |
 | `timeliness` | final | Two events' real timestamps must differ by no more than a bound (`max:"24h"`); `timezone` is required |
 | `state_machine` | trace | Only declared edges are allowed (`transitions`); `walk:"rows"` walks the event log itself |
+| `recurrence` | Scheduled jobs: slots laid out at fixed intervals inside a window; catches duplicate runs, drift, gaps and wrong counts |
 
 Relations are more portable than hardcoded values: `totalAmount == Σ items.subTotal` should hold on any implementation, while `totalAmount == 56` only holds when menu prices have not changed. Shape assertions work the same way — "no duplicates" does not depend on any specific id.
 
@@ -456,12 +467,15 @@ The remaining boundaries are numbered to match L1–L11 in [docs/LIMITS.md](docs
 
 ## Docs
 
-- [docs/GUIDE.md](docs/GUIDE.md) — Full guide: start from a URL, from logs to formal grading, connect your own app
+**Start at [docs/README.md](docs/README.md) — the docs map**: every document answers one question, routed by what you need right now. Full list below.
+
+- [docs/GUIDE.md](docs/GUIDE.md) — How to use it: start from a URL, from logs to formal grading, connect your own app
 - [docs/SPEC.md](docs/SPEC.md) — Spec: case format, 20 assertion kinds and phases, verdict order table, per-mechanism rules
 - [docs/ADAPTER-GUIDE.md](docs/ADAPTER-GUIDE.md) — Connect your own app: three-tier paths, change only four places, verification order
-- [CHANGELOG.md](CHANGELOG.md) — What each version did and why
 - [docs/LIMITS.md](docs/LIMITS.md) — Ledger of the 11 limits: status, acceptance command, why it stays
 - [docs/ROADMAP.md](docs/ROADMAP.md) — What comes next, in what order, and how each item is verified
+- [docs/domains/](docs/domains/) — measured details of four domains: animal, lexicon, cron, labaccess
+- [docs/museum/](docs/museum/README.md) — the false-verdict museum: 12 exhibits, each a hole this repo actually fell into
 - [docs/mutants/](docs/mutants/README.md) — Mutant directory and submission standards
 - [knowledge/](knowledge/README.md) — Incident archive and admission constitution
 - [docs/media/](docs/media/) — All images, animations and the introduction video on this page, all generated locally (the three SVG badges are too; only the CI badge is rendered live by GitHub)

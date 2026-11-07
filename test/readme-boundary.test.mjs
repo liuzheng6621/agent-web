@@ -21,6 +21,27 @@ function implementedBlock(text, startMark, endMark) {
   return text.slice(i, j);
 }
 
+
+// v0.67.0：断言表格自身也曾漂移（recurrence 上线两个版本后 README 仍写 17 种、表里没它）。
+// 守卫：两份 README 的断言表格必须覆盖 KINDS 的每一个名字——再加断言时，README 不同步就红。
+function assertionSection(text, headingMark) {
+  const i = text.indexOf(headingMark);
+  assert.ok(i >= 0, `找不到断言节标题：${headingMark}`);
+  const j = text.indexOf(String.fromCharCode(10) + '## ', i + headingMark.length);
+  return text.slice(i, j < 0 ? text.length : j);
+}
+
+test('README 断言表格必须覆盖全部 KINDS，数字必须写对', () => {
+  const zhSec = assertionSection(read('README.md'), '## 断言能说的');
+  const enSec = assertionSection(read('README.en.md'), '## Assertions say more');
+  const missingZh = KINDS.filter((k) => !zhSec.includes('`' + k + '`'));
+  const missingEn = KINDS.filter((k) => !enSec.includes('`' + k + '`'));
+  assert.deepEqual(missingZh, [], `中文断言表漏了：${missingZh.join(', ')}`);
+  assert.deepEqual(missingEn, [], `英文断言表漏了：${missingEn.join(', ')}`);
+  assert.match(zhSec, new RegExp(KINDS.length + ' 种 kind'));
+  assert.match(enSec, new RegExp(KINDS.length + ' kinds'));
+});
+
 // 曾经被写成「缺的能力」、现在已落地的七种。它们必须在清单里被点名——
 // 这七种正是读者最容易被旧文档骗的地方。
 const ONCE_MISSING = ['window', 'every_step', 'pagination', 'linkage', 'payload', 'timeliness', 'state_machine'];

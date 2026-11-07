@@ -1,4 +1,4 @@
-# agent-web v0.66.0
+# agent-web v0.67.0
 
 <p align="center">
   <img src="docs/media/hero.png" alt="agent-web：给 Agent 写机器可判的集成测试" width="100%">
@@ -18,7 +18,7 @@
 </p>
 
 <p align="center">
-  <b>当前版本 0.66.0</b> · 20 种断言 · 32 条命令 · 63 个变异体
+  <b>当前版本 0.67.0</b> · 20 种断言 · 32 条命令 · 63 个变异体
 </p>
 
 <p align="center">
@@ -27,6 +27,16 @@
 </p>
 
 ---
+
+<p align="center">
+  <a href="#三十秒判断该不该用">三十秒判断</a> ·
+  <a href="#六十秒上手">六十秒上手</a> ·
+  <a href="#判决只有三种">三种判决</a> ·
+  <a href="#在五个域上验过">五个域</a> ·
+  <a href="#命令一览">命令</a> ·
+  <a href="#边界已实现与仍未解决">边界</a> ·
+  <a href="#文档">文档地图</a>
+</p>
 
 ## 三十秒判断该不该用
 
@@ -170,7 +180,7 @@ FAIL todo/recorded   assertion_false
 
 ## 断言能说的，比「第 0 行等于 56」多
 
-17 种 kind，全部机器可判，没有一种是「让模型看看对不对」：
+20 种 kind，全部机器可判，没有一种是「让模型看看对不对」：
 
 | kind | 说什么 |
 |---|---|
@@ -188,6 +198,7 @@ FAIL todo/recorded   assertion_false
 | `linkage` | 检查跨集合实体关联与对应数量 |
 | `timeliness` | 终态 | 两个事件的真实时间戳之差不得超过上限（`max:"24h"`），必须声明 `timezone` |
 | `state_machine` | trace | 只许走声明的那些边（`transitions`）；`walk:"rows"` 把流水集合当序列 |
+| `recurrence` | 定时任务：窗口内按固定间隔铺槽，抓重复跑、跑偏、漏跑、总数不符 |
 
 关系式比写死具体值更耐移植：`totalAmount == Σ items.subTotal` 在哪个实现上都该成立，
 而 `totalAmount == 56` 只在菜单价格不变时成立。形状断言同理——「列表不重」不依赖任何具体编号。
@@ -496,12 +507,15 @@ node bin/agent-web.mjs verify cases/realworld --adapter=realworld --detail
 
 ## 文档
 
-- [docs/GUIDE.md](docs/GUIDE.md) —— 完整使用指南：从一个网址开始、从日志到正式判分、接入自己的应用
+**先看 [docs/README.md](docs/README.md)——文档地图**：每份文档答一个问题，按你此刻的问题分流；下面是完整列表。
+
+- [docs/GUIDE.md](docs/GUIDE.md) —— 怎么用：从一个网址开始、从日志到正式判分、接入自己的应用
 - [docs/SPEC.md](docs/SPEC.md) —— 规范：案例格式、20 种断言与相位、判决顺序表、各机制的判定规则
 - [docs/ADAPTER-GUIDE.md](docs/ADAPTER-GUIDE.md) —— 接自己的应用：三档路径、只改四处、验收顺序
-- [CHANGELOG.md](CHANGELOG.md) —— 每个版本做了什么、因为什么
 - [docs/LIMITS.md](docs/LIMITS.md) —— 11 条限制的台账：状态、验收命令、为什么这条不解决
 - [docs/ROADMAP.md](docs/ROADMAP.md) —— 接下来做什么、按什么顺序、每条怎么验收
+- [docs/domains/](docs/domains/) —— 四个域的实测细节：动物、词库、定时任务、实验室
+- [docs/museum/](docs/museum/README.md) —— 假判决博物馆：12 件展品，每件都是这个仓库真踩过的坑
 - [docs/mutants/](docs/mutants/README.md) —— 变异体目录与投稿标准
 - [knowledge/](knowledge/README.md) —— 事故档案与入库宪法
 - [docs/media/](docs/media/) —— 本页面所有图、动图与介绍片，全部本地生成（顶部那三个自带 SVG 也是；只有 ci 徽章是 GitHub 实时渲染的）

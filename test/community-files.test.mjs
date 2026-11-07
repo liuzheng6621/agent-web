@@ -143,3 +143,13 @@ test('README 顶部有「该不该用」的判断入口', () => {
   assert.match(section, /帮不上忙/);
   assert.match(section, /不做性能测试/);
 });
+
+// 文档地图不许腐烂：docs/README.md 列出的每个仓库内路径都必须真实存在。
+test('docs/README.md 文档地图列出的路径都存在', () => {
+  const map = read('docs/README.md');
+  const links = [...map.matchAll(/\]\(([^)#h][^)#]*?)\)/g)].map((m) => m[1]);
+  const missing = [...new Set(links)]
+    .map((p) => path.posix.normalize('docs/' + p))
+    .filter((p) => !exists(p));
+  assert.deepEqual(missing, [], `文档地图指向不存在的路径：${missing.join('、')}`);
+});
