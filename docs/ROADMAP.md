@@ -1,4 +1,4 @@
-# 路线图：从 v0.55.0 到 v0.65.0
+# 路线图：从 v0.55.0 到 v0.66.0
 
 这份文档回答一个问题：**接下来该做什么，按什么顺序，做到什么程度算完成。**
 
@@ -11,11 +11,11 @@
 
 | 项 | 数字 | 怎么核 |
 |---|---|---|
-| 版本 | 0.65.0 | `node bin/agent-web.mjs version` |
+| 版本 | 0.66.0 | `node bin/agent-web.mjs version` |
 | 断言 | 20 种 | `--help` 里的断言表 |
 | 命令 | 32 条 | 同上 |
 | 变异体 | 63 个 | `node bin/agent-web.mjs mutants` |
-| 测试 | 524 条 | `npm test` |
+| 测试 | 531 条 | `npm test` |
 | 判据准入 | 适用 41 / 抓到 39（95.1%） | `node scripts/certify-baseline.mjs --emit-limits` |
 | 计入的域 | **6 个** | `docs/LIMITS.md` L11 的计数判据 |
 | 台账状态 | L1/L2/L4/L5/L7/L8/**L11** mitigated · L3/L6 by-design · L9 withdrawn · L10 依赖外部 | `grep status docs/LIMITS.md` |

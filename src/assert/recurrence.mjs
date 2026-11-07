@@ -61,6 +61,12 @@ export function recurrence(a, ctx) {
     return unknown('invalid_case', `时间窗倒置：from=${from} 晚于 to=${to}`);
   }
   const tol = Number.isFinite(a.tolerance_ms) ? a.tolerance_ms : 0;
+  if (tol < 0) {
+    return unknown(
+      'invalid_case',
+      `tolerance_ms 不能是负数（收到 ${a.tolerance_ms}）：负容差把每一行都算成跑偏。校验层拦它，求值器也不替它背书`,
+    );
+  }
 
   const sel = selectEntities(view, a.selector ?? { collection: 'runs' });
   if (sel.status === 'missing') return unknown('missing_observation', sel.reason);
@@ -69,14 +75,18 @@ export function recurrence(a, ctx) {
   const field = a.field ?? 'scheduledFor';
   const ignore = new Set(Array.isArray(a.ignore_status) ? a.ignore_status : []);
 
-  const slots = [];
-  for (let t = from; t <= to; t += every) slots.push(t);
-  if (slots.length > MAX_SLOTS) {
+  // 先按公式算个数，再决定造不造数组。守卫原来放在循环后面：
+  // 「每毫秒一次、窗口一小时」要先空转三百六十万圈才被告知写错了，
+  // 「窗口一年」则直接把进程拖死 —— 用一个写错的案例打死判决器，本身就是 bug。
+  const slotCount = Math.floor((to - from) / every) + 1;
+  if (slotCount > MAX_SLOTS) {
     return unknown(
       'invalid_case',
-      `窗口内槽位 ${slots.length} 个，超过 ${MAX_SLOTS}：节律或窗口写错了，先改案例再谈判决`,
+      `窗口内槽位 ${slotCount} 个，超过 ${MAX_SLOTS}：节律或窗口写错了，先改案例再谈判决`,
     );
   }
+  const slots = [];
+  for (let t = from; t <= to; t += every) slots.push(t);
 
   // 每一行运行记录必须落在某个槽位的容差内；落在两个槽位之间（或容差外）算漂移。
   // 窗口边界必须是半开区间 [from, to)：to 是「到这一刻为止」，不包含这一刻之后。
@@ -112,11 +122,10 @@ export function recurrence(a, ctx) {
       drifted.push(at);
       continue;
     }
-    if (driftedSlots.has(k)) {
-      driftedSlots.delete(k);
-      drifted.push(at);
-      continue;
-    }
+    // 槽位曾经跑偏、现在来了一次准点的：准点行把槽位填上（seen），
+    // 跑偏记录照旧留着。旧代码在这里把准点行记成第二次跑偏、再把槽位
+    // 从跑偏集合里删掉 —— 同一个槽位同时变成「跑偏两次」和「漏跑一次」，
+    // 两笔都错：真相是一次跑偏加一次准点。
     if (seen.has(k)) {
       return bad(
         'recurrence_duplicated',

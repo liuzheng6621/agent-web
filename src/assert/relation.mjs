@@ -27,6 +27,21 @@ export const RELATION_OPS = Object.freeze(['eq', 'sum_equals', 'product_equals',
 
 const NUMERIC = (v) => typeof v === 'number' && Number.isFinite(v);
 
+/**
+ * 浮点等价判据：容差随量级走（相对 1e-9，绝对下限 1e-9）。
+ *
+ * 为什么不能用固定绝对容差：float64 在 1e9 量级的最小间隔约 1.2e-7，
+ * 固定 1e-9 会把「算得对的大额账」判成 violation —— 假红跟假绿一样毁判决：
+ * 前者让人去查一笔没坏的账，查三次之后没人再信这个断言。
+ * 也为什么不能用精确相等：0.1 + 0.2 与 0.3 差 5.6e-17，那是浮点的错，
+ * 不是账的错。
+ * 这把尺子曾经有两把（sum_equals 用 1e-9、sum_by_equals 用 ===），
+ * 同一笔 0.1+0.2 的账在两个算子下一个绿一个红。现在只有这一把。
+ */
+function close(x, y) {
+  return Math.abs(x - y) <= 1e-9 * Math.max(1, Math.abs(x), Math.abs(y));
+}
+
 function guard(spec, ctx) {
   const sel = selectEntities(ctx.final, spec);
   if (sel.status === 'missing') return { blocked: ok(UNKNOWN, 'missing_observation', sel.reason) };
@@ -63,7 +78,7 @@ function opSumEquals(a, row, spec) {
     return ok(UNKNOWN, 'missing_observation', `${describeSelector(spec)} 的 ${a.items}[].${a.of} 有非数字项`);
   }
   const sum = values.reduce((x, y) => x + y, 0);
-  if (Math.abs(sum - total) < 1e-9) {
+  if (close(sum, total)) {
     return ok(TRUE, 'ok', `${describeSelector(spec)}: Σ${a.of}=${fmt(sum)} 等于 ${a.path}=${fmt(total)}`);
   }
   return ok(
@@ -87,7 +102,7 @@ function opProductEquals(a, row, spec) {
     if (!NUMERIC(l) || !NUMERIC(r) || !NUMERIC(p)) {
       return ok(UNKNOWN, 'missing_observation', `${describeSelector(spec)} 的 ${a.items}[${i}] 有非数字项`);
     }
-    if (Math.abs(l * r - p) >= 1e-9) {
+    if (!close(l * r, p)) {
       return ok(
         FALSE,
         'relation_violated',
@@ -155,7 +170,7 @@ function opSumByEquals(a, rows) {
   }
   if (seen === 0) return ok(UNKNOWN, 'missing_observation', `没找到 ${gf}=${left}/${right} 的行`);
   const note = skipped > 0 ? `（跳过 ${skipped} 条读不懂的分录）` : '';
-  if (l !== r) return ok(FALSE, 'relation_violated', `${left} 合计 ${l} ≠ ${right} 合计 ${r}${note}`);
+  if (!close(l, r)) return ok(FALSE, 'relation_violated', `${left} 合计 ${l} ≠ ${right} 合计 ${r}${note}`);
   return ok(TRUE, 'ok', `${left} 与 ${right} 各 ${l}${note}`);
 }
 

@@ -119,6 +119,41 @@ test('校验：every/from/to/timezone 必填，tolerance 与 expect_count 得合
   assert.ok(errs2.some((e) => e.includes('expect_count')));
 });
 
+test('槽位守卫先算后造：超大窗口不能先拖死判决器再报错', () => {
+  const t0 = performance.now();
+  const r = recurrence(
+    { ...BASE, every: '1ms', to: '2026-01-02T00:00:00Z' }, // 8640 万个槽位
+    { final: RUNS([slot(0)]) },
+  );
+  assert.equal(r.status, 'unknown');
+  assert.match(r.message, /超过 10000/);
+  const ms = performance.now() - t0;
+  assert.ok(ms < 200, `守卫必须放在造数组之前（实际耗时 ${Math.round(ms)}ms）`);
+});
+
+test('求值器不信任校验层：tolerance_ms 为负在求值时也是 invalid_case（纵深防御）', () => {
+  const r = recurrence({ ...BASE, tolerance_ms: -1 }, { final: RUNS([slot(0), slot(1), slot(2), slot(3)]) });
+  assert.equal(r.status, 'unknown');
+  assert.equal(r.code, 'invalid_case');
+  assert.match(r.message, /tolerance_ms/);
+});
+
+test('跑偏之后又来一次准点的：槽位算填满，跑偏照记 —— 不把准点行记成第二次跑偏', () => {
+  // slot 1 先跑偏 +5 分钟（容差 0），随后 slot 1 又准点跑了一次
+  const times = [
+    slot(0),
+    new Date(Date.parse(slot(1)) + 5 * 60000).toISOString(),
+    slot(1),
+    slot(2),
+    slot(3),
+  ];
+  const r = recurrence(BASE, { final: RUNS(times) });
+  assert.equal(r.status, 'false');
+  assert.equal(r.code, 'recurrence_drift');
+  // 旧代码把准点行也记成跑偏，报「有 2 次跑偏」；真相是一次跑偏加一次准点
+  assert.match(r.message, /有 1 次跑偏/);
+});
+
 test('版本号可读，且改动会换版本', () => {
   assert.equal(RECURRENCE_VERSION, 'agent-web/recurrence-1');
 });

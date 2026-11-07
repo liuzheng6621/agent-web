@@ -104,6 +104,61 @@ test('发现器不会提议不成立的关系', () => {
   assert.equal(found.find((x) => x.assertion.op === 'sum_equals'), undefined);
 });
 
+test('一把尺子：0.1+0.2 的账不能因为浮点判假红（三个算子同一个 close）', () => {
+  const floaty = { final: { transactions: [{ entries: [
+    { direction: 'debit', amount: 0.1 }, { direction: 'debit', amount: 0.2 },
+    { direction: 'credit', amount: 0.3 },
+  ] }] } };
+  const spec = {
+    selector: { collection: 'transactions' },
+    op: 'sum_by_equals', leaf: 'entries', field: 'amount', group_field: 'direction', left: 'debit', right: 'credit',
+  };
+  // 旧代码在这里用 === ：0.1+0.2 与 0.3 差 5.6e-17，合法账被记成 relation_violated
+  assert.equal(relation(spec, floaty).status, 'true');
+
+  const sumEquals = {
+    kind: 'relation', op: 'sum_equals', selector: { collection: 'orders', index: 0 },
+    items: 'items', of: 'subTotal', path: 'totalAmount',
+  };
+  const order = { id: 1, status: 'PICKED', totalAmount: 0.3, items: [
+    { dishName: 'a', count: 1, unitPrice: 0.1, subTotal: 0.1 },
+    { dishName: 'b', count: 1, unitPrice: 0.2, subTotal: 0.2 },
+  ] };
+  assert.equal(evalAssertion(sumEquals, { final: { orders: [order], menu: [], status_log: [] } }).status, TRUE);
+});
+
+test('大金额也守得住：容差随量级走，1e9 量级的浮点误差不判假，差 100 元照判假', () => {
+  const spec = {
+    selector: { collection: 'transactions' },
+    op: 'sum_by_equals', leaf: 'entries', field: 'amount', group_field: 'direction', left: 'debit', right: 'credit',
+  };
+  // 7 笔 (1e9/7) 加起来与 1e9 差 2.4e-7 —— float64 在这个量级的最小间隔就比 1e-9 大
+  const legit = { final: { transactions: [{ entries: Array.from({ length: 7 }, () => ({ direction: 'debit', amount: 1e9 / 7 })).concat([{ direction: 'credit', amount: 1e9 }]) }] } };
+  assert.equal(relation(spec, legit).status, 'true');
+  // 真·不平（差 100 元）：1e9 量级下也必须红
+  const off = { final: { transactions: [{ entries: [
+    { direction: 'debit', amount: 1e9 }, { direction: 'debit', amount: 1e9 },
+    { direction: 'credit', amount: 2e9 - 100 },
+  ] }] } };
+  const r = relation(spec, off);
+  assert.equal(r.status, 'false');
+  assert.equal(r.code, 'relation_violated');
+});
+
+test('sum_equals 同样随量级走：七笔 1e9/7 凑成 1e9 是对的，不是 violation', () => {
+  const unit = 1e9 / 7;
+  const a = {
+    kind: 'relation', op: 'sum_equals', selector: { collection: 'orders', index: 0 },
+    items: 'items', of: 'subTotal', path: 'totalAmount',
+  };
+  const big = {
+    id: 1, status: 'PICKED', totalAmount: 1e9,
+    items: Array.from({ length: 7 }, (_, i) => ({ dishName: `d${i}`, count: 1, unitPrice: unit, subTotal: unit })),
+  };
+  // 旧尺子（绝对 1e-9）：和与总额差 2.4e-7，比 1e-9 大，假红
+  assert.equal(evalAssertion(a, { final: { orders: [big], menu: [], status_log: [] } }).status, TRUE);
+});
+
 test('sum_by_equals：借贷必须相等，多一条贷方就红', () => {
   const spec = {
     selector: { collection: 'transactions' },
