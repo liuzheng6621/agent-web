@@ -17,13 +17,14 @@
  *   3. 无状态泄漏   写完之后再 reset，必须回到第一份初始视图
  *   4. 空参不炸     每个能力用空参数调一次，不得抛异常、不得 infra_error
  *   5. 写了要变     声明 applied 的写操作之后视图毫无变化 —— 可疑，报警不判死
+ *   6. 契约内 outcome  每次 execute 都必须回 applied/rejected/unsupported/infra_error 之一
  *
  * 第 5 条只报警不判死，因为有些写操作本来就不改规范视图（发通知、写审计日志）。
  * 报出来让人自己判，比替人判死要好。
  */
 
 import { stableStringify, fingerprint } from './values.mjs';
-import { validateAdapter, validateManifest } from './adapter/contract.mjs';
+import { validateAdapter, validateManifest, OUTCOMES } from './adapter/contract.mjs';
 
 export const PROBE_VERSION = 'agent-web/probe-1';
 
@@ -201,10 +202,15 @@ export async function probeAdapter({ adapter, adapterName = 'unknown', timeoutMs
       const caps = (manifest.capabilities ?? []).slice(0, 6);
       const role = roles[0];
       const missing = [];
+      // 顺带把「契约外 outcome」也查了：它比 unsupported 更危险 ——
+      // unsupported 至少会被判 coverage_gap，契约外的值会让这一步什么都不命中，
+      // 一路滑到终态断言。这里只报，判死交给 runner。
+      const offContract = [];
       for (const cap of caps) {
         runId = (await withTimeout(adapter.reset({}))).runId;
         const res = await withTimeout(adapter.execute(runId, { as: role, capability: cap.id, arguments: {} }));
         const code = res && res.error && res.error.code;
+        if (!OUTCOMES.includes(res && res.outcome)) offContract.push(`${cap.id} → ${JSON.stringify(res && res.outcome)}`);
         if ((res && res.outcome === 'unsupported') || code === 'unsupported_capability') missing.push(cap.id);
       }
       add(
@@ -216,6 +222,18 @@ export async function probeAdapter({ adapter, adapterName = 'unknown', timeoutMs
           ? `manifest 声明了但实现说没有：${missing.join('、')} —— 声明与行为对不上，覆盖率会跟着错`
           : `抽查 ${caps.length} 条能力，没有「声明了却回 unsupported」的`,
       );
+      if (offContract.length > 0) {
+        add(
+          'outcome-contract',
+          '每次 execute 都回契约内的 outcome',
+          FAIL,
+          FAIL,
+          `返回了契约外的值：${offContract.join('、')} —— 只认 ${OUTCOMES.join(' / ')}。`
+            + '契约外的值不会被任何分支命中，那一步会一路滑到终态断言，判决可能因此假通过',
+        );
+      } else {
+        add('outcome-contract', '每次 execute 都回契约内的 outcome', PASS, FAIL, `抽查 ${caps.length} 条，全部在 ${OUTCOMES.join('/')} 内`);
+      }
     } catch (e) {
       add('declared-vs-behavior', '声明了的能力真的存在', FAIL, FAIL, String(e && e.message));
     }

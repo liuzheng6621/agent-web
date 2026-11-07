@@ -29,7 +29,12 @@ Gitee Release v0.6.0 三个数，谁看都是三个项目。
 - `cron` 适配器 `events_complete: false`：它没有独立事件流，`runs` 这份列表本身就是观察。
   声明 `true` 等于谎称「事件记录完整」，`event_absent` 会据此判假——拿假前提判真结论。
 - `scripts/kind-necessity.mjs` 扩到时序三种（原「时序两种」），结论行随之改写。
-- 测试 435 → 457（`test/recurrence.test.mjs` 十四条 + `test/domain-cron.test.mjs` 八条）。
+- 测试 435 → 464（`test/recurrence.test.mjs` 14 + `test/domain-cron.test.mjs` 8 + `test/outcome-contract.test.mjs` 6）。
+- **修掉一个真 bug**：适配器返回契约外的 `outcome`（如 `'success'`、`'applied '`、`'APPLIED'`）时，
+  runner 的四个分类分支全不命中，这一步既不失败也不 unknown，一路滑到终态断言——
+  终态恰好成立就判 `pass`。新增判决码 `contract_violation`（判 unknown，不是 rejected：
+  这一步做成了没有，无法判断），并在 `probe` 加第 6 项 `outcome-contract` 作第二道闸。
+  现场证据：`docs/museum/e07-contract-violation.mjs`（第 7 件展品）。
 
 ## 0.59.0 — 2026-11-07
 

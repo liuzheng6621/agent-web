@@ -612,7 +612,8 @@ manifest 校验失败 → `unknown / invalid_environment`。
 | 8 | 步的能力不在 manifest | unknown | `coverage_gap` |
 | 9 | 步的能力不在 `allowed_capabilities` | fail | `invalid_action` |
 | 10 | 参数绑定失败 | fail | `invalid_action` |
-| 11 | 适配器返回 `unsupported` | unknown | `coverage_gap` |
+| 11 | 适配器返回契约外的 `outcome` | unknown | `contract_violation` |
+| 11b | 适配器返回 `unsupported` | unknown | `coverage_gap` |
 | 12 | 适配器返回 `infra_error` | unknown | `infrastructure_error` |
 | 13 | 应成功却被拒绝 | fail | `unexpected_rejection` |
 | 14 | 应被拒绝却成功了 | fail | `expected_rejection` |
@@ -621,6 +622,14 @@ manifest 校验失败 → `unknown / invalid_environment`。
 | 17 | 任一断言为 unknown | unknown | `missing_observation`（若所有判不了的断言原因相同且在白名单内，用该原因，例如 `unsupported_event`） |
 | 18 | 全部成立 | pass | `ok` |
 | — | 未捕获异常 | unknown | `infrastructure_error` |
+
+注意 11：**契约外的 outcome 必须拦在分类之前**。旧版四个分支（`unsupported` / `infra_error` /
+应拒却成 / 应成却拒）全不命中时，这一步既不失败也不 unknown，会一路滑到终态断言——
+而终态断言可能正好成立，判决就 `pass` 了。适配器回一个拼错的 `'applied '`、
+大写 `'APPLIED'`、或读起来很合理的 `'success'`，全都能过。这不是适配器写错，
+是**判定权威被悄悄换掉**：验的不再是契约，而是「这个值恰好没被任何分支拦下」。
+所以它判 `unknown`（这一步做成了没有，无法判断），不是 `rejected`。
+现场证据见 `docs/museum/e07-contract-violation.mjs`。
 
 注意 5 与 16 的不对称：**前置条件为假判 unknown 而不是 fail**。初态不干净是环境问题，不是被测系统的错。把环境问题记成 fail，会把噪声算进被测对象头上。
 

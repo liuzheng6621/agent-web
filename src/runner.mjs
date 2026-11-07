@@ -14,7 +14,7 @@
  */
 
 import { validateCase, validateSteps, resolveArguments, deriveLabels, BindingError, draftBlocker } from './case.mjs';
-import { validateManifest } from './adapter/contract.mjs';
+import { validateManifest, OUTCOMES } from './adapter/contract.mjs';
 import { checkStateAgainstView } from './view.mjs';
 import { evalAssertions, firstFailure, TRUE, FALSE, UNKNOWN } from './assert/index.mjs';
 import { getPath } from './values.mjs';
@@ -248,6 +248,21 @@ async function judgeInner({ case: c, adapter, adapterName = 'unknown', trajector
       });
 
       // ---- step 4: 结果分类 ----
+      // 契约外的 outcome 必须先被拦下。适配器返回 'success' / 'ok' / 拼错的 'applied '
+      // 时，下面每一条 if 都不命中，于是这一步既不算失败也不算 unknown ——
+      // 它会一路滑到终态断言，而终态断言可能正好成立，判决就 pass 了。
+      // 这不是适配器写错，这是**判定权威被悄悄换掉**：验的不再是「这一步做成了」，
+      // 而是「这一步没被拦下」。所以按 infra_error 处理，不按 rejected 处理。
+      if (!OUTCOMES.includes(res.outcome)) {
+        aborted = {
+          status: 'unknown',
+          code: 'contract_violation',
+          at: i,
+          detail: `适配器返回了契约外的 outcome ${JSON.stringify(res.outcome)}，`
+            + `只认 ${OUTCOMES.join(' / ')}。这一步到底做成了没有，无法判断`,
+        };
+        break;
+      }
       if (res.outcome === 'unsupported') {
         aborted = { status: 'unknown', code: 'coverage_gap', at: i, detail: `适配器演不了 ${step.capability}` };
         break;

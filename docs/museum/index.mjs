@@ -5,8 +5,9 @@ import * as e03 from './e03-draft-gate.mjs';
 import * as e04 from './e04-precondition-false.mjs';
 import * as e05 from './e05-hanging-adapter.mjs';
 import * as e06 from './e06-role-collapse.mjs';
+import * as e07 from './e07-contract-violation.mjs';
 
-export const exhibits = [e01, e02, e03, e04, e05, e06];
+export const exhibits = [e01, e02, e03, e04, e05, e06, e07];
 
 export async function runAll() {
   const out = [];

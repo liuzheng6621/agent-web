@@ -34,6 +34,7 @@
 | 04 | 前置条件为假 | `fail` | `unknown` / `invalid_initial_state` | 判决顺序第 6 条 |
 | 05 | 卡住的适配器 | 挂死，无判决 | `unknown` / `infrastructure_error` | `judge` 外层超时 |
 | 06 | 角色单射被破坏 | `pass` | `unknown` / `invalid_environment` | 复位后 `roleBindings` 检查 |
+| 07 | 契约外的 outcome | `pass` | `unknown` / `contract_violation` | `OUTCOMES` 白名单 + `probe` 第 6 项 |
 
 ## 01 · 身份塌缩
 
@@ -105,9 +106,22 @@ node --test test/museum.test.mjs
 | e04 前置条件为假 | — | 不能：它是判定规则（判 `unknown`），不是结构性风险 |
 | e05 卡住的适配器 | — | 不能：它让判决作废，靠 `reason_code: infrastructure_error` 识别并另行统计 |
 | e06 角色单射被破坏 | — | 不能：同上，`invalid_environment` 已经是显式判决 |
+| e07 契约外的 outcome | `probe/outcome-contract` | 能，`probe` 第 6 项每次抽查都验 |
 
 另外 `traps` 里有一条 `terminal-only`（只看终态），它的展品还没写——这是一个已知空缺，留着就是因为不想让「有探测器没展品」变成常态。规则写进了 SPEC 第 12 章：**没有展品的陷阱不收。**
 
 ## 投稿
 
 发现新的假通过，开个 issue 附上：症状一句话、最小复现、你觉得哪个机制应该抓住它。收进来的展品会进这张表，并写进 CHANGELOG。
+
+## 07 · 契约外的 outcome
+
+**症状** 把 `execute` 的返回值从 `applied` 改成 `'success'`——一个在任何文档里都不存在、但读起来完全合理的词——整条案例仍然 `pass`，理由码 `ok`。
+
+**三值为什么抓不到** 终态断言问的是「最后有没有这张订单」，那件事确实发生了。判决在它的口径内是对的，只是它回答的不是「这一步做成了没有」。
+
+**谁抓住的** v0.60.0 加的两处，互相独立：`src/runner.mjs` 的 `OUTCOMES` 白名单（判 `unknown / contract_violation`）与 `probe` 的第 6 项 `outcome-contract`。前者拦住判决，后者在适配器接入的第一分钟就报警——**即使有人把白名单改回去，探针也会独立报出来**。
+
+**为什么值得单独一件** 这是唯一一件「适配器没有撒谎、断言没有写错、环境没有坏」的假通过。它坏在**枚举**上：契约说四选一，实现回了第五个。任何靠 `if` 串联的分类器都有这个洞——不是没写 `else`，是**没写 `else` 这件事本身不会报错**。
+
+**复现** `node -e "import('./docs/museum/e07-contract-violation.mjs').then(async m=>console.log(await m.run()))"`
