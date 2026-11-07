@@ -8,9 +8,16 @@ import fs from 'node:fs';
 
 const HAPPY = JSON.parse(fs.readFileSync('cases/coffee/happy-path.json', 'utf8'));
 
-test('契约：constraints 声明合法才放行', () => {
-  const m = { ...createMemoryAdapter().manifest ? {} : {}, capabilities: [] };
-  assert.ok(true);
+test('契约：constraints 声明合法才放行', async () => {
+  // 这条原本是 assert.ok(true) 的空壳：上面那行 `createMemoryAdapter().manifest ? {} : {}`
+  // 恒为 {}（manifest 是方法不是属性，永远 truthy），什么也没验。
+  const m = await createMemoryAdapter().manifest();
+  const ok = JSON.parse(JSON.stringify(m));
+  ok.capabilities[0].constraints = { 'items[].qty': { min: 1, max: 9, integer: true } };
+  assert.deepEqual(validateManifest(ok), []);
+
+  // 合法声明必须真的能被读出来，不能只是「没报错」。
+  assert.deepEqual(ok.capabilities[0].constraints['items[].qty'], { min: 1, max: 9, integer: true });
 });
 
 test('契约：constraints 空对象与非法项都要报错', async () => {

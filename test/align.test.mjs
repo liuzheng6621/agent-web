@@ -144,7 +144,9 @@ test('align.yml：未定进 unresolved，accepted 是空的（人签之前不生
   const yml = renderAlignYaml(r);
   assert.ok(yml.includes('accepted: []'));
   assert.ok(yml.includes('unresolved:'));
-  assert.ok(yml.includes('targetAmount') === false || true);
+  // 原先是 `yml.includes('targetAmount') === false || true`，永远通过。
+  // 想说的是「未定的映射不许进 accepted」，那就直接查 accepted 段。
+  assert.ok(!yml.split('accepted:')[1].includes('targetAmount'), '未定映射混进了 accepted');
   const obj = toYamlObject(r);
   assert.equal(obj.align_version, 'agent-web/align-1');
   assert.ok(obj.unresolved.some((u) => u.field === 'pickupNo'));

@@ -7,8 +7,9 @@ import * as e05 from './e05-hanging-adapter.mjs';
 import * as e06 from './e06-role-collapse.mjs';
 import * as e07 from './e07-contract-violation.mjs';
 import * as e08 from './e08-second-place.mjs';
+import * as e09 from './e09-doc-drift.mjs';
 
-export const exhibits = [e01, e02, e03, e04, e05, e06, e07, e08];
+export const exhibits = [e01, e02, e03, e04, e05, e06, e07, e08, e09];
 
 export async function runAll() {
   const out = [];

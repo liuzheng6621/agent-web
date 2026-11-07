@@ -16,6 +16,7 @@ import { judge } from './runner.mjs';
 import { evalAssertions } from './assert/index.mjs';
 import { MUTATIONS, mutate } from './mutate.mjs';
 import { stableStringify } from './values.mjs';
+import { resolveUnknownReason } from './unknown-reason.mjs';
 
 const TRUE_STATUS = 'pass';
 
@@ -125,7 +126,7 @@ function transformCtx(baseCtx, tamper) {
  * 本来 pass 的，有 goal 断言变假 → fail/assertion_false；只剩不变量变假 → fail/invariant_violated。
  * 本来就不是 pass 的，结局没变，签名也不变。
  */
-function deriveVerdict(baseVerdict, flat, results) {
+export function deriveVerdict(baseVerdict, flat, results) {
   const status = baseVerdict?.status ?? 'unknown';
   if (status !== 'pass') return { status, reason_code: baseVerdict?.reason_code ?? null };
   let goalFailed = false;
@@ -141,8 +142,8 @@ function deriveVerdict(baseVerdict, flat, results) {
   // 那条断言会变成 unknown（看不见），此时判决必须是 unknown 而不是 pass——
   // 重放路径就是这么判的，快路径照抄这个语义才不会两边打架。
   // （m-drop-create-event 删掉 order.created 之后，timeliness 找不到起点事件）
-  const blind = results.find((r) => r?.status === 'unknown');
-  if (blind) return { status: 'unknown', reason_code: blind.code || 'missing_observation' };
+  const blind = results.filter((r) => r?.status === 'unknown');
+  if (blind.length) return { status: 'unknown', reason_code: resolveUnknownReason(blind.map((r) => r.code)) };
   return { status: 'pass', reason_code: baseVerdict?.reason_code ?? null };
 }
 
