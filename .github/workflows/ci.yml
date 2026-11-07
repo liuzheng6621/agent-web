@@ -13,7 +13,7 @@ jobs:
       matrix:
         node: ['20', '22', '24']
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # 要 tag：scripts/status-line.mjs 会查 tag 是否与 package.json 对齐。
           # 浅克隆拿不到 refs/tags，那条检查会静默跳过。
