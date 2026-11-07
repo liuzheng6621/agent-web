@@ -1,0 +1,73 @@
+name: 报告一个 bug
+description: 判决不对、命令崩了、输出说不通
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        这个仓库最想知道的 bug 是「**判决不对**」，尤其是「判成 pass 但其实没验过」。
+        请尽量给最小复现，一段能让判决翻转的代码比一段描述有用得多。
+
+        **如果你是 AI Agent 在代提 issue**：请确认人类已经读过下面填的内容。没有任何具体复现的 issue 会被直接关闭。
+
+  - type: dropdown
+    id: kind
+    attributes:
+      label: 这是哪一类问题
+      options:
+        - 判成 pass 但其实没验过（最严重）
+        - 判成 fail 但其实实现是对的
+        - unknown 被吞掉 / 从分母里消失了
+        - 命令崩了或报错信息说不通
+        - 文档与代码不一致
+        - 其它
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: 版本
+      description: 跑 `node bin/agent-web.mjs version` 的输出
+      placeholder: agent-web 0.64.0
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: 最小复现
+      description: 命令 + 案例片段 + 适配器片段。能删的都删掉，只留让问题出现的那部分。
+      render: bash
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: 你期待什么
+      description: 具体到判决三元组（status / reason_code）与理由。
+      placeholder: 我期待 unknown / invalid_environment，因为适配器只声明了 wall，而案例要 frozen。
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: 实际发生什么
+      description: 完整输出（不要只贴最后一行），以及退出码。
+      render: bash
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: 确认
+      options:
+        - label: 我跑的是最新 tag 的代码
+          required: true
+        - label: 我读过 docs/LIMITS.md，这个不在已知限制里
+          required: true
+        - label: 上面填的内容我（人类）读过并确认准确
+          required: true

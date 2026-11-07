@@ -1,0 +1,25 @@
+cff-version: 1.2.0
+message: "如果这个工具帮到了你的研究或项目，按下面这样引用。"
+title: "agent-web"
+abstract: >-
+  给 Agent 写机器可判的集成测试：一份案例，跑两个实现，判决必须一致。
+  判决只有 pass / fail / unknown 三种，unknown 留在分母里；断言必须机器可判，
+  不使用模型判定；新增一种断言必须能杀掉至少一个变异体（判据准入）。
+type: software
+authors:
+  - alias: YG
+    name-particle: ""
+repository-code: "https://github.com/liuzheng6621/agent-web"
+url: "https://github.com/liuzheng6621/agent-web"
+repository-artifact: "https://github.com/liuzheng6621/agent-web"
+license: MIT
+version: 0.65.0
+date-released: "2026-11-07"
+keywords:
+  - agent testing
+  - integration testing
+  - machine-judgeable assertions
+  - three-valued logic
+  - mutation testing
+  - LLM agents
+  - cross-implementation differential testing

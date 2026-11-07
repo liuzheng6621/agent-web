@@ -1,0 +1,65 @@
+name: 提一个改动
+description: 新断言、新命令、新域，或改现有行为
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        这个仓库的改动门槛按「**它能不能让判决更可信，或者让「不可信」这件事本身被看见**」来判。
+        做不到这两件事之一的改动，即使功能上很合理，也会被拒——不是不欢迎，是它不属于这个项目的目标。
+
+        请先读 [CONTRIBUTING.md](https://github.com/liuzheng6621/agent-web/blob/main/CONTRIBUTING.md) 和 [AGENTS.md](https://github.com/liuzheng6621/agent-web/blob/main/AGENTS.md)。
+
+  - type: dropdown
+    id: kind
+    attributes:
+      label: 改动类型
+      options:
+        - 新断言（必须能杀掉至少一个变异体）
+        - 新命令
+        - 新域（必须有两个独立实现 + compare 100%）
+        - 新变异体
+        - 改现有判决行为
+        - 文档 / 工程化
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: 现在有什么问题
+      description: 不要描述解决方案，描述现在缺什么、会导致什么后果。最好给一个"现在判不出来"的具体例子。
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 你打算怎么改
+      description: 如果是新断言，写清它的语义、适用相位、可能返回的 code。
+    validations:
+      required: true
+
+  - type: textarea
+    id: falsify
+    attributes:
+      label: 这个改动怎么被证伪
+      description: |
+        这是本仓库特有的一栏，必填。
+        新断言 → 造一个只有它能抓的变异体，写清它抓什么。
+        新域 → 两个实现分别是什么、哪里不同。
+        改判决行为 → 哪条现有测试会因此改变预期，为什么那样才对。
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: 确认
+      options:
+        - label: 这不是「让模型来判断」的方案（本仓库禁止 LLM judge）
+          required: true
+        - label: 我读过 docs/LIMITS.md，这不是已登记的限制
+          required: true
+        - label: 上面填的内容我（人类）读过并确认准确
+          required: true

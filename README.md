@@ -1,4 +1,4 @@
-# agent-web v0.64.0
+# agent-web v0.65.0
 
 <p align="center">
   <img src="docs/media/hero.png" alt="agent-web：给 Agent 写机器可判的集成测试" width="100%">
@@ -14,10 +14,11 @@
   <img alt="node" src="docs/media/badge-node.svg">
   <img alt="dependencies" src="docs/media/badge-deps.svg">
   <img alt="license" src="docs/media/badge-license.svg">
+  <a href="https://github.com/liuzheng6621/agent-web/actions/workflows/ci.yml"><img alt="ci" src="https://github.com/liuzheng6621/agent-web/actions/workflows/ci.yml/badge.svg"></a>
 </p>
 
 <p align="center">
-  <b>当前版本 0.64.0</b> · 20 种断言 · 32 条命令 · 63 个变异体
+  <b>当前版本 0.65.0</b> · 20 种断言 · 32 条命令 · 63 个变异体
 </p>
 
 <p align="center">
@@ -26,6 +27,24 @@
 </p>
 
 ---
+
+## 三十秒判断该不该用
+
+**如果你的 Agent 测试长这样，这个工具帮不上忙**：只有一份实现、断言靠模型看输出、失败时靠人读日志。
+
+**如果长这样，它就是给你写的**：
+
+| 你的现状 | 这里对应什么 |
+|---|---|
+| 有 mock 实现，也有真实后端，但没人证明两者行为一样 | `compare`：同一份案例跑两遍，判决必须逐条一致 |
+| 测试挂了，你分不清是代码坏了还是环境没起来 | 三值判决：`unknown` 是一个独立结论，不是失败的别名 |
+| 断言写了很多，但不知道哪条真的在起作用 | `certify` + 变异体：故意写坏实现，看哪条断言抓得住 |
+| 想让 Agent 自己改代码，但不敢让它自己判断改对没有 | 断言机器可判，禁 LLM judge；`selftest` 12 条标签由机制产出 |
+| 手上有接口但没测试，不知道从哪开始 | `discover`：输入网址，生成能跑的适配器和案例草稿 |
+
+一句话：**你在为「Agent 改的代码到底对不对」找一个不依赖信任的答案。**
+
+不适合的场景也说清：它不做性能测试、不做 UI 测试、不做安全扫描。它只回答一个问题——**某次业务操作的行为，是否符合一份写死的、机器能判的预期。**
 
 ## 六十秒上手
 
@@ -485,7 +504,11 @@ node bin/agent-web.mjs verify cases/realworld --adapter=realworld --detail
 - [docs/ROADMAP.md](docs/ROADMAP.md) —— 接下来做什么、按什么顺序、每条怎么验收
 - [docs/mutants/](docs/mutants/README.md) —— 变异体目录与投稿标准
 - [knowledge/](knowledge/README.md) —— 事故档案与入库宪法
-- [docs/media/](docs/media/) —— 本页面所有图、动图与介绍片，全部本地生成
+- [docs/media/](docs/media/) —— 本页面所有图、动图与介绍片，全部本地生成（顶部那三个自带 SVG 也是；只有 ci 徽章是 GitHub 实时渲染的）
+- [CONTRIBUTING.md](CONTRIBUTING.md) —— 三条不可谈判的规则、提交前必须过的六道门、四种典型改动的步骤
+- [AGENTS.md](AGENTS.md) —— 给要改这个仓库的 AI Agent 读的：五条硬约束、六个踩过的坑
+- [SECURITY.md](SECURITY.md) —— 「能让适配器骗过探针」在本仓库算有效漏洞，以及哪些不算
+- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) —— 攻击主张，不攻击人
 
 ## 许可
 

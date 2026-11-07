@@ -1,0 +1,25 @@
+# 这个仓库的换行符是混合的，所以这里不设 end_of_line ——
+# 设了会让编辑器把 CRLF 文件整体重写，产生看不出意义的巨大 diff。
+# 哪些文件是 CRLF 见 AGENTS.md 的「本机工具注意事项」。
+
+root = true
+
+[*]
+charset = utf-8
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+[*.md]
+# 文档里的行尾双空格是硬换行，删了会改变渲染结果
+trim_trailing_whitespace = false
+
+[*.{yml,yaml}]
+indent_size = 2
+
+[*.py]
+indent_size = 4
+
+[Makefile]
+indent_style = tab

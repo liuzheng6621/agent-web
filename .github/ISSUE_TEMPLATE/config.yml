@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 使用问题 / 怎么用
+    url: https://github.com/liuzheng6621/agent-web/blob/main/docs/GUIDE.md
+    about: 1025 行的使用指南，先看这里，比开 issue 快。
+  - name: 已知限制
+    url: https://github.com/liuzheng6621/agent-web/blob/main/docs/LIMITS.md
+    about: 11 条限制的台账。你遇到的问题可能已经在里面，并写清了为什么不解决。
+  - name: 安全漏洞
+    url: https://github.com/liuzheng6621/agent-web/security/advisories/new
+    about: 请走私密报告，不要开公开 issue。

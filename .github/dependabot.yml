@@ -1,0 +1,15 @@
+version: 2
+
+# 这个仓库没有运行时依赖（package.json 里没有 dependencies 字段，这是故意的）。
+# 所以这里只跟 GitHub Actions —— 唯一的"外部依赖"是 CI 用的 action 版本。
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "chore(ci)"
+    labels:
+      - dependencies
+    # 一次最多开 3 个 PR：这个仓库的 CI 是串行跑守卫脚本的，PR 太多会互相排队。
+    open-pull-requests-limit: 3

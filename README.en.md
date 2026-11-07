@@ -1,4 +1,4 @@
-# agent-web v0.64.0
+# agent-web v0.65.0
 
 <p align="center">
   <img src="docs/media/hero.png" alt="agent-web: integration tests an agent can be judged on" width="100%">
@@ -15,10 +15,11 @@
   <img alt="node" src="docs/media/badge-node.svg">
   <img alt="dependencies" src="docs/media/badge-deps.svg">
   <img alt="license" src="docs/media/badge-license.svg">
+  <a href="https://github.com/liuzheng6621/agent-web/actions/workflows/ci.yml"><img alt="ci" src="https://github.com/liuzheng6621/agent-web/actions/workflows/ci.yml/badge.svg"></a>
 </p>
 
 <p align="center">
-  <b>v0.64.0</b> · 20 assertion kinds · 32 commands · 63 mutants
+  <b>v0.65.0</b> · 20 assertion kinds · 32 commands · 63 mutants
 </p>
 
 <p align="center">
@@ -27,6 +28,24 @@
 </p>
 
 ---
+
+## Should you use this? Thirty seconds
+
+**It won't help if your agent tests look like this**: one implementation only, assertions that ask a model "does this look right", and a human reading logs when something fails.
+
+**It's written for this**:
+
+| What you have | What this maps to |
+|---|---|
+| A mock implementation and a real backend, but nobody proved they behave alike | `compare`: run one case twice, verdicts must agree line by line |
+| Tests fail and you can't tell whether the code broke or the environment didn't start | Three-valued verdicts: `unknown` is its own conclusion, not a euphemism for failure |
+| Many assertions, no idea which ones actually do anything | `certify` + mutants: deliberately break the implementation, see which assertion catches it |
+| You want an agent to edit code but can't let it decide whether the edit was right | Assertions are machine-judgeable; no LLM judge. `selftest` labels 12 cases by mechanism |
+| An API but no tests, and no idea where to start | `discover`: give it a URL, get a runnable adapter and case drafts |
+
+In one line: **you want an answer to "is the code the agent wrote actually correct" that doesn't depend on trust.**
+
+What it is not, stated plainly: no performance testing, no UI testing, no security scanning. It answers one question — **does this business operation behave the way a written-down, machine-checkable expectation says it should.**
 
 ## Sixty seconds
 
@@ -445,7 +464,11 @@ The remaining boundaries are numbered to match L1–L11 in [docs/LIMITS.md](docs
 - [docs/ROADMAP.md](docs/ROADMAP.md) — What comes next, in what order, and how each item is verified
 - [docs/mutants/](docs/mutants/README.md) — Mutant directory and submission standards
 - [knowledge/](knowledge/README.md) — Incident archive and admission constitution
-- [docs/media/](docs/media/) — All images, animations and the introduction video on this page, all generated locally
+- [docs/media/](docs/media/) — All images, animations and the introduction video on this page, all generated locally (the three SVG badges are too; only the CI badge is rendered live by GitHub)
+- [CONTRIBUTING.md](CONTRIBUTING.md) — three non-negotiable rules, six gates before you commit, four typical changes
+- [AGENTS.md](AGENTS.md) — written for the AI agent editing this repo: five hard constraints, six traps we've already hit
+- [SECURITY.md](SECURITY.md) — "you can make an adapter fool the probe" counts as a valid vulnerability here; and what doesn't
+- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) — attack the claim, not the person
 
 ## License
 

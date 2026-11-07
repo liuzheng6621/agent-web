@@ -6,6 +6,47 @@
 CI 也在查。这条规则是买来的：这个仓库曾经同时存在 `package.json` 0.16、README 0.9、
 Gitee Release v0.6.0 三个数，谁看都是三个项目。
 
+## 0.65.0 — 2026-11-07
+
+这一版没有新增断言、没有新增命令、没有改判决逻辑。它做的是让一个陌生人能在三十秒内判断
+「这个工具跟我有关吗」，以及让他提第一个 issue 时不用靠猜。
+
+参照了五个高星仓库的门面（vitest、got、promptfoo、lm-evaluation-harness 与几个同类工具），
+只抄能提高「判决可信度」或「不可信被看见」的那部分，其余明确不抄——理由写在下面。
+
+- **`package.json` 补仓库元数据**（`repository` / `bugs` / `homepage` / `author`）。之前四个全缺，
+  npm 页面上会显示「无仓库链接」。`keywords` 从 6 个扩到 12 个，加的都是真实检索词
+  （`mutation-testing` / `machine-judgeable` / `three-valued-logic`）。
+- **新增 `CONTRIBUTING.md`**：三条不可谈判的规则（三值判决且 `unknown` 留分母 / 禁 LLM judge /
+  新增断言必须杀掉至少一个变异体）、提交前必须过的六道门、四种典型改动的步骤、AI 参与规则。
+  它是唯一对外解释宪法的地方。
+- **新增 `AGENTS.md`**：给要改这个仓库的 Agent 读的。五条硬约束 + 六个踩过的坑
+  （契约外 outcome 假通过 / `may_have_committed` 与 `infra_error` 是相反指令 / `applies_to` 不要省略 /
+  环境没起来不许报数字 / `execute()` 第一参是 `runId` / 忽略 `as` 会让越权案例假通过）。
+  这个仓库是给 Agent 写测试的，之前却没有一份写给 Agent 的说明书。
+- **新增 `SECURITY.md`**：把这个仓库特有的安全含义写清——「能让适配器骗过探针」是**有效漏洞**，
+  不是使用问题。列出四类算漏洞（判成 pass 其实没验过 = 最严重，点名展品 07/08/11 三次历史）
+  与三类不算（会看探测器的骗子、换掉 `globalThis.fetch` 这两类已在 L8 登记，重复报不算新发现）。
+- **新增 `CODE_OF_CONDUCT.md`**（Contributor Covenant 2.1 按本项目具体化）与 **`CITATION.cff`**。
+- **新增 `.github/` 三件**：表单式 issue 模板（bug + feature，强制最小复现与「怎么被证伪」）、
+  PR 模板（同样强制那一栏）、`dependabot.yml`（只跟 GitHub Actions，因为零依赖是卖点）。
+- **新增 `.editorconfig`**：故意**不设 `end_of_line`** —— 这个仓库的换行符是混合的，设了会让编辑器
+  把 CRLF 文件整体重写，产生看不出意义的巨大 diff。
+- **README 顶部加「三十秒判断该不该用」**：一张五行对照表（你有什么 → 这里对应什么），
+  外加明确写出**不适合什么**（不做性能测试、不做 UI 测试、不做安全扫描）。
+  之前 README 有 492 行却没有「我该不该用这个」的判断入口。
+- **加 CI 徽章**（GitHub 实时渲染，是页面上唯一非本地生成的图）。
+- **新增 `test/community-files.test.mjs`（11 条）**：这些文件不是装饰，是承诺，所以要有测试守着。
+  包括「CONTRIBUTING 提的六道门必须都是真脚本」（写了个不存在的命令比不写更糟）、
+  「AGENTS.md 里提到的源码路径都存在」（说明书指错路比没有说明书更糟）、
+  「CITATION.cff 的版本必须跟 `package.json` 一致」。
+
+**明确不抄的**：monorepo / pnpm workspace（零依赖是这个项目的卖点）、release-please 自动发版
+（`status-line.mjs` + 手工 tag 比它更严）、Discord（中文项目用 Discussions 更合适）。
+高星仓库的「社区规模」不是目标，「判决可信」才是。
+
+测试 513 → **524 条**。
+
 ## 0.64.0 — 2026-11-07
 
 这一版不写功能，只做两件「让不该安静的事安静不下来」的事。
