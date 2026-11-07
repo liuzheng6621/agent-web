@@ -69,13 +69,24 @@ export function wrap(adapter) {
 | `m-ledger-sign-flip` | state | 负余额的符号被翻正 |
 | `m-ledger-total-lies` | state | 交易合计说成非零（装平） |
 | `m-ledger-any-balance` | execute | 不平的账也报成功（接口撒谎） |
+| `m-lab-slot-conflict-ignore` | execute | 同一时段约两次都成功（时段排他没判） |
+| `m-lab-otp-window-ignore` | execute | 时段没到就发门禁口令（时间窗没判） |
+| `m-lab-borrow-stock-frozen` | state | 可借数量永远等于总量（借出不扣库存） |
+| `m-lab-approve-not-pending` | execute | 已经批过的还能再批（批准没查状态） |
 
 看完整说明：`agent-web mutants`。
 
-**现在的战绩：咖啡域 17/19，账本域 4/5。** 目录共 22 个变异体，其中 20 个声明了
+**现在的战绩：咖啡域 17/19，账本域 4/5，实验室域 7/20。** 目录共 60 个变异体，其中 44 个声明了
 `applies_to`——账本变异体在咖啡适配器上标记「不适用」，不进分母。 漏网的两个都记在 `scripts/certify-baseline.mjs` 的
 `KNOWN_SURVIVORS` 里，理由分别是「取餐号的 +100 偏移是各实现自有的约定」和
 「排序本来就没写进契约」——都不是尺子不够长，是这两样东西不该跨实现断言。
+
+实验室域的分母要打个折看：20 个里有 13 个是咖啡域专用的老变异体，它们**没声明 `applies_to`**，
+工具只能按「适用」算——那些变异体在实验室适配器上连差异都造不出来（清单末尾那句
+「先确认案例走没走到」，说的就是这个坑）。真正与本域相关的 7 个，全被抓住：
+预约时段排他、门禁口令时间窗、库存扣减、批准状态机各一个，外加三个跨域的通病
+（`m-no-reject` 该拒的不拒、`m-exec-role-ignore` 身份塌缩、`m-exec-drop-intermediate` 丢中间态）。
+这 13 个老变异体缺 `applies_to` 是笔明账，补它是独立的活儿。
 
 新加的三个执行层变异体各自钉住了一种断言：`m-read-with-side-effect` 只有 `unchanged` 抓得住，
 `m-skip-intermediate` 靠 `status_transition` 的完整序列，`m-double-effect` 靠一条针对
@@ -96,7 +107,7 @@ meta 里写 `requires_trace: true` 就是声明这件事，`scripts/state-equiva
 
 1. **它对应哪种真实故障？** 编不出来就别收——变异体的价值是"这是真会发生的坏法"。
 2. **谁抓住它？** 跑 `agent-web certify cases/<你的案例> --mutations=<新 id>`，给出结果。
-3. **它和现有 19 个是不是同一个？** 两个变异体只有 id 不同，等于把一张票投了两遍。
+3. **它和现有 59 个是不是同一个？** 两个变异体只有 id 不同，等于把一张票投了两遍。
 4. **有没有案例抓不住它？** 有，就写进 README 的"已知盲区"，别假装没有。
 
 ## 边界

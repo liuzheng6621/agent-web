@@ -20,8 +20,8 @@ function readCases() {
 const cases = readCases();
 const expected = JSON.parse(fs.readFileSync(path.join(DIR, 'expected.json'), 'utf8'));
 
-test('labaccess：四条案例都通过格式校验', () => {
-  assert.equal(cases.length, 4);
+test('labaccess：六条案例都通过格式校验', () => {
+  assert.equal(cases.length, 6);
   for (const c of cases) assert.deepEqual(validateCase(c), [], c.id);
 });
 
@@ -56,6 +56,37 @@ test('labaccess：这个后端没有实体事件流，manifest 必须诚实写 f
   const adapter = createLabAccessAdapter({ baseUrl: 'http://127.0.0.1:1' });
   const manifest = await adapter.manifest();
   assert.equal(manifest.events_complete, false, '写 true 会诱使别人拿事件断言去查它');
+});
+
+test('labaccess：时段排他——同实验室同时段第二次必须被拒', () => {
+  const c = cases.find((x) => x.id === 'labaccess/slot-exclusive');
+  assert.ok(c, '缺 slot-exclusive');
+  const creates = c.reference_trajectory.filter((s) => s.capability === 'reservations.create');
+  assert.equal(creates.length, 2, '要两次提交才叫排他');
+  assert.equal(creates[0].expected_outcome, 'applied');
+  assert.equal(creates[1].expected_outcome, 'rejected',
+    '后端 ensureLaboratorySlotAvailable 一旦放行重叠时段，这条先红');
+  assert.equal(creates[1].as, 'student2', '第二次必须换个人，否则验的是"同一人不能重复提交"');
+  assert.equal(creates[1].arguments.startsInMinutes, creates[0].arguments.startsInMinutes,
+    '两次必须落在同一时段，差一分钟就验不出重叠');
+});
+
+test('labaccess：批准是一次性的——批过再批必须被拒', () => {
+  const c = cases.find((x) => x.id === 'labaccess/approve-twice');
+  assert.ok(c, '缺 approve-twice');
+  const approves = c.reference_trajectory.filter((s) => s.capability === 'reservations.approve');
+  assert.equal(approves.length, 2);
+  assert.equal(approves[0].expected_outcome, 'applied');
+  assert.equal(approves[1].expected_outcome, 'rejected',
+    '后端只允许 pending 被批准，幂等到没底线时这条会红');
+});
+
+test('labaccess：库存案例要有中途断言，终态看不出借出这件事', () => {
+  const c = cases.find((x) => x.id === 'labaccess/borrow-stock');
+  assert.ok(c, '缺 borrow-stock');
+  const mid = c.task.goal_assertions.filter((a) => a.kind === 'window');
+  assert.equal(mid.length, 1, '只断言"归还后回到 5"的话，把库存写死成 5 也能过');
+  assert.equal(mid[0].of.value, 3, '借两台期间可借数必须是 3');
 });
 
 test('labaccess：口令案例必须是「还没到点就拿不到」，不是「能拿到」', () => {

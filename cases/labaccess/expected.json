@@ -2,5 +2,7 @@
   "labaccess/reservation-approval": "pass",
   "labaccess/otp-before-window": "pass",
   "labaccess/approve-forbidden": "pass",
-  "labaccess/borrow-stock": "pass"
+  "labaccess/borrow-stock": "pass",
+  "labaccess/slot-exclusive": "pass",
+  "labaccess/approve-twice": "pass"
 }

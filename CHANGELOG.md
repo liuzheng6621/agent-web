@@ -6,6 +6,32 @@
 CI 也在查。这条规则是买来的：这个仓库曾经同时存在 `package.json` 0.16、README 0.9、
 Gitee Release v0.6.0 三个数，谁看都是三个项目。
 
+## 0.58.0 — 2026-11-07
+
+实验室域补上它该有的坏法：两条新案例、四个本域变异体，`certify` 抓获率 **18.8% → 35.0%**。
+
+上一版把这个域接进来时就写了一句话：「它最该有的三个变异体还没写」。这一版把它们写了，
+但不是原样写的——有一个写不成，理由写在下面。
+
+- 新增两条案例：`cases/labaccess/slot-exclusive`（同一实验室同一时段第二个人必须被拒）、
+  `cases/labaccess/approve-twice`（批过的再批一次必须被拒）。实测 `verify` **6/6 与预期一致**。
+- 新增四个本域变异体（前三个在执行层，靠判决翻转被抓）：
+  `m-lab-slot-conflict-ignore`（时段重叠也放行）、`m-lab-otp-window-ignore`（时段没到就发口令）、
+  `m-lab-approve-not-pending`（批过的还能再批）、`m-lab-borrow-stock-frozen`（可借数永远等于总量，状态层）。
+- **没写「凭证有效期不截断」那个变异体，这是故意的。** 后端 `clampExpiry` 把口令有效期
+  夹在预约结束时间内，但当前案例模型**没有等待步**：后端要求 `startAt >= now` 才能建预约，
+  而口令只在 `startAt <= now < endAt` 内签发——于是「成功签发」的状态在案例里根本走不到，
+  伪造一个成功响应观察里没有任何东西会变。写一个永远漏网的条目进目录只是噪声，
+  所以把机制与为什么抓不住写进 `docs/domains/labaccess.md`，并补了一个同族且可达的
+  `m-lab-approve-not-pending`。附带发现：断言语言里没有任何**有序比较**算子（无法表达「时刻 A < 时刻 B」）。
+- 一个事实更正：上一版说「容量满了第二次必须被拒」不准确。`capacity` 只被 `ensureGroupCapacity` 用（成员数），
+  真正相斥的是 `ensureLaboratorySlotAvailable`：**同一实验室同一时段只能有一条有效预约**，
+  跟容量无关。案例名从「容量」改成「时段排他」就是为了不把错的东西写进史书。
+- `certify` 分母要打折看：适用 20 个里有 13 个是咖啡域专用的老变异体，它们没声明 `applies_to`，
+  工具只能按「适用」算，而它们在实验室适配器上连差异都造不出来。与本域真正相关的 7 个全被抓住。
+- 顺手把 `docs/ROADMAP.md` 的行尾归一（它一直是 CRLF，与 `.gitattributes` 的 `eol=lf` 不一致）。
+  代价是这一次 diff 看起来像整篇重写，之后就干净了。
+
 ## 0.57.0 — 2026-11-06
 
 第六个真实后端：实验室预约平台（`D:/hos/appointment-check-in-system`，Spring Boot 3 + MySQL）。

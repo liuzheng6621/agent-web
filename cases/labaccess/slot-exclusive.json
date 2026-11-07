@@ -1,0 +1,68 @@
+{
+  "schema_version": "agent-web/0.1",
+  "id": "labaccess/slot-exclusive",
+  "environment": {
+    "adapter": "labaccess"
+  },
+  "task": {
+    "natural_goal": "同一间实验室的同一时段只能有一条有效预约，第二个人来约就该被挡回去",
+    "goal_assertions": [
+      {
+        "kind": "count_delta",
+        "selector": {
+          "collection": "reservations"
+        },
+        "delta": 1
+      },
+      {
+        "kind": "field_equals",
+        "selector": {
+          "collection": "reservations",
+          "index": 0
+        },
+        "path": "status",
+        "value": "pending"
+      }
+    ],
+    "invariants": [
+      {
+        "kind": "unchanged",
+        "scopes": [
+          "equipment"
+        ]
+      }
+    ]
+  },
+  "reference_trajectory": [
+    {
+      "id": "s1",
+      "capability": "reservations.create",
+      "as": "student",
+      "arguments": {
+        "startsInMinutes": 240,
+        "durationMinutes": 30,
+        "purpose": "slot-a"
+      },
+      "expected_outcome": "applied"
+    },
+    {
+      "id": "s2",
+      "capability": "reservations.create",
+      "as": "student2",
+      "arguments": {
+        "startsInMinutes": 240,
+        "durationMinutes": 30,
+        "purpose": "slot-b"
+      },
+      "expected_outcome": "rejected"
+    }
+  ],
+  "observability": {
+    "declared_scopes": [
+      "labs",
+      "reservations",
+      "equipment",
+      "borrows"
+    ]
+  }
+}

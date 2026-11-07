@@ -61,6 +61,10 @@ import * as dupFirstMenu from './m-breed-duplicate-first-menu.mjs';
 import * as dropFirstMenu from './m-breed-drop-first-menu.mjs';
 import * as blankLogType from './m-breed-blank-status-log-0-type.mjs';
 import * as truncateLogType from './m-breed-truncate-status-log-0-type.mjs';
+import * as labSlotConflictIgnore from './m-lab-slot-conflict-ignore.mjs';
+import * as labOtpWindowIgnore from './m-lab-otp-window-ignore.mjs';
+import * as labBorrowStockFrozen from './m-lab-borrow-stock-frozen.mjs';
+import * as labApproveNotPending from './m-lab-approve-not-pending.mjs';
 
 const ENTRIES = [
   ['m-money-off-by-cent', moneyOffByCent],
@@ -120,6 +124,11 @@ const ENTRIES = [
   ['m-breed-drop-first-menu', dropFirstMenu],
   ['m-breed-blank-status-log-0-type', blankLogType],
   ['m-breed-truncate-status-log-0-type', truncateLogType],
+
+  ['m-lab-slot-conflict-ignore', labSlotConflictIgnore],
+  ['m-lab-otp-window-ignore', labOtpWindowIgnore],
+  ['m-lab-borrow-stock-frozen', labBorrowStockFrozen],
+  ['m-lab-approve-not-pending', labApproveNotPending],
 
 ];
 

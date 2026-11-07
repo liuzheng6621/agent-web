@@ -1,16 +1,18 @@
 # 第六个域：研启・SciAegis（实验室预约平台）
 
 真实后端：`D:\hos\appointment-check-in-system`（Spring Boot 3 + MySQL 8，151 个后端测试）。
-适配器 `labaccess`，四条案例在 `cases/labaccess/`。
+适配器 `labaccess`，六条案例在 `cases/labaccess/`。
 
 ## 为什么挑它
 
 前五个域的写入都是「你调接口，状态就变」。这个域不一样：**状态是被时间推着走的**。
 
-- 预约有**时段**，时段有**容量**（容量满了第二次提交必须被拒）
+- 同一间实验室的同一时段**只能有一条**有效预约，第二个人来约必须被挡回去
+  （`ensureLaboratorySlotAvailable`：区间相交就抛 `RESERVATION_CONFLICT`）
 - 时段**之外**取不到门禁口令——后端判的是 `startAt <= now < endAt`，早一分钟都不行
-- 口令的**有效期被预约结束时间截断**（`expiresAt = min(now + TTL, endAt)`）
-- 批准之后才发得出凭证；器材借出扣可借数、归还才恢复
+- 口令的**有效期被预约结束时间截断**（`expiresAt = min(now + TTL, endAt)`，`OTP_TTL = 5min`）
+- 批准之后才发得出凭证，且**只有 pending 能被批准**（批过的再批一次要拒）
+- 器材借出扣可借数、归还才恢复
 
 `state_machine`、`window`、`relation` 三种断言在这里第一次有真对手。
 
@@ -26,18 +28,38 @@ cd E:/SKIl.1/agent-web
 export LABACCESS_ADMIN_PASSWORD=$(grep '^APP_DEV_ADMIN_PASSWORD=' \
   /d/hos/appointment-check-in-system/services/backend/.env | cut -d= -f2)
 
-node bin/agent-web.mjs probe  --adapter=labaccess
-node bin/agent-web.mjs verify cases/labaccess --adapter=labaccess
+node bin/agent-web.mjs probe   --adapter=labaccess
+node bin/agent-web.mjs verify  cases/labaccess --adapter=labaccess
 node bin/agent-web.mjs certify cases/labaccess --adapter=labaccess
 ```
+
+`verify` / `certify` 必须带 `--adapter=labaccess`：不带就会退回默认适配器，
+每条案例都报 `coverage_gap 能力 reservations.create 不在 manifest`——看着像案例坏了，
+其实是尺子拿错了。
 
 ## 实测
 
 | 命令 | 结果 |
 |---|---|
 | `probe` | 9 项：8 通过 / 0 失败 / 1 跳过（跳过项是「没有只允许部分角色的写能力」，给能力标了 `roles` 之后不再跳过） |
-| `verify` | **4/4 与预期标签一致**，可判定率 100%，p50 ≈ 1.5s |
-| `certify` | 抓到 3 / 适用 16 = **18.8%**，40 个变异体不适用（它们声明的是咖啡店/账本/词库的集合） |
+| `verify` | **6/6 与预期标签一致**，可判定率 100%，p50 ≈ 1.4s |
+| `certify` | 抓到 7 / 适用 20 = **35.0%**（四个实验室变异体全抓），40 个变异体不适用 |
+
+`certify` 的分母要打个折看：适用的 20 个里有 13 个是咖啡域专用的老变异体，它们没声明
+`applies_to`，工具只能按「适用」算，而它们在实验室适配器上连差异都造不出来。
+真正与本域相关的 7 个全被抓住，其中 3 个是跨域通病（`m-no-reject`、`m-exec-role-ignore`、
+`m-exec-drop-intermediate`），4 个是本域专属（下一节）。
+
+## 六条案例
+
+| 案例 | 钉住什么 |
+|---|---|
+| `reservation-approval` | 预约 → 批准，`count_delta` + 状态迁移 |
+| `approve-forbidden` | 学生调教师审批端点必须被拒（身份塌缩的探针） |
+| `slot-exclusive` | 同一实验室同一时段第二次必须被拒（时段排他） |
+| `approve-twice` | 已经批过的再批一次必须被拒（批准是一次性的） |
+| `otp-before-window` | 时段没到就取门禁口令必须被拒（时间窗） |
+| `borrow-stock` | 借出两台时 `availableQuantity == 3`，归还后回到 5（中途 `window`） |
 
 ## 适配这个后端时踩到的四件事
 
@@ -52,8 +74,37 @@ node bin/agent-web.mjs certify cases/labaccess --adapter=labaccess
 
 第二版更值得记：能力名取对了，但**忽略了 `action.as`**，永远用教师 token 去打审批。于是越权案例 `approve-forbidden`（学生自己批自己）**被判 pass**——学生确实"批准"成功了。这正是这个项目存在的理由：身份塌缩会让越权案例假通过。修法是 `tokenFor(as)`，让每步用自己的票。
 
+## 四个本域变异体（v0.58.0）
+
+| 变异体 | 层 | 坏在哪 | 谁抓住它 |
+|---|---|---|---|
+| `m-lab-slot-conflict-ignore` | execute | 同一时段约两次都成功 | `slot-exclusive` 的 `expected_outcome: rejected` |
+| `m-lab-otp-window-ignore` | execute | 时段没到就发口令 | `otp-before-window` 的 `expected_outcome: rejected` |
+| `m-lab-approve-not-pending` | execute | 已批过的还能再批 | `approve-twice` 的第三个步骤 |
+| `m-lab-borrow-stock-frozen` | state | 可借数永远等于总量 | `borrow-stock` 的 `window`（中途 3，终态 5 看不出问题） |
+
+三个 execute 层的都靠**判决翻转**（该拒的变成成功）被抓住，`caseCaught` 记的是
+`sig(base.verdict) !== sig(p.verdict)`；只有 `m-lab-borrow-stock-frozen` 是被具体断言杀死的。
+换句话说：这四条案例里真正有杀伤力的断言只有 4 条（`armedAssertions 19 / usefulAssertions 4`），
+其余 `count_delta` 和 `unchanged` 目前都是空转——它们该在别的变异体上发挥作用，不是在这儿凑数。
+
+## 这个域验不到的东西：凭证有效期被截断
+
+后端 `clampExpiry(now, OTP_TTL, reservationEndAt)` 把凭证有效期夹在预约结束时间之内。
+写个「有效期不截断」的变异体很容易，但**当前案例模型抓不住它**，原因是结构性的：
+
+1. 案例步骤只能是能力，**没有等待步**（`src/case.mjs` 里没有 wait/sleep）；
+2. 后端要求 `startAt >= now` 才能建预约，而 OTP 只在 `startAt <= now < endAt` 内签发；
+3. 于是「成功签发凭证」的状态在案例里根本走不到——所有 OTP 步骤都停在
+   `ACCESS_WINDOW_INVALID`。伪造一个成功的 OTP 响应，观察里没有任何东西会变。
+
+要抓它得先让案例模型能表达时间推进，或者让后端开放一个"签发但不校验窗口"的测试入口。
+两条都不该为了一个变异体硬塞，所以这条暂记为盲区：**写进这里，而不是写一个永远漏网的变异体进目录**。
+（顺带一提，「有效期 ≤ 结束时间」还缺一种有序比较断言：`relation` 只有 `eq/sum_equals/product_equals/sorted/sum_by_equals`，
+`payload` 只有 `exists/equals/is_string/is_list/not_empty/count_gte/count_equals/contains`，都比不了两个时刻的先后。）
+
 ## 还没做
 
 - 只覆盖「预约—审批—口令」和「借用—批准—归还」两条链；课表导入、权限申报、设备事件、人脸登记都没接。
 - 没有第二个实现，所以 `compare` 用不上——按 L11 的门槛（两个独立实现 + `compare` 100%），它**不算一个"验过的域"**，只算一次真实后端验证。台账里 L11 仍写五个域。
-- 变异体只有 3 个能杀：会话窗口、审批越权、借还库存。**这个形状最该有的变异体还没写**（提前发凭证、容量不判、有效期不截断），它们要落在适配器层，不是后端层。
+- 13 个老变异体缺 `applies_to`，会虚增每个新域的分母（见 `docs/mutants/README.md`）。
