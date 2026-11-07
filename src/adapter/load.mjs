@@ -50,6 +50,11 @@ const BUILTINS = {
     const m = await import('./taixianglian.mjs');
     return m.createTaixianglianAdapter();
   },
+  // 咖啡店第二观测通道：同 execute，observe 走 SQL 直读（L2 写后事实层）。
+  'taixianglian-sql': async () => {
+    const m = await import('./taixianglian-sql.mjs');
+    return m.createTaixianglianSqlAdapter();
+  },
   // 第三个域的真实后端（Spring Boot 3 + MySQL）：形状与咖啡店完全不同 ——
   // Spring Page 信封、大写状态、三角色、审批链。它自己的缺陷也写成了案例。
   animal: async () => {

@@ -375,6 +375,9 @@ export function createTaixianglianAdapter(options = {}) {
   return { manifest, reset, observe, execute, close, baseUrl, toStep };
 }
 
+// MANIFEST 一并导出：taixianglian-sql 复用同一份声明改名字段，view/capabilities 永不漂移。
+export { MANIFEST as TAIXIANGLIAN_MANIFEST };
+
 export function validateTaixianglianAdapter() {
   return validateManifest(MANIFEST);
 }

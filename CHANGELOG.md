@@ -6,6 +6,23 @@
 CI 也在查。这条规则是买来的：这个仓库曾经同时存在 `package.json` 0.16、README 0.9、
 Gitee Release v0.6.0 三个数，谁看都是三个项目。
 
+## 0.68.0 — 2026-11-07
+
+第二观测通道 `taixianglian-sql`：L2 写后事实层的地基（三层验证栈 S1）。
+
+- 新适配器 `src/adapter/taixianglian-sql.mjs`：`execute` 与 `taixianglian` 完全同路（HTTP），
+  `observe` 改走 SQL 直读 —— 独立 JVM 跑 `org.h2.tools.Shell`（与后端同版本 2.4.240），
+  经 `AUTO_SERVER=TRUE;AUTO_SERVER_PORT=9199` 混连 H2 文件库，只许 `SELECT`，
+  把 menu / orders / status_log 投影成同一份规范视图。查询字段映射集中在 view.sql-map，只写一次。
+- `taixianglian.mjs` 导出 `TAIXIANGLIAN_MANIFEST`：两条通道复用同一份声明，
+  view / capabilities / roles 不漂移，不同的只有观测路径。
+- 环境变量：`TAIXIANGLIAN_SQL_DB_URL` / `TAIXIANGLIAN_SQL_JAVA` / `TAIXIANGLIAN_SQL_H2_JAR`；
+  未设置时 observe 返回 missing_scopes（进 unknown 分母，不假装失败）。
+- 实测：咖啡店后端（8099，H2 文件库）上 `compare` 跑 `cases/coffee/` 全部 12 条，
+  跨适配器判决一致率 **100%（12/12：pass 6 / fail 5 / unknown 1，逐条同值）**。
+- 差异照实记录：happy-path 与 linkage-events 在 HTTP/SQL 通道 fail —— 后端下单不落状态流水，
+  案例按 memory 域的 order.created 形状写死了 index。这是域语义差异被两条通道如实照出，不是通道缺陷。
+
 ## 0.67.0 — 2026-11-07
 
 门面二轮：让仓库更好找、更直观。
