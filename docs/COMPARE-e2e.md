@@ -45,6 +45,8 @@
 - `serialGroupId` / `serialGroups`：明确哪些测试必须串行。
 - `expectedFailure`：声明「这条本来就会失败」。我们没有等价物，见第四节陷阱。
 - `limits` / `usage` / `changes` / `carried`：预算、用量、变更影响面、跨 run 继承。
+- `ACTION_MAY_HAVE_COMMITTED` 那一档（v0.61.0 已补，见 8.1）。留在这里是因为它当初确实在这个清单里——
+  补上的东西要从「缺什么」里划掉，否则这张表会慢慢变成愿望清单。
 
 ## 四、两个必须记住的陷阱
 
@@ -95,7 +97,7 @@ agent-web ingest <报告.json> [--from=e2e] [--json]
 同理，`ingest` 的产物**不进** `report --counts`：那份报告只吃本仓库自己的判决。
 外部报告的 `pass` 不是本仓库的 `pass`，混在一起数就是在给自己记虚功。
 
-## 七、他们文档里那段「所有权边界」，指出了我们的一个洞
+## 八、他们文档里那段「所有权边界」，指出了我们的一个洞
 
 `writing-an-engine.mdx` 里有一张所有权表，把「谁负责什么」切得很干净：
 
@@ -108,8 +110,9 @@ agent-web ingest <报告.json> [--from=e2e] [--json]
 我们的适配器契约里没有这条——`observe` 能不能重试、`execute` 撞到多匹配该报什么，从来没写。
 
 而真正扎到我的是另一条推论。他们把所有「状态分类」都收在 runner，engine 只能抛错或返回值。
-我们也是这么分的，但**漏了一个分支**：`execute` 的返回值我们声明了四选一
-（`applied` / `rejected` / `unsupported` / `infra_error`），却从来没有检查它真的落在这四个里。
+我们也是这么分的，但**漏了一个分支**：`execute` 的返回值我们声明了封闭枚举
+（`applied` / `rejected` / `unsupported` / `infra_error`，v0.61.0 起加 `may_have_committed`），
+却从来没有检查它真的落在里面。
 
 于是有了一个只在纸面上存在的契约：适配器回 `'success'`，四个分类分支全不命中，
 这一步既不失败也不 `unknown`，一路滑到终态断言——终态恰好成立，判决就 `pass`。
@@ -126,3 +129,16 @@ agent-web ingest <报告.json> [--from=e2e] [--json]
 **这条对照的意义**：e2e 用异常（`EngineError` + 一组固定错误码）而不是返回值，所以他们天然没有这个洞——
 抛不出已知错误码的就是「未知错误 → 基础设施故障」。返回值风格的契约更易读，但必须自己补上
 「值不在枚举里」这一支。这是两种风格的真实代价，不是风格偏好。
+
+### 8.1 顺着这张表，还挖出第二件事：`may_have_committed`
+
+他们的错误码里有一个 `ACTION_MAY_HAVE_COMMITTED`，明确写着「runner 不再重复执行」。
+我们当时只有四档，写请求超时、连接断在响应头之前、后端 5xx 全被塞进 `infra_error`。
+
+判决上没问题——都判 `unknown`。**问题在重放**：`infra_error` 的语义是「这次调用没发生」，
+可以重试；`may_have_committed` 的语义是「可能已经生效」，不许重试。
+两条相反的指令共用一个码，重放器只能猜，猜错就是把已经扣了的钱再扣一次。
+
+v0.61.0 加了第五档，判决 `unknown / effect_uncertain`，与 `infrastructure_error` 分开报。
+这是六个未决问题里**唯一一条会改变判决结果**的，其余五条是结构整理。
+决策全文在 `E:/SKIl.1/ai研究/BACKLOT_DECISIONS.md`。

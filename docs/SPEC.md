@@ -481,16 +481,27 @@ node bin/agent-web.mjs accept <案例文件> --by=<确认人> [--at=<ISO 时间>
 }
 ```
 
-`Outcome` 四选一：
+`Outcome` 五选一：
 
 | outcome | 含义 |
 | --- | --- |
 | `applied` | 执行成功，`payload` 带返回值 |
 | `rejected` | 业务层拒绝（越权、非法迁移、参数不合法），`error.code` 必填 |
 | `unsupported` | 适配器演不了这个能力（**不是**失败） |
-| `infra_error` | 适配器自己坏了（网络、令牌过期、解析失败） |
+| `infra_error` | 适配器自己坏了（网络、令牌过期、解析失败），**这次调用没发生** |
+| `may_have_committed` | 请求发出去了，结果没回来——**可能已经生效** |
 
 区分 `rejected` 与 `infra_error` 很关键：前者是**被测系统的行为**，后者是**测量仪器故障**。把仪器故障记成"系统拒绝"会凭空造出一次假失败。
+
+`may_have_committed` 与 `infra_error` 同样必须分开，但方向相反：
+这两档在判决上都是 `unknown`，区别在**重放指令**——
+`infra_error` 说"可以重试"，`may_have_committed` 说"不许重试，先去看状态"。
+写请求超时、连接断在收到响应头之前、后端 5xx 都属后者。塞进 `infra_error`，
+判决看不出问题，重放器却会照着重跑，把已经扣了的钱再扣一次。
+
+`close(runId)` 必须**幂等**：重复调用不得抛错，也不得让第二次的失败看起来像被测系统坏了。
+理由很实际——不幂等的清理函数逼每个调用方自己记账，而调用方记账的地方通常就是重试路径。
+`probe` 有一条 `close-idempotent` 专门查这个。
 
 ### 6.1 Manifest
 
@@ -613,6 +624,7 @@ manifest 校验失败 → `unknown / invalid_environment`。
 | 9 | 步的能力不在 `allowed_capabilities` | fail | `invalid_action` |
 | 10 | 参数绑定失败 | fail | `invalid_action` |
 | 11 | 适配器返回契约外的 `outcome` | unknown | `contract_violation` |
+| 11a | 适配器返回 `may_have_committed` | unknown | `effect_uncertain` |
 | 11b | 适配器返回 `unsupported` | unknown | `coverage_gap` |
 | 12 | 适配器返回 `infra_error` | unknown | `infrastructure_error` |
 | 13 | 应成功却被拒绝 | fail | `unexpected_rejection` |
@@ -622,6 +634,14 @@ manifest 校验失败 → `unknown / invalid_environment`。
 | 17 | 任一断言为 unknown | unknown | `missing_observation`（若所有判不了的断言原因相同且在白名单内，用该原因，例如 `unsupported_event`） |
 | 18 | 全部成立 | pass | `ok` |
 | — | 未捕获异常 | unknown | `infrastructure_error` |
+
+注意 11a：**`may_have_committed` 与 `infra_error` 判的都是 `unknown`，但理由码必须分开**。
+前者说「请求发出去了，结果没回来，可能已经生效」，后者说「这次调用没发生」——
+这是两条**相反**的重放指令：`infrastructure_error` 允许重试，`effect_uncertain` 不许。
+合成一个码，重放器只能猜；猜错就是把已经扣了的钱再扣一次。
+三种真实情形会落到这一档：写请求超时、连接断在收到响应头之前、后端 5xx。
+适配器回这一档时，**后续步骤一律不执行**——拿一个不确定是否存在的 id 去执行下一步，
+会把「一个不确定」扩散成「一串不确定」。
 
 注意 11：**契约外的 outcome 必须拦在分类之前**。旧版四个分支（`unsupported` / `infra_error` /
 应拒却成 / 应成却拒）全不命中时，这一步既不失败也不 unknown，会一路滑到终态断言——
@@ -1083,17 +1103,27 @@ certify 判断「这个变异体被案例看见了」靠比对两份规范视图
 
 ### 14.1 查什么
 
-| 检查 | 判据 | 失败意味着 |
-| --- | --- | --- |
-| 契约 | 五方法齐全、`manifest()` 通过 `validateManifest` | 适配器没写完 |
-| 复位幂等 | 连续两次 `reset` 后的初始视图指纹相同 | 复位没落实到可观测状态上 |
-| 观测稳定 | 同一状态连读两次指纹相同 | 视图里混进时钟或随机数，`count_delta` 会随机漂移 |
-| 无状态泄漏 | 写一轮再 `reset`，仍等于第一份初态 | 上一轮的残留会流进下一轮，判决之间不再独立 |
-| 空参不炸 | 每条能力用空参数调一次，不得抛异常、不得 `infra_error` | 参数校验没做，Agent 一乱调就崩 |
-| 写了要变 | 声明 `applied` 的写操作之后视图毫无变化 → **只报警** | 可能是假执行，也可能这个写本来就不改规范视图 |
+| # | 检查 | 判据 | 失败意味着 |
+| --- | --- | --- | --- |
+| 1 | 契约 | 五方法齐全 | 适配器没写完 |
+| 2 | manifest | `manifest()` 可读且通过 `validateManifest` | 声明写错了，后面全部白跑 |
+| 3 | 复位幂等 | 连续两次 `reset` 后的初始视图指纹相同 | 复位没落实到可观测状态上 |
+| 4 | 观测稳定 | 同一状态连读两次指纹相同 | 视图里混进时钟或随机数，`count_delta` 会随机漂移 |
+| 5 | 无状态泄漏 | 写一轮再 `reset`，仍等于第一份初态 | 上一轮的残留会流进下一轮，判决之间不再独立 |
+| 6 | 空参不炸 | 每条能力用空参数调一次，不得抛异常、不得 `infra_error` | 参数校验没做，Agent 一乱调就崩 |
+| 7 | 声明了的能力真的存在 | manifest 里每条能力调一次，不得回 `unsupported` | 声明与实现脱节，案例会在这一步静默变成覆盖缺口 |
+| 8 | 角色真的生效 | 每条有角色约束的写能力，换一个局外人去调，必须被拒 | 身份塌缩：适配器忽略了 `as`，越权案例会假通过 |
+| 9 | 读操作不改状态 | 参数全可选的读能力，执行后视图指纹不变 | 读偷偷写了东西，`count_delta` 会莫名其妙地漂 |
+| 10 | 契约内的 outcome | 每次 `execute` 的 `outcome` 必须在 `OUTCOMES` 里 | 枚举外的值会让那一步滑到终态断言假通过（见 `docs/museum/e07`） |
+| 11 | `close` 幂等 | 连续两次 `close` 都不抛错 | 清理函数逼调用方自己记账，而记账处通常是重试路径 |
+| — | 写了要变 | 声明 `applied` 的写操作之后视图毫无变化 → **只报警** | 可能是假执行，也可能这个写本来就不改规范视图 |
 
 最后一条只报警不判死，是刻意的：发通知、写审计日志这类写操作本来就不改视图，替人判死会制造误报。
 探针给的是「这几件可机械判定的事上没有矛盾」，不是「这个适配器可信」。
+
+第 7–9 项是 v0.47.0 补的，第 10 项 v0.60.0，第 11 项 v0.61.0。每一条都对应一次真实的假通过：
+第 8 项对应 labaccess 适配器忽略 `action.as` 让越权案例转绿；第 10 项对应四个分类分支都不命中时
+那一步既不失败也不算未知，一路滑到终态断言。
 
 ### 14.2 探针查不了的
 

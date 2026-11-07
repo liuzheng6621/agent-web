@@ -6,6 +6,26 @@
 CI 也在查。这条规则是买来的：这个仓库曾经同时存在 `package.json` 0.16、README 0.9、
 Gitee Release v0.6.0 三个数，谁看都是三个项目。
 
+## 0.61.0 — 2026-11-07
+
+读完 `tester-army/e2e` 的交接文档，把六个未决问题逐条判了，只挑出**一条会改变判决结果**的先做。
+决策全文在 `E:/SKIl.1/ai研究/BACKLOT_DECISIONS.md`。
+
+- **新增第五档 outcome `may_have_committed`。** 写请求超时、连接断在收到响应头之前、后端 5xx，
+  这三种以前全塞进 `infra_error`，判 `unknown`。判决没错，**重放错了**：`infra_error` 的语义是
+  「这次调用没发生」，可以重试；`may_have_committed` 的语义是「可能已经生效」，不许重试。
+  两条相反的指令共用一个码，重放器只能猜，猜错就是把已经扣了的钱再扣一次。
+  新判决：`unknown / effect_uncertain`，与 `infrastructure_error` 分开报，`detail` 写明「不许重放」。
+- **`may_have_committed` 之后后续步骤一次都不跑。** 拿一个不确定是否存在的 id 去执行下一步，
+  会把「一个不确定」扩散成「一串不确定」。有一条测试用计数的假适配器钉住这一点。
+- **manifest 校验从 `judge()` 里提到读案例之前。** 以前一份坏 manifest 会先跑完复位、读完初态，
+  才在判决里报 `invalid_environment`——读者看到这个码会以为环境坏了，其实是声明写错了。
+  `verify` / `certify` / `compare` 现在先问一次，坏了直接退 2，并指名第几条、哪个字段。
+- **`probe` 第十一项：`close` 必须幂等。** 不幂等的清理函数逼每个调用方自己记账，
+  而记账的地方通常就是重试路径。SPEC 第 6 章补了这条要求。
+- 测试 466 → 472（`test/outcome-contract.test.mjs` 补 3 条、新增 `test/precheck-manifest.test.mjs` 5 条、
+  `test/probe.test.mjs` 补 1 条）。探针 10 → 11 项。
+
 ## 0.60.0 — 2026-11-07
 
 第七个域：**定时任务调度**。它逼出的维度是前六个域都没有的——时间是**槽位序列**，

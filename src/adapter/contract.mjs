@@ -10,19 +10,35 @@
  *   execute(runId, action)            -> { outcome, payload }     执行一个动作
  *   close(runId)                      -> void
  *
- * outcome 必须四选一，不允许合并：
- *   applied       动作被执行了
- *   rejected      应用自己拒绝了（业务规则 / 权限 / 冲突）
- *   unsupported   适配器演不了（覆盖缺口）
- *   infra_error   适配器或下层故障
+ * outcome 必须五选一，不允许合并：
+ *   applied             动作被执行了
+ *   rejected            应用自己拒绝了（业务规则 / 权限 / 冲突）
+ *   unsupported         适配器演不了（覆盖缺口）
+ *   infra_error         适配器或下层故障，**这次调用没发生**
+ *   may_have_committed  请求发出去了，但结果没回来 —— 可能已经生效
  *
- * 四者混淆是这类系统最常见的错误：
+ * 五者混淆是这类系统最常见的错误：
  * 把 unsupported 当 rejected，会让"覆盖不足"被记成"应用拒绝"，指标虚高。
+ *
+ * 最后一档是重放安全的唯一支点，也是它容易被省掉的原因：
+ * infra_error 与 may_have_committed 是两条**相反**的重放指令——
+ * 前者说"可以重试"，后者说"不许重试，先去看状态"。
+ * 把超时、连接断在响应前、后端 5xx 塞进 infra_error，判决本身看不出问题（都判 unknown），
+ * 但重放器会照着重跑一遍，把已经扣了的钱再扣一次。
  */
 
 import { validateViewContract } from '../view.mjs';
 
-export const OUTCOMES = Object.freeze(['applied', 'rejected', 'unsupported', 'infra_error']);
+export const OUTCOMES = Object.freeze([
+  'applied',
+  'rejected',
+  'unsupported',
+  'infra_error',
+  'may_have_committed',
+]);
+
+/** 这一档意味着「可能已经生效」，重放器据此拒绝重复执行同一步。 */
+export const UNCERTAIN_OUTCOMES = Object.freeze(['may_have_committed']);
 export const CAPABILITY_KINDS = Object.freeze(['read', 'write', 'session']);
 
 export const EVIDENCE_LEVELS = Object.freeze(['observed', 'inferred', 'validated']);

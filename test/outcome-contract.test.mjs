@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import { judge } from '../src/runner.mjs';
 import { probeAdapter } from '../src/probe.mjs';
 import { createMemoryAdapter } from '../src/adapter/memory.mjs';
-import { OUTCOMES } from '../src/adapter/contract.mjs';
+import { OUTCOMES, UNCERTAIN_OUTCOMES } from '../src/adapter/contract.mjs';
 
 const CASE = {
   schema_version: 'agent-web/0.1',
@@ -31,19 +31,22 @@ const CASE = {
   observability: { declared_scopes: ['orders', 'menu'] },
 };
 
-function withOutcome(outcome) {
+function withOutcome(outcome, error) {
   const inner = createMemoryAdapter();
   return {
     ...inner,
     async execute(runId, action) {
       const res = await inner.execute(runId, action);
-      return { ...res, outcome };
+      return error ? { ...res, outcome, error } : { ...res, outcome };
     },
   };
 }
 
-test('契约说四选一：OUTCOMES 是封闭枚举，顺序固定', () => {
-  assert.deepEqual([...OUTCOMES], ['applied', 'rejected', 'unsupported', 'infra_error']);
+test('契约说五选一：OUTCOMES 是封闭枚举，顺序固定', () => {
+  assert.deepEqual([...OUTCOMES], [
+    'applied', 'rejected', 'unsupported', 'infra_error', 'may_have_committed',
+  ]);
+  assert.deepEqual([...UNCERTAIN_OUTCOMES], ['may_have_committed']);
 });
 
 test('契约外的 outcome 判 unknown / contract_violation（不是 pass）', async () => {
@@ -52,6 +55,52 @@ test('契约外的 outcome 判 unknown / contract_violation（不是 pass）', a
     assert.equal(v.status, 'unknown', `outcome=${JSON.stringify(bogus)} 被判成了 ${v.status}`);
     assert.equal(v.reason_code, 'contract_violation', `outcome=${JSON.stringify(bogus)}`);
   }
+});
+
+test('may_have_committed 判 unknown / effect_uncertain，且与 infra_error 分开', async () => {
+  const uncertain = await judge({
+    case: CASE,
+    adapter: withOutcome('may_have_committed', { code: 'ETIMEDOUT', message: '请求超时' }),
+    adapterName: 'memory',
+  });
+  assert.equal(uncertain.status, 'unknown');
+  assert.equal(uncertain.reason_code, 'effect_uncertain',
+    'infra_error 说「可以重试」，effect_uncertain 说「不许重试」—— 合成一个码，重放器只能猜');
+  assert.ok(uncertain.detail.includes('ETIMEDOUT'), 'detail 里要留原因，否则没人能据此行动');
+  assert.ok(uncertain.detail.includes('不许重放'), 'detail 里要写明重放策略');
+
+  const infra = await judge({
+    case: CASE, adapter: withOutcome('infra_error'), adapterName: 'memory',
+  });
+  assert.equal(infra.reason_code, 'infrastructure_error');
+  assert.notEqual(uncertain.reason_code, infra.reason_code);
+});
+
+test('may_have_committed 时不许继续往下执行：后续步骤一次都不能跑', async () => {
+  const inner = createMemoryAdapter();
+  let calls = 0;
+  const guarded = {
+    ...inner,
+    async execute(runId, action) {
+      calls += 1;
+      if (action.capability === 'order.create') {
+        return { outcome: 'may_have_committed', error: { code: 'ECONNRESET', message: '连接断在响应前' } };
+      }
+      return inner.execute(runId, action);
+    },
+  };
+  const twoStep = {
+    ...CASE,
+    id: 'contract/mhc-stops',
+    reference_trajectory: [
+      CASE.reference_trajectory[0],
+      { id: 's2', capability: 'order.cancel', as: 'customer', expected_outcome: 'applied',
+        arguments: { orderId: '$s1.orderId' } },
+    ],
+  };
+  const v = await judge({ case: twoStep, adapter: guarded, adapterName: 'memory' });
+  assert.equal(v.reason_code, 'effect_uncertain');
+  assert.equal(calls, 1, '第一步结果不确定之后，第二步不该再跑 —— 那会拿一个不存在的 orderId 去取消');
 });
 
 test('白名单内的值照旧：unsupported 判 coverage_gap，applied 判 pass', async () => {

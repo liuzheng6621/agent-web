@@ -171,13 +171,31 @@ test('探针：读偷偷写必须被抓', async () => {
   assert.match(c.detail, /note\.list/);
 });
 
-test('探针：内置适配器十项全过', async () => {
+test('探针：内置适配器十一项全过', async () => {
   const { createMemoryAdapter } = await import('../src/adapter/memory.mjs');
   const r = await probeAdapter({ adapter: createMemoryAdapter() });
   assert.equal(r.summary.failed, 0);
-  for (const id of ['declared-vs-behavior', 'role-effective', 'read-no-side-effect', 'outcome-contract']) {
+  for (const id of ['declared-vs-behavior', 'role-effective', 'read-no-side-effect', 'outcome-contract', 'close-idempotent']) {
     assert.ok(r.checks.some((c) => c.id === id), `缺检查项 ${id}`);
   }
+});
+
+test('探针：close 不幂等会被抓出来', async () => {
+  const { createMemoryAdapter } = await import('../src/adapter/memory.mjs');
+  const inner = createMemoryAdapter();
+  let closed = 0;
+  const brittle = {
+    ...inner,
+    async close(runId) {
+      closed += 1;
+      if (closed > 1) throw new Error('已经关过了');
+      return inner.close(runId);
+    },
+  };
+  const r = await probeAdapter({ adapter: brittle });
+  const c = r.checks.find((x) => x.id === 'close-idempotent');
+  assert.equal(c.status, 'fail');
+  assert.match(c.detail, /第二次 close 抛错/);
 });
 
 test('探针：每条能力各挑自己的局外人（角色集合不同不许诬告）', async () => {

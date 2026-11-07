@@ -334,10 +334,20 @@ export async function probeAdapter({ adapter, adapterName = 'unknown', timeoutMs
       add('read-no-side-effect', '读操作不改状态', FAIL, FAIL, String(e && e.message));
     }
 
+    // ---- 10：close 必须幂等 ----
+    // 不幂等的 close 会在重试路径上炸：调用方重跑一次收尾就报错，
+    // 而"收尾失败"看起来像被测系统的问题。这条不是洁癖 ——
+    // 一个不能重复调用的清理函数，等于逼每个调用方自己记账。
     try {
-      if (runId) await adapter.close(runId);
-    } catch {
-      /* close 失败不影响判定 */
+      if (runId) {
+        await adapter.close(runId);
+        await adapter.close(runId);
+        add('close-idempotent', 'close 可以重复调用', PASS, FAIL, '连续两次 close 都没抛错');
+      } else {
+        add('close-idempotent', 'close 可以重复调用', 'skipped', WARN, '没有拿到 runId，无从验证');
+      }
+    } catch (e) {
+      add('close-idempotent', 'close 可以重复调用', FAIL, FAIL, `第二次 close 抛错：${e && e.message}`);
     }
     return report(checks);
   }

@@ -271,6 +271,21 @@ async function judgeInner({ case: c, adapter, adapterName = 'unknown', trajector
         aborted = { status: 'unknown', code: 'infrastructure_error', at: i, detail: res.error?.message ?? '适配器故障' };
         break;
       }
+      // 「可能已经生效」与「没发生」是两条相反的重放指令，必须分开报。
+      // 判 unknown 是一样的（看不见结果），但理由码不同：
+      // infrastructure_error 说「可以重试」，effect_uncertain 说「不许重试，先去看状态」。
+      // 合成一个码，重放器只能猜，猜错就是把已经扣了的钱再扣一次。
+      if (res.outcome === 'may_have_committed') {
+        aborted = {
+          status: 'unknown',
+          code: 'effect_uncertain',
+          at: i,
+          detail: `${step.capability} 可能已经生效但结果没回来`
+            + `（${[res.error?.code, res.error?.message].filter(Boolean).join(' ') || '适配器未给原因'}）`
+            + '：这一步不许重放，先观测再决定',
+        };
+        break;
+      }
       if (step.expected_outcome === 'applied' && res.outcome === 'rejected') {
         aborted = {
           status: 'fail',

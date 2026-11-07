@@ -38,6 +38,7 @@ import { renderFlowHtml, renderDashboardHtml } from '../src/flow.mjs';
 import { summarize, agreement, formatText, countFailedAssertions } from '../src/report.mjs';
 import { countTrajectory, formatCounts, COUNT_KEYS } from '../src/counts.mjs';
 import { loadAdapter, listBuiltins } from '../src/adapter/load.mjs';
+import { validateManifest } from '../src/adapter/contract.mjs';
 import { ENTRIES, KNOWLEDGE_VERSION, validateAll } from '../knowledge/index.mjs';
 import { signalsFromCertify, signalsFromProbe, recallSignals, loadState, saveState, bump, recallExit, formatRecall } from '../src/recall.mjs';
 import { diffViews } from '../src/view.mjs';
@@ -101,6 +102,38 @@ function readExpected(dirOrFile) {
   const p = path.join(dir, 'expected.json');
   if (!fs.existsSync(p)) return {};
   return JSON.parse(fs.readFileSync(p, 'utf8'));
+}
+
+// manifest 校验必须发生在**读案例之前**。
+// 现在它发生在 judge() 里：先读完案例、跑完复位、读完初态，才在判决里报
+// invalid_environment。读者看到这个码会以为环境坏了，其实是声明写错了 ——
+// 一个错字被包装成一次环境事故，浪费的不只是时间，是可信度。
+// 所以 verify / certify / compare 在碰案例文件之前先问一次，坏了直接退 2。
+async function precheckManifest(spec) {
+  let adapter;
+  try {
+    adapter = await makeAdapter(spec);
+  } catch (e) {
+    return { ok: false, lines: [`加载适配器 ${spec} 失败：${e && e.message}`] };
+  }
+  let manifest;
+  try {
+    manifest = await adapter.manifest();
+  } catch (e) {
+    return { ok: false, lines: [`${spec} 的 manifest() 抛错：${e && e.message}`] };
+  }
+  const errors = validateManifest(manifest);
+  if (errors.length === 0) return { ok: true, manifest };
+  return {
+    ok: false,
+    lines: [
+      `${spec} 的 manifest 没通过校验，共 ${errors.length} 条：`,
+      ...errors.map((x, i) => `  ${i + 1}. ${x}`),
+      '',
+      '这不是环境坏了，是声明写错了。改完再跑 —— 现在退 2，是因为',
+      '带着一份坏 manifest 跑出来的判决，读者会把它当成环境事故。',
+    ],
+  };
 }
 
 async function makeAdapter(name) {
@@ -860,6 +893,12 @@ async function cmdCertify(args, flags) {
     return 2;
   }
 
+  const pre = await precheckManifest(spec);
+  if (!pre.ok) {
+    for (const line of pre.lines) console.error(line);
+    return 2;
+  }
+
   const map = loadCaseDir(args[0]);
   const cases = [...map.values()].sort((a, b) => String(a.id).localeCompare(String(b.id)));
   if (cases.length === 0) {
@@ -1006,6 +1045,11 @@ async function cmdVerify(args, flags) {
     return 2;
   }
   const adapterName = flags.adapter ?? 'memory';
+  const pre = await precheckManifest(adapterName);
+  if (!pre.ok) {
+    for (const line of pre.lines) console.error(line);
+    return 2;
+  }
   const adapter = await makeAdapter(adapterName);
   const files = collectCaseFiles(args[0]);
   const expected = readExpected(args[0]);
@@ -1253,11 +1297,18 @@ async function cmdCompare(args, flags) {
     console.error('用法：agent-web compare <案例文件或目录> --adapters=memory,taixianglian');
     return 2;
   }
-  const files = collectCaseFiles(args[0]);
   const names = String(flags.adapters ?? 'memory')
     .split(',')
     .map((x) => x.trim())
     .filter(Boolean);
+  for (const name of names) {
+    const pre = await precheckManifest(name);
+    if (!pre.ok) {
+      for (const line of pre.lines) console.error(line);
+      return 2;
+    }
+  }
+  const files = collectCaseFiles(args[0]);
 
   const matrix = new Map();
   const views = new Map();
