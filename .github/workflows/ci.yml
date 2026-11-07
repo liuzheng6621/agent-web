@@ -18,7 +18,7 @@ jobs:
           # 要 tag：scripts/status-line.mjs 会查 tag 是否与 package.json 对齐。
           # 浅克隆拿不到 refs/tags，那条检查会静默跳过。
           fetch-depth: 0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node }}
 
