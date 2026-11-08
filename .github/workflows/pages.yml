@@ -9,6 +9,8 @@ on:
       - 'src/**'
       - 'bin/agent-web.mjs'
       - 'VERSION'
+      - 'docs/GUIDE.md'
+      - 'scripts/build-manual.mjs'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 
@@ -42,6 +44,10 @@ jobs:
             --result=build/verdicts.jsonl --out=build/coffee.dashboard.html
           node bin/agent-web.mjs flow cases/coffee/happy-path.json \
             --result=build/verdicts.jsonl --out=build/happy-path.flow.html
+      - name: 渲染使用手册（docs/GUIDE.md，改文档即改页面）
+        run: |
+          node scripts/build-manual.mjs docs/GUIDE.md _site/manual.html
+          cp -r docs/media _site/media
       - name: 组装站点（版本号来自 VERSION）
         run: |
           mkdir -p _site
@@ -50,9 +56,11 @@ jobs:
           node -e '
             const fs = require("fs");
             const v = process.argv[1];
-            let s = fs.readFileSync("site/index.html", "utf8");
-            s = s.split("{{VERSION}}").join(v);
-            fs.writeFileSync("_site/index.html", s);
+            for (const f of ["_site/index.html", "_site/manual.html"]) {
+              let s = fs.readFileSync(f, "utf8");
+              s = s.split("{{VERSION}}").join(v);
+              fs.writeFileSync(f, s);
+            }
           ' "$V"
           # 禁止把口令、token 之类打进产物
           ! grep -rEi 'aed6e04e|admin1234567|access_token=' _site/

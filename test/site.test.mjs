@@ -51,3 +51,19 @@ test('构建产物不许带口令或 token', () => {
   const wf = read('.github/workflows/pages.yml');
   assert.ok(/grep -rEi/.test(wf) && wf.includes('_site/'), 'workflow 必须有产物敏感扫描');
 });
+
+test('使用手册必须由 CI 从仓库文档生成，而不是手工抄一份', () => {
+  const script = read('scripts/build-manual.mjs');
+  const wf = read('.github/workflows/pages.yml');
+  const site = read('site/index.html');
+  assert.ok(wf.includes('node scripts/build-manual.mjs docs/GUIDE.md _site/manual.html'),
+    'workflow 必须从 docs/GUIDE.md 生成手册');
+  assert.ok(wf.includes('cp -r docs/media _site/media'), '手册插图必须随产物部署');
+  assert.ok((wf.match(/paths:/) && wf.includes("'docs/GUIDE.md'") && wf.includes("'scripts/build-manual.mjs'")),
+    '手册或文档变更必须触发站点重建');
+  const imports = [...script.matchAll(/from ['"]([^'"]+)['"]/g)].map((m) => m[1]);
+  assert.ok(imports.length > 0 && imports.every((m) => m.startsWith('node:')),
+    '手册生成器必须零依赖（只许 node: 内置），当前: ' + imports.join(','));
+  assert.ok(script.includes('missing.length'), '生成器必须自检文内锚点，锚点断了就该构建失败');
+  assert.ok(site.includes('manual.html'), '封面必须给出手册入口');
+});
