@@ -6,6 +6,7 @@
 > - **手上有接口、有日志，想长出案例** → [从一个网址开始](#从一个网址开始) · [录一段流量](#录一段流量把它变成适配器) · [从日志到正式判分](#使用指南从日志到正式判分)
 > - **想理解断言与判决凭什么可信** → [断言凭什么被收下](#断言凭什么被收下判据准入) · [体检报告](#体检报告这批判决有多少条在盲区里)
 > - **想知道它做不了什么** → [为什么没有并发开关](#为什么没有并发开关)，以及 [LIMITS.md](LIMITS.md) 的十一条台账
+- **想查命令、字段、断言、适配器怎么写** → 命令速查 · 案例怎么写 · 断言速查 · 适配器五方法
 > - **我是要改这个仓库的 Agent** → 先读 [AGENTS.md](../AGENTS.md)，这里只查细节
 
 README 只放入门和目录。这一份是完整说明：每条命令的细节、判决顺序表怎么来的、遇到过的坑怎么修的、以及为什么有些看起来该做的东西没有做。
@@ -85,6 +86,184 @@ node bin/agent-web.mjs verify cases/coffee/happy-path.json --adapter=memory
 ```
 
 `selftest` 会跑 7 条样例：正常完成、越权、漏步骤和无法判断等情况。样例通过表示程序的基本判分流程正常，不代表所有真实系统都已测过。
+
+---
+
+## 命令速查：三十三条命令各管什么
+
+所有命令都是 `node bin/agent-web.mjs <命令>`，零依赖、没有安装步骤。表按「先会判、再会出题、再会抓谎」的顺序排；两级命令（`drill grade`、`import hurl`）按全名一行。
+
+| 命令 | 干什么 | 什么时候用 |
+| --- | --- | --- |
+| `selftest` | 零依赖自测：内置适配器 + 内置案例 | 克隆后第一跑，判分流程活着没 |
+| `verify` | 跑案例出判决 | 日常主命令，单条或整目录 |
+| `report` | 由 results.jsonl 出指标 | 跑完一批看三值分布 |
+| `accept` | 确认草稿，确认后才能判决 | draft / prepare 之后的人关 |
+| `capabilities` | 打印能力清单与证据等级 | 接新适配器先看它声明了什么 |
+| `coverage` | 能力覆盖率对账（`--min` 设门槛） | 想知道案例碰到了系统多少面 |
+| `probe` | 探针：查适配器自己有没有在撒谎 | 信任任何适配器之前必跑 |
+| `certify` | 判据准入：变异体 × 断言杀伤矩阵 | 证明「这条断言有用」 |
+| `breed` | 照着视图形状自动生成变异体 | 变异体不够时补 |
+| `drill` | 出题：对真盲区出题（题面不含答案） | 把盲区变成考题 |
+| `drill grade` | 批改：只认跑出来的结果 | 收 drill 的答卷 |
+| `compare` | 同一份案例喂多个实现，比判决 | 双实现对照的核心 |
+| `drift` | 比较两次跑批的初态形状 | 升级后区分漂移与见证 |
+| `record` | 把 Agent 的实际动作还原成候选轨迹 | 手上有一份动作日志 |
+| `prepare` | 一次生成步骤、案例草稿和流程预览 | 日志到案例的快路径 |
+| `draft` | 回放轨迹，反推案例草稿（要人确认） | 手上有一份轨迹文件 |
+| `flow` | 单案例流程图；给目录则生成判决总览 | 要给人看判决过程时 |
+| `crosscheck` | 交叉复核：不经过适配器自己的 fetch 再发一遍 | 抓 fetch 层的谎 |
+| `discover` | 探一个站点：生成只读适配器、案例草稿和施工单 | 只有一个网址时 |
+| `import hurl` | 把 hurl 套件转成案例草稿（不联网） | 有现成 hurl 套件 |
+| `tap` | 录五分钟：流量长出适配器、孪生与案例 | 录一个活站点 |
+| `learn` | 把录制学成四样（yaml/孪生/案例/认不出的） | tap 之后的加工 |
+| `mutants` | 变异体目录：谁的坏法、怎么抓、怎么投稿 | 查变异体、投新变异体 |
+| `ingest` | 把别家测试报告翻成三值判决 | 消费外部报告 |
+| `align` | 跨命名体系的字段映射提议 | 两套视图名字对不上 |
+| `negatives` | 按声明派生负例候选（全部 disputed） | 出拒绝类案例的审阅表 |
+| `preflight` | 跑之前预检：预测 ready / unknown / fail | 跑批前与预期对账 |
+| `audit` | 假绿审计：拿真实后端当尺子 | 量一个候选实现 |
+| `gate` | 四行口径门禁：覆盖率/抗变异/独立证据/unknown | CI 门禁，缺行即红 |
+| `traps` | 陷阱普查：这批判决有多少是盲的 | 跑批后自查盲区 |
+| `knowledge` | 事故档案：这个仓库踩过的坑 | 查旧坑 |
+| `recall` | 比对档案：这次有没有重犯旧错 | 第二次犯同一个错时拦下 |
+| `init` | 生成案例模板 | 开新域 |
+| `version` | 版本、最近一次变更、版本号三处是否一致 | 发版前自检 |
+
+---
+
+## 案例怎么写：一份文件里有什么
+
+案例是一份 JSON，放在 `cases/<域>/` 下，唯一执行入口是 `verify`。文件四块：环境（跑在哪个适配器上）、可观测声明（允许看哪些 scope）、参考轨迹（步骤）、断言（goal 与不变量）。
+
+| 字段 | 含义 | 必填 |
+| --- | --- | --- |
+| `id` | 案例名，域内唯一 | 是 |
+| `environment.adapter` | 内置名或适配器路径 | 是 |
+| `environment.seed` | 复位种子（reseed 策略的适配器用） | 否 |
+| `environment.clock_policy` | 时钟策略声明 | 否 |
+| `observability.declared_scopes` | 声明要看的 scope；没声明的进 unknown 分母 | 建议 |
+| `reference_trajectory[]` | 参考步骤：`id`（s1 起） / `capability` / `arguments` / `as` / `expected_outcome`（applied 或 rejected） | 是 |
+| `task.goal_assertions` | 终态断言数组；集合与行写在 `selector`（`collection` + 可选 `index`），字段路径走 `path` | 是 |
+| `task.invariants` | 不变量断言数组（跨步骤求值） | 否 |
+
+`as` 是角色身份，适配器必须真的按它切换身份；忽略它会让越权案例假通过——本仓库踩过两次，见「先问一句：这个适配器有没有在撒谎」。
+
+最小案例长这样：
+
+```json
+{
+  "schema_version": "agent-web/0.1",
+  "id": "mydom/my-first-case",
+  "environment": { "adapter": "memory", "seed": {} },
+  "observability": { "declared_scopes": ["orders"] },
+  "reference_trajectory": [
+    { "id": "s1", "capability": "order.create", "arguments": { "items": [{ "dishName": "拿铁", "qty": 1 }] }, "as": "customer", "expected_outcome": "applied" },
+    { "id": "s2", "capability": "order.list", "arguments": {}, "as": "customer", "expected_outcome": "applied" }
+  ],
+  "task": {
+    "natural_goal": "顾客下单后，订单出现在自己的列表里，停在 PENDING",
+    "goal_assertions": [
+      { "kind": "count_delta", "selector": { "collection": "orders" }, "delta": 1, "label": "下单后多一条订单" },
+      { "kind": "field_equals", "selector": { "collection": "orders", "index": 0 }, "path": "status", "value": "PENDING", "label": "新订单停在 PENDING" }
+    ]
+  }
+}
+```
+
+跑它与预检：
+
+```bash
+node bin/agent-web.mjs verify cases/mydom/my-first-case.json --adapter=memory
+node bin/agent-web.mjs preflight cases/mydom --adapter=memory
+```
+
+每个域目录还有一份 `expected.json`：`"域/案例id": "pass|fail|unknown"` 的平面映射。它是 compare 与 certify 的基线——改判决必须同一次提交改它，否则守卫会红。
+
+---
+
+## 断言速查：二十一种 kind 各判什么
+
+相位只有三个值：`final` 看终态视图，`trace` 看每一步的执行记录，`initial_vs_final` 看前后两份快照的差。每种 kind 的相位由矩阵固定，改它会把正常实现判红——比如关系式按 trace 求值，会在「新订单还没算出总额」的那一瞬间判红。
+
+| kind | 判什么 | 相位 |
+| --- | --- | --- |
+| `entity_exists` | 视图里出现符合形状的行 | final |
+| `field_equals` | 某字段值等于期望 | final |
+| `count_delta` | 前后行数变化 | initial_vs_final |
+| `status_transition` | 流水里出现 from→to 迁移 | trace |
+| `unchanged` | 集合前后完全没变 | initial_vs_final |
+| `event_absent` | 某事件全程没出现 | trace |
+| `composite` | 子断言的与 | 随子断言 |
+| `relation` | 关系式：eq / sum_equals / product_equals / sorted | final |
+| `sorted_by` | 某列单调 | final |
+| `unique` | 某列无重复值 | final |
+| `type_of` | 字段类型 | final |
+| `subset` | 集合包含 | final |
+| `window` | 步骤窗口内才求值内层断言 | trace |
+| `every_step` | 每一步内层断言都成立 | trace |
+| `pagination` | 翻页返回：不重 / 不漏 / 不乱 | trace |
+| `payload` | 步骤返回的形状与 op | trace |
+| `linkage` | 跨集合行联动（必须写 expect） | final |
+| `timeliness` | 事件时间戳落在窗口内 | final |
+| `state_machine` | 流水走过的每条边合法 | trace |
+| `recurrence` | 周期任务槽位序列：不重跑 / 跑偏 / 漏跑 | final |
+| `precedence` | 流水行相对顺序（允许中间夹行） | final |
+
+新增一种 kind 必须过判据准入：先造一个只有它能杀的变异体，杀不掉就不加。当前二十一种的必要性反证都在 `scripts/kind-necessity.mjs` 里，跑一次能看到「摘掉它谁就漏网」。
+
+---
+
+## 适配器怎么写：五方法契约
+
+适配器是案例与被测系统之间唯一的桥，它是可执行代码（见「适配器是可执行代码」）。契约五个方法：
+
+| 方法 | 签名 | 责任 |
+| --- | --- | --- |
+| 复位 | `reset()` → `{runId, state, roleBindings, reset_note}` | 把环境回到声明的初态 |
+| 观测 | `observe(runId)` → 规范视图 | 只读投影，断言的唯一事实来源 |
+| 执行 | `execute(runId, {capability, arguments, as})` → `{outcome, ...}` | 执行一步；第一参是 runId，不是能力名 |
+| 分类 | `classify(capability)` → `read` 或 `write` | 告诉 runner 这一步改不改状态 |
+| 收尾 | `close(runId)` | 释放资源，必须幂等 |
+
+最小骨架：
+
+```js
+export function createMyAdapter(options = {}) {
+  const runs = new Map();
+  return {
+    async reset() {
+      const runId = 'r' + Date.now();
+      runs.set(runId, { orders: [] });
+      return { runId, state: runs.get(runId), roleBindings: { customer: 'u1' }, reset_note: '空表' };
+    },
+    async observe(runId) {
+      const s = runs.get(runId);
+      return { orders: s.orders.map((o) => ({ id: o.id, status: o.status })) };
+    },
+    async execute(runId, action) {
+      const s = runs.get(runId);
+      if (action.capability === 'order.create') {
+        if (action.as !== 'customer') return { outcome: 'rejected', reason_code: 'forbidden' };
+        s.orders.push({ id: s.orders.length + 1, status: 'PENDING' });
+        return { outcome: 'applied', orderId: s.orders.length };
+      }
+      return { outcome: 'unsupported', reason_code: 'unknown_capability' };
+    },
+    classify: (capability) => (capability === 'order.create' ? 'write' : 'read'),
+    async close(runId) { runs.delete(runId); },
+  };
+}
+```
+
+在 `src/adapter/load.mjs` 的 `BUILTINS` 里登记名字，然后先探针后判决：
+
+```bash
+node bin/agent-web.mjs probe --adapter=myadapter
+node bin/agent-web.mjs verify cases/mydom --adapter=myadapter
+```
+
+两句实话：视图里不要放本轮专属的值（自增 id、时间戳走投影或声明 derived）；`execute` 忽略 `action.as` 会让越权案例假通过。这两条都是本仓库的真实事故，probe 的 role-effective 检查与越权案例各守一条。
 
 ---
 

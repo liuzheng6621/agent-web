@@ -14,7 +14,7 @@ const srcPath = resolve(srcArg);
 const outPath = resolve(outArg);
 const docDir = dirname(srcPath);          // …/docs
 const repoRoot = resolve(docDir, '..');
-const md = readFileSync(srcPath, 'utf8');
+const md = readFileSync(srcPath, 'utf8').replace(/\r\n/g, '\n');
 
 // GFM 风格锚点：小写、删符号（保留字母数字/空格/连字符，CJK 保留）、空格转 `-`
 function slugText(t) {
@@ -137,7 +137,7 @@ while (i < lines.length) {
     const cells = (r) => r.replace(/^\|/, '').replace(/\|$/, '').split('|').map((c) => c.trim());
     const head = cells(rows[0]);
     const dataRows = rows.slice(rows[1] && /^[|\s:-]+$/.test(rows[1]) ? 2 : 1);
-    body.push('<div class="tw"><table><thead><tr>' + head.map((c) => `<th>${inline(c)}</th>`).join('') + '</tr></thead><tbody>'
+    body.push('<div class="tw" tabindex="0"><table><thead><tr>' + head.map((c) => `<th>${inline(c)}</th>`).join('') + '</tr></thead><tbody>'
       + dataRows.map((r) => '<tr>' + cells(r).map((c) => `<td>${inline(c)}</td>`).join('') + '</tr>').join('')
       + '</tbody></table></div>');
     continue;
