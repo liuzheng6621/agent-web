@@ -6,6 +6,15 @@
 CI 也在查。这条规则是买来的：这个仓库曾经同时存在 `package.json` 0.16、README 0.9、
 Gitee Release v0.6.0 三个数，谁看都是三个项目。
 
+## 0.73.0
+
+**gate 命令：三层验证栈四行口径一次出齐，缺任一行 exit 1。**
+
+- 四行：契约覆盖率（capabilities 覆盖）、判据抗变异率（certify）、独立证据判决率（--compare 双通道对照）、unknown 占比（留在分母）；
+- 缺行红、行值不红——口径门禁只管行在不在、分母在不在；policy-check 佐证只进第三行 detail，判例数不混进判决数；
+- 输出全部 m/n (x.x%) 形式；禁语与 report --counts 同规（无 score/grade/rank、无分母百分比）；
+- 测试：test/gate.test.mjs 7 条（含真适配器条件 e2e：单案例全量四行齐 → rc=0）；npm test 554 = 552 pass + 2 skip + 0 fail；
+- 21 种断言、33 条命令、72 个变异体不变；kind-necessity / state-equivalence / selftest / certify-baseline / certify-can-fail / verdict-determinism 六守卫 rc=0。
 ## 0.72.0 — 2026-11-08
 
 **半途失败不再谎报，观测污染有了专门的变异体与按步抓手。**

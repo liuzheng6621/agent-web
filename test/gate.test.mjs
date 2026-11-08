@@ -1,0 +1,90 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { gateReport, formatGate, GATE_VERSION } from '../src/gate.mjs';
+
+// 合成数据：四行数据源的形状来自 capabilities / certify / verify / compare 的真实输出。
+const goodCoverage = { rate: { covered: 7, declared: 9, value: 7 / 9 } };
+const goodCertify = { summary: { caught: 48, applicable: 50, caughtRate: 48 / 50 } };
+const goodVerdicts = [
+  { status: 'pass' }, { status: 'fail' }, { status: 'unknown' }, { status: 'pass' },
+];
+const goodCompare = { agree: 3, total: 4, left: 'a', right: 'b' };
+
+test('gate-1：四行齐全时 sound=true，rows 四键都在', () => {
+  const r = gateReport({ coverage: goodCoverage, certify: goodCertify, verdicts: goodVerdicts, compare: goodCompare });
+  assert.equal(r.version, GATE_VERSION);
+  assert.equal(r.sound, true);
+  assert.deepEqual(r.missing, []);
+  for (const k of ['coverage', 'resistance', 'independent', 'unknown']) {
+    assert.ok(r.rows[k], `缺 ${k}`);
+    assert.ok(r.rows[k].value >= 0 && r.rows[k].value <= 1);
+  }
+  assert.equal(r.rows.coverage.covered, 7);
+  assert.equal(r.rows.coverage.declared, 9);
+  assert.equal(r.rows.resistance.caught, 48);
+  assert.equal(r.rows.independent.supported, 3);
+  assert.equal(r.rows.unknown.count, 1);
+  assert.equal(r.rows.unknown.total, 4);
+});
+
+test('没跑 certify → resistance 进 missing；没跑 compare → independent 进 missing', () => {
+  const r = gateReport({ coverage: goodCoverage, certify: null, verdicts: goodVerdicts, compare: null });
+  assert.equal(r.sound, false);
+  assert.deepEqual(r.missing, ['resistance', 'independent']);
+});
+
+test('判决为零 → unknown 缺行；coverage 分母为零 → coverage 缺行', () => {
+  const r = gateReport({ coverage: { rate: { covered: 0, declared: 0, value: null } }, certify: goodCertify, verdicts: [], compare: goodCompare });
+  assert.deepEqual(r.missing.sort(), ['coverage', 'unknown']);
+});
+
+test('certify applicable=0（全不适用）→ resistance 缺行，不是 0/0', () => {
+  const r = gateReport({ coverage: goodCoverage, certify: { summary: { caught: 0, applicable: 0, caughtRate: null } }, verdicts: goodVerdicts, compare: goodCompare });
+  assert.deepEqual(r.missing, ['resistance']);
+});
+
+test('formatGate：全部 m/n 形式，无分母百分比与禁语都不得出现', () => {
+  const r = gateReport({ coverage: goodCoverage, certify: goodCertify, verdicts: goodVerdicts, compare: goodCompare, policy: { ok: true, total: 12, mismatch: 0 } });
+  const t = formatGate(r);
+  for (const banned of ['score', 'grade', 'rank', '100% 正确']) {
+    assert.ok(!t.toLowerCase().includes(banned), `禁语漏出：${banned}`);
+  }
+  assert.ok(t.includes('7/9'), '覆盖率必须有分母');
+  assert.ok(t.includes('48/50'), '抗变异率必须有分母');
+  assert.ok(t.includes('3/4'), '独立证据必须有分母');
+  assert.ok(t.includes('1/4'), 'unknown 占比必须有分母');
+  assert.ok(t.includes('policy 佐证 12/12'));
+  assert.ok(t.includes('unknown 留在分母'));
+});
+
+test('formatGate：缺行时列出缺行名并说 exit 1', () => {
+  const r = gateReport({ coverage: goodCoverage, certify: null, verdicts: goodVerdicts, compare: null });
+  const t = formatGate(r);
+  assert.ok(t.includes('resistance'));
+  assert.ok(t.includes('independent'));
+  assert.ok(t.includes('exit 1'));
+});
+
+// 真适配器条件端到端：Windows + coffee-sql env 齐才跑（与 test/sql-shell-dispose.test.mjs 同门槛）。
+// 单案例全量 gate（certify 默认开）：四行齐全 → rc=0；happy-path 两通道判决不一致（已知域语义差异）
+// 只压低第三行的值，不红——口径门禁不管质量。
+test('真适配器 e2e：gate 单案例四行齐 → rc=0', { skip: process.platform !== 'win32' || !process.env.TAIXIANGLIAN_SQL_DB_URL || !process.env.TAIXIANGLIAN_BASE_URL ? '需要 Windows + TAIXIANGLIAN_* env + 后端在跑' : false }, async () => {
+  const { execFileSync } = await import('node:child_process');
+  const path = await import('node:path');
+  const { fileURLToPath } = await import('node:url');
+  const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+  let out = '';
+  let status = null;
+  try {
+    out = execFileSync(process.execPath, [path.join(ROOT, 'bin', 'agent-web.mjs'), 'gate', path.join(ROOT, 'cases', 'coffee', 'happy-path.json'), '--adapter=memory', '--compare=taixianglian-sql', '--no-policy'], { encoding: 'utf8', timeout: 120000 });
+    status = 0;
+  } catch (e) {
+    out = String(e.stdout || '') + String(e.stderr || '');
+    status = e.status;
+  }
+  assert.equal(status, 0, `单案例四行应齐全退 0：${out.slice(0, 400)}`);
+  assert.ok(out.includes('独立证据判决率'), '第三行必须出现');
+  assert.ok(out.includes('unknown 占比'), '第四行必须出现');
+  assert.ok(out.includes('memory vs taixianglian-sql'), '对照双方必须写明');
+  assert.ok(out.includes('四行齐全'), '放行句必须出现');
+});

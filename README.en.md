@@ -1,4 +1,4 @@
-# agent-web v0.72.0
+# agent-web v0.73.0
 
 <p align="center">
   <img src="docs/media/hero.png" alt="agent-web: integration tests an agent can be judged on" width="100%">
@@ -19,7 +19,7 @@
 </p>
 
 <p align="center">
-  <b>v0.72.0</b> · 21 assertion kinds · 32 commands · 72 mutants
+  <b>v0.73.0</b> · 21 assertion kinds · 33 commands · 72 mutants
 </p>
 
 <p align="center">
@@ -385,6 +385,7 @@ pass for an adapter that does nothing at all.
 | `mutants` | Mutant directory: whose fault, how to catch, how to submit |
 | `ingest` | Translate another tool's test report into three-valued verdicts, and count what "green" really proved |
 | `audit` | False-green audit: use the real backend as a ruler |
+| `gate` | Four-line gate: coverage / mutation resistance / independent evidence / unknown share in one output; any missing line exits 1 |
 | `traps` | Trap census: how many verdicts in this batch are blind |
 | `knowledge` / `recall` | Incident archive / recidivism detection (second hit exits 1) |
 | `init` | Generate a case template |
@@ -454,7 +455,7 @@ Two layers. These capabilities already have code and tests and should not be cou
 The remaining boundaries are numbered to match L1–L12 in [docs/LIMITS.md](docs/LIMITS.md).
 **Each entry states only the unsolved part** — what already works is in the list above and is not repeated here:
 
-A word on evidence grades: every number in this README (catch rates, agreement rates, timings) comes from this repo's own CI. The scripts are reproducible — but **reproduction runs the same scripts**, and as of v0.72.0 no third party has reproduced them independently. "Reproducible" is a machine fact, not external validity. The `knowledge/` and `docs/mutants/` contribution channels exist to turn self-attestation into outside evidence, one accepted submission at a time; until one arrives, read the numbers here as "the author's proof that his own ruler is self-consistent", not as correctness rates.
+A word on evidence grades: every number in this README (catch rates, agreement rates, timings) comes from this repo's own CI. The scripts are reproducible — but **reproduction runs the same scripts**, and as of v0.73.0 no third party has reproduced them independently. "Reproducible" is a machine fact, not external validity. The `knowledge/` and `docs/mutants/` contribution channels exist to turn self-attestation into outside evidence, one accepted submission at a time; until one arrives, read the numbers here as "the author's proof that his own ruler is self-consistent", not as correctness rates.
 
 1. **Write semantics still need a human (L1).** `tap` records what the app did, but cannot infer that "insufficient stock must be rejected"; a domain owner must approve the rule.
 2. **Field mappings still need review (L2).** Nested-array leaves and same-name/different-meaning fields across collections cannot be decided by machine; a human must sign.

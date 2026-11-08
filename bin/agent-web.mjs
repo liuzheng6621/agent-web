@@ -7,6 +7,7 @@
  *   agent-web report <results.jsonl>   由判决结果出指标
  *  agent-web accept <文件> --by=NAME     确认草稿，确认后才能判决
  *  agent-web audit <可信.jsonl> <被审.jsonl>  用真实判决当尺子，量假绿/假红
+ *  agent-web gate <案例目录> --adapter=SPEC --compare=SPEC2  四行口径门禁：缺行即红
  *  agent-web traps <结果.jsonl> --cases=目录  陷阱普查：这批判决有多少条在盲区里
  *  agent-web certify <案例目录> --adapter=SPEC  判据准入：哪些断言真的抓得住东西
  *  agent-web mutants                          变异体目录：实现能坏成什么样
@@ -45,6 +46,9 @@ import { diffViews } from '../src/view.mjs';
 import { auditRuns, formatAudit } from '../src/audit.mjs';
 import { summarizeTraps, formatTraps, trapVerdict } from '../src/traps.mjs';
 import { certify, formatCertify, formatSuggestions, certifyExit } from '../src/certify.mjs';
+import { gateReport, formatGate } from '../src/gate.mjs';
+
+import { spawnSync } from 'node:child_process';
 import { breedMutants, formatBreed, loadBredMutants, BREED_VERSION } from '../src/breed.mjs';
 import { MUTATIONS, describeMutations } from '../src/mutate.mjs';
 import { KINDS } from '../src/assert/index.mjs';
@@ -1072,6 +1076,87 @@ async function cmdAccept(args, flags) {
   return 0;
 }
 
+// gate —— 四行口径一次出齐（契约覆盖率/判据抗变异率/独立证据判决率/unknown 占比）。
+// 行缺（没跑 certify、没跑 compare、判决为零）= exit 1；行值低不红——口径门禁不管质量。
+async function cmdGate(args, flags) {
+  if (args.length === 0) {
+    console.error('用法：agent-web gate <案例目录> [--adapter=memory] [--compare=SPEC2] [--no-certify] [--no-policy] [--timeout=5000] [--json]');
+    console.error('  四行：契约覆盖率/判据抗变异率/独立证据判决率/unknown 占比；unknown 留在分母。');
+    return 2;
+  }
+  const adapterName = flags.adapter ?? 'memory';
+  const names = [adapterName, typeof flags.compare === 'string' ? flags.compare : null].filter(Boolean);
+  for (const name of names) {
+    const pre = await precheckManifest(name);
+    if (!pre.ok) {
+      for (const line of pre.lines) console.error(line);
+      return 2;
+    }
+  }
+  const adapter = await makeAdapter(adapterName);
+  const manifest = await adapter.manifest();
+  const files = [];
+  for (const t of args) files.push(...collectCaseFiles(t));
+  if (files.length === 0) {
+    console.error('没有在给定路径里找到案例');
+    return 2;
+  }
+
+  // coverage 与 certify 都要案例对象；runOne 自己读文件，两边互不干扰。
+  const cases = [];
+  for (const f of files) {
+    const c = JSON.parse(fs.readFileSync(f, 'utf8'));
+    const errs = validateCase(c);
+    if (errs && errs.length > 0) {
+      console.error(`${path.basename(f)} 不是合法案例：${errs[0]}`);
+      return 2;
+    }
+    cases.push(c);
+  }
+  const coverage = summarizeCoverage(collectUsage(cases, manifest));
+
+  const timeoutMs = numFlag(flags.timeout);
+  const verdicts = [];
+  for (const f of files) verdicts.push(await runOne(f, adapter, { adapterName, timeoutMs }));
+
+  // 独立证据：第二通道逐案例对照。判决一致才算有佐证——不一致本身进不了分子。
+  let compare = null;
+  if (typeof flags.compare === 'string') {
+    const adapter2 = await makeAdapter(flags.compare);
+    let agree = 0;
+    for (const f of files) {
+      const a = await runOne(f, adapter, { adapterName, timeoutMs });
+      const b = await runOne(f, adapter2, { adapterName: flags.compare, timeoutMs });
+      if (a.status === b.status) agree += 1;
+    }
+    compare = { agree, total: files.length, left: adapterName, right: flags.compare };
+  }
+
+  let certifyReport = null;
+  if (flags['no-certify'] !== true) {
+    certifyReport = await certify({ cases, adapterFactory: async () => makeAdapter(adapterName), adapterName, mutations: MUTATIONS, timeoutMs });
+  }
+
+  // policy 佐证只进第三行的 detail：判例数不是判决数，混进分子会污染口径。
+  let policy = null;
+  if (flags['no-policy'] !== true) {
+    const script = path.join(ROOT, 'scripts', 'policy-check.mjs');
+    if (fs.existsSync(script)) {
+      const r = spawnSync(process.execPath, [script, '--json'], { encoding: 'utf8' });
+      if (r.status === 0) {
+        try { policy = JSON.parse(r.stdout); } catch { /* 佐证拿不到就留空 */ }
+      } else {
+        console.error(`提示：policy-check 退出 ${r.status}，佐证缺失不算缺行（第三行照出）`);
+      }
+    }
+  }
+
+  const report = gateReport({ coverage, certify: certifyReport && { summary: certifyReport.summary }, verdicts, compare, policy });
+  if (flags.json) console.log(JSON.stringify(report, null, 2));
+  else console.log(formatGate(report));
+  return report.sound ? 0 : 1;
+}
+
 async function cmdVerify(args, flags) {
   if (args.length === 0) {
     console.error('用法：agent-web verify <目录或文件> [--adapter=memory]');
@@ -2035,6 +2120,7 @@ const HELP = `agent-web —— 给 Agent 写机器可判的集成测试
   agent-web negatives <案例或目录> --adapter=SPEC  按声明派生负例候选（全部 disputed，只出审阅表）
   agent-web preflight <案例或目录> --adapter=SPEC  跑之前预检：预测 ready / unknown / fail，与预期对账
   agent-web audit <真实.jsonl> <候选.jsonl>    假绿审计：拿真实后端当尺子量候选实现
+  agent-web gate <案例目录> --adapter=SPEC --compare=SPEC2  四行口径门禁：契约覆盖率/抗变异/独立证据/unknown；缺行即红
   agent-web traps <结果.jsonl> --cases=DIR    陷阱普查：这批判决有多少是盲的
   agent-web knowledge                         事故档案：这个仓库踩过的 ${ENTRIES.length} 个坑
   agent-web recall [案例目录]                 比对档案：这次有没有重犯旧错（第二次拦下）
@@ -2092,6 +2178,8 @@ async function main() {
         return await cmdCapabilities(args, flags);
       case 'traps':
         return await cmdTraps(args, flags);
+      case 'gate':
+        return await cmdGate(args, flags);
       case 'certify':
         return await cmdCertify(args, flags);
       case 'breed':
