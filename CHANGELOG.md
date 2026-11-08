@@ -6,6 +6,35 @@
 CI 也在查。这条规则是买来的：这个仓库曾经同时存在 `package.json` 0.16、README 0.9、
 Gitee Release v0.6.0 三个数，谁看都是三个项目。
 
+## 0.70.0 — 2026-11-08
+
+**L3 语义层的第一个真实落地**：咖啡店规则写成 Rego 第二副本，`conftest` 判 allow/deny。
+这一层补的是案例断言永远补不上的洞——断言只能证明「我写的判据过了」，
+证明不了「我写的判据对不对」。
+
+- `policy/coffee.rego`：八条规则（R1 迁移合法性 / R2 终态不可离开 / R3 角色权限 /
+  R4 链条连续 / R5 金额对账 / R6 明细自洽 / R7 属主 / R8 系统只能取消待接单）。
+  **不是从 Java 翻译的**，是照 `policy/DECISIONS.md` 重写一遍，两边独立。
+- `policy/DECISIONS.md`：规则 ↔ Java 权威处对照表、三处「两边都对」的差异、
+  什么时候要改这份文件、这份声明不覆盖什么。
+- `policy/glue.mjs`：canonical view → 策略输入。三条硬约束：只搬运不计算、
+  唯一一处合成（下单不落流水，起点事件从 `orders` 行合成）、身份只查表不推断。
+- `policy/fixtures/`：11 条判例（1 好 10 坏），每条坏例对应一条规则被违反。
+  **实测第一轮就抓到自己一个洞**：R7 原本跳过首事件，导致「替别人下单」漏网，
+  去掉 `not is_start(e)` 后才拦住——这条记在 DECISIONS.md 里。
+- `scripts/policy-check.mjs`：独立执行器，把 conftest 的 allow/deny 翻成三值词汇，
+  缺 conftest 时退出 2 并明示（不静默通过）。`npm run policy`。
+- `test/policy.test.mjs`：8 条守卫。7 条不需要外部二进制（结构/胶水纯函数/判例声明），
+  1 条执行守卫缺 conftest 时 **skip 并显式报告**，不静默吞掉。
+- `docs/domains/coffee.md`：双通道 + 语义层 + 后端事实（下单不落流水、40402 掩盖越权、
+  SYSTEM 映射成 STAFF、pickupNo=100+id、超时自动取消、H2 URL 两个坑）。
+- **新增 L12 台账条目**（`by-design`）：语义层只覆盖一域、靠判例驱动不靠类型驱动、
+  不判拒绝码、不判跨订单时序。边界可数：`policy-check.mjs` 每次都能数出覆盖几条规则。
+- 守卫升级：`test/limits.test.mjs` 与 `test/readme-boundary.test.mjs` 里写死的
+  「11 条」全部改成以 `docs/LIMITS.md` 为基准——加一条限制不用再改三处测试，
+  而真正要守的「三处数字一致」仍然守得住。
+- 543 测试（+8），20 种断言，32 条命令，67 个变异体。
+
 ## 0.69.0 — 2026-11-08
 
 L2 写后事实层的 **S2 闭环**：coffee-sql 三案例 + 四变异体，`m-sql-phantom-success` 从造不出来到被杀。

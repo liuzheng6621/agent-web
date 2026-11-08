@@ -8,6 +8,17 @@ import { KINDS } from '../src/assert/index.mjs';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
 
+// 台账编号以 docs/LIMITS.md 为唯一基准：README 的条目数跟着它走，
+// 不在这里写死字面量（写死就要每加一条改两处测试，改漏一处就假绿）。
+function limitsEntries() {
+  const ids = [];
+  const re = /^## (L\d+) /gm;
+  let m;
+  const s = read('docs/LIMITS.md');
+  while ((m = re.exec(s))) ids.push(m[1]);
+  return { ids };
+}
+
 /**
  * 取「已实现」那一层：从标题到「剩下的边界」之间的块。
  * 这一层的作用是「这些能力已经有了，不该再算成没做」，
@@ -71,10 +82,15 @@ test('README 边界节：已实现清单必须点名几个会被人当成「没�
   }
 });
 
-test('README 边界节：十一条与台账的编号必须一一对应且不重复', () => {
+test('README 边界节：条目与台账的编号必须一一对应且不重复', () => {
   const zh = implementedBlock(read('README.md'), '剩下的边界', '<!-- limits:end -->');
   const nums = [...zh.matchAll(/^\d+\. /gm)].length;
-  assert.equal(nums, 11, `边界节应有 11 条，实际 ${nums} 条`);
+  // 条数不写死：真正的约束是「条目数 == 台账条目数」且编号连续。
+  const { ids } = limitsEntries();
+  assert.equal(nums, ids.length, `边界节应有 ${ids.length} 条，实际 ${nums} 条`);
   const refs = [...zh.matchAll(/（L(\d+)）/g)].map((m) => Number(m[1]));
-  assert.deepEqual(refs, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], `L 编号顺序不对：${refs.join(',')}`);
+  assert.deepEqual(refs, ids.map((_, n) => n + 1), `L 编号顺序不对：${refs.join(',')}`);
+  const en = implementedBlock(read('README.en.md'), 'The remaining boundaries', '<!-- limits:end -->');
+  const enNums = [...en.matchAll(/^\d+\. /gm)].length;
+  assert.equal(enNums, ids.length, `英文边界节应有 ${ids.length} 条，实际 ${enNums} 条`);
 });

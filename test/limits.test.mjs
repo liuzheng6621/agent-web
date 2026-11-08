@@ -35,15 +35,16 @@ function limitsEntries() {
   return { raw: s, ids };
 }
 
-test('限制清单：README 中英各 11 条，与 docs/LIMITS.md 的条目数一一对应', () => {
+test('限制清单：README 中英条数，与 docs/LIMITS.md 的条目数一一对应', () => {
   const zh = readmeItems('zh');
   const en = readmeItems('en');
   const { ids } = limitsEntries();
-  assert.equal(zh.length, 11, '中文 README 的限制条数变了：' + zh.length);
-  assert.equal(en.length, 11, '英文 README 的限制条数变了：' + en.length);
-  assert.equal(ids.length, 11, 'LIMITS.md 的条目数变了：' + ids.join(','));
-  const want = Array.from({ length: 11 }, (_, i) => 'L' + (i + 1));
-  assert.deepEqual(ids, want, 'LIMITS.md 的编号必须是 L1..L11 且按顺序');
+  // 条数不写死：写死等于每加一条限制都要改三处测试。要守的是「三处数字一致」，
+  // 以 LIMITS.md 为基准，README 跟着它走。
+  assert.equal(zh.length, ids.length, '中文 README 与 LIMITS.md 条数不一致：' + zh.length + ' vs ' + ids.length);
+  assert.equal(en.length, ids.length, '英文 README 与 LIMITS.md 条数不一致：' + en.length + ' vs ' + ids.length);
+  const want = ids.map((_, n) => 'L' + (n + 1));
+  assert.deepEqual(ids, want, 'LIMITS.md 的编号必须连续且按顺序：' + ids.join(','));
 });
 
 test('限制清单：每条都必须有 status，且 status 只取五种', () => {
@@ -222,8 +223,9 @@ function boundaryItems(lang) {
 test('限制清单：下层只写没解决的部分，不许复述上层已经做到的事', () => {
   const zh = boundaryItems('zh');
   const en = boundaryItems('en');
-  assert.equal(zh.length, 11, '中文下层的条数变了：' + zh.length);
-  assert.equal(en.length, 11, '英文下层的条数变了：' + en.length);
+  const { ids } = limitsEntries();
+  assert.equal(zh.length, ids.length, '中文下层条数变了：' + zh.length + ' vs ' + ids.length);
+  assert.equal(en.length, ids.length, '英文下层条数变了：' + en.length + ' vs ' + ids.length);
 
   for (const line of zh) {
     for (const w of DONE_ZH) {
@@ -298,8 +300,8 @@ function limitsStatusMap() {
 test('限制清单：ROADMAP 台账状态行必须与 LIMITS 总表逐条互锁（手抄必漂）', () => {
   const map = limitsStatusMap();
   const groups = {};
-  for (let i = 1; i <= 11; i++) {
-    const id = 'L' + i;
+  // 编号不写死上限：台账加一条，这条守卫要跟着自动覆盖到。
+  for (const id of limitsEntries().ids) {
     (groups[map[id]] ||= []).push(id);
   }
   const want = STATUS_ORDER

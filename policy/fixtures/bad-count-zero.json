@@ -1,0 +1,52 @@
+{
+  "orders": [
+    {
+      "id": 1,
+      "userId": 2,
+      "totalAmount": 28.0,
+      "status": "PICKED",
+      "items": [
+        {
+          "dishName": "拿铁",
+          "count": 0,
+          "unitPrice": 28.0,
+          "subTotal": 28.0
+        }
+      ]
+    }
+  ],
+  "events": [
+    {
+      "orderId": 1,
+      "from": null,
+      "to": "PENDING",
+      "operatorId": 2,
+      "operatorRole": "CUSTOMER",
+      "at": "2026-11-08T09:00:00"
+    },
+    {
+      "orderId": 1,
+      "from": "PENDING",
+      "to": "MAKING",
+      "operatorId": 3,
+      "operatorRole": "STAFF",
+      "at": "2026-11-08T09:01:00"
+    },
+    {
+      "orderId": 1,
+      "from": "MAKING",
+      "to": "READY",
+      "operatorId": 3,
+      "operatorRole": "STAFF",
+      "at": "2026-11-08T09:05:00"
+    },
+    {
+      "orderId": 1,
+      "from": "READY",
+      "to": "PICKED",
+      "operatorId": 2,
+      "operatorRole": "CUSTOMER",
+      "at": "2026-11-08T09:06:00"
+    }
+  ]
+}

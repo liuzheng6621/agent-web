@@ -1,4 +1,4 @@
-# agent-web v0.69.0
+# agent-web v0.70.0
 
 <p align="center">
   <img src="docs/media/hero.png" alt="agent-web: integration tests an agent can be judged on" width="100%">
@@ -19,7 +19,7 @@
 </p>
 
 <p align="center">
-  <b>v0.69.0</b> · 20 assertion kinds · 32 commands · 67 mutants
+  <b>v0.70.0</b> · 20 assertion kinds · 32 commands · 67 mutants
 </p>
 
 <p align="center">
@@ -464,6 +464,7 @@ The remaining boundaries are numbered to match L1–L11 in [docs/LIMITS.md](docs
 9. **Parallel execution stays disabled for now (L9).** There is no parallel executor; re-enabling it requires byte-identical verdicts, failure causes and per-step receipts between serial and parallel runs.
 10. **Difficulty estimates depend on sample sources (L10).** Multiple independent submitters/batches are needed to interpret the result as external difficulty rather than self-test performance.
 11. **Real-backend validation covers only six domains (L11).** The threshold is two independent implementations plus 100% `compare` agreement. The first four domains each got a second implementation; the fifth (RealWorld) arrived in v0.55.0, the sixth (scheduled jobs) in v0.60.0. Adding more is still manual work.
+12. **The semantic layer covers one domain (L12).** `policy/coffee.rego` is a second, independent declaration of the coffee shop rules; 11 fixtures (1 allow, 10 deny) are judged by `conftest`. The other six domains have no rule copy, and editing the Java rules does not notify Rego — only a failing fixture reveals the drift. Rejection codes and cross-order ordering are out of scope.
 <!-- limits:end -->
 
 ## Docs

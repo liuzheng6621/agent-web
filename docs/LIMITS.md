@@ -31,6 +31,7 @@ README 的「边界：已实现与仍未解决」是这份清单的摘要。**�
 | L9 | 并发被撤回了 | `withdrawn` | `npm run determinism`；开关守卫见 `test/limits.test.mjs` |
 | L10 | 难度标签只是统计 | `mitigated` | `node bin/agent-web.mjs drill stats --min-attempts=5` |
 | L11 | 只在六个域上验过 | `mitigated` | `node bin/agent-web.mjs compare cases/<域> --adapters=A,B` |
+| L12 | 语义层只覆盖一域 | `by-design` | `node scripts/policy-check.mjs` |
 
 ## L1 写操作的语义仍然要人给
 
@@ -330,3 +331,30 @@ v0.63.1 补全 `applies_to` 后，本域适用 8 个（四个 `m-lab-*` + 四个
 `compare` 判决一致率 100%、`probe` 通过、`certify` 基线不倒退。做不到就说明词汇还缺，
 缺口写进 `docs/domains/<name>.md`。
 
+
+## L12 语义层只覆盖咖啡店一域，且规则副本靠人同步
+
+`status: by-design`
+
+`policy/coffee.rego` 是 `common/OrderStateMachine.java` 等规则的**第二次声明**：
+不是翻译，是照 `policy/DECISIONS.md` 重写一遍，两边独立，打架时报警。
+11 条判例（1 好 10 坏）在 `policy/fixtures/`，`node scripts/policy-check.mjs` 判 allow/deny。
+
+这条限制说的是它**做不到**什么：
+
+1. **只覆盖一个域。** 其余六域（账本、词库、动物、定时任务、实验室、RealWorld）没有规则副本，
+   它们的语义层是 0。要补，每个域都得先有「规则权威处」可指——没有权威处的域补不了。
+2. **靠人同步，不靠机制。** Java 改了 `ALLOWED` 表，Rego 不会自己知道；
+   只有 `bad-*` 判例红的时候才暴露。这是**判例驱动**，不是类型驱动。
+3. **判例的期望是文件名前缀**（`good-`/`bad-`）。改判例语义而不改名，会假绿。
+4. **不判拒绝码。** Java 用 40402 掩盖越权（防 id 枚举），策略只判「该不该允许」。
+   两处口径不同是设计（见 `policy/DECISIONS.md` 第 2 节），但意味着
+   「拒绝码对不对」这条完全落在 L1 案例断言上。
+5. **不判跨订单时序。** 「先做 A 再做 B」需要 `precedence` 断言（S4），策略只看单订单链条。
+
+**为什么仍是 by-design 而不是 open**：语义层永远只能覆盖「有形式化规约」的部分，
+把「没有规约的域」标成待办等于假装它们有规约。这条的边界是**可数**的：
+`policy/fixtures/` 里有多少判例、覆盖几条规则，`policy-check.mjs` 每次都能数出来。
+
+验收：`node scripts/policy-check.mjs` 全绿；`npm test` 里 8 条 `policy:` 守卫全绿
+（缺 conftest 时执行守卫 skip 并显式报告，不静默通过）。

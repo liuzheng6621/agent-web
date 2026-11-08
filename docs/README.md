@@ -12,7 +12,8 @@
 | 有现成接口测试套件（hurl），能不能直接用 | [GUIDE · 现成的案例从哪来](../README.md#现成的案例从哪来) 与 `import hurl` |
 | 断言怎么写、有哪些、各管什么 | [SPEC 第 4 章](SPEC.md)（20 种断言） |
 | 判决为什么是 unknown，unknown 去哪了 | [SPEC 第 7 章](SPEC.md)（判决顺序表）+ [LIMITS L8](LIMITS.md) |
-| 它做不了什么、哪些永远做不了 | [LIMITS.md](LIMITS.md)（11 条台账，每条带验收命令） |
+| 规则对不对——案例断言之外还有第二条通道吗 | [policy/DECISIONS.md](../policy/DECISIONS.md)（规则的第二次声明 + `conftest`） |
+| 它做不了什么、哪些永远做不了 | [LIMITS.md](LIMITS.md)（12 条台账，每条带验收命令） |
 | 我要给这个仓库投稿（断言/变异体/域） | [CONTRIBUTING.md](../CONTRIBUTING.md) + [mutants 投稿标准](mutants/README.md) |
 | 这个仓库踩过哪些坑 | [knowledge/](../knowledge/README.md)（事故档案）+ [museum/](museum/README.md)（12 件展品） |
 | 我是 AI Agent，要改这个仓库 | [AGENTS.md](../AGENTS.md) 先行，再查 [SPEC](SPEC.md) |
@@ -26,12 +27,12 @@
 | [docs/GUIDE.md](GUIDE.md) | 怎么用：网址起步、录流量、判分、审计 | 约 1000 行 |
 | [docs/SPEC.md](SPEC.md) | 规范唯一出处：案例、断言、判决、探针、命令 | 约 2000 行 |
 | [docs/ADAPTER-GUIDE.md](ADAPTER-GUIDE.md) | 接自己的应用：三档路径、只改四处 | 129 行 |
-| [docs/LIMITS.md](LIMITS.md) | L1–L11 台账：状态、验收命令、为什么 | 332 行 |
+| [docs/LIMITS.md](LIMITS.md) | L1–L12 台账：状态、验收命令、为什么 | 332 行 |
 | [docs/ROADMAP.md](ROADMAP.md) | 路线图：做完什么、下一条怎么验收 | 288 行 |
 | [CHANGELOG.md](../CHANGELOG.md) | 每个版本做了什么、因为什么 | 随版本增长 |
 | [docs/domains/](domains/) | 四个域的实测细节 | 每域一份 |
 | [docs/museum/](museum/README.md) | 假判决博物馆：12 件可运行的展品 | 每件一个 .mjs |
-| [docs/mutants/](mutants/README.md) | 63 个变异体目录 + `applies_to` 约定 | 每体一个 .mjs |
+| [docs/mutants/](mutants/README.md) | 67 个变异体目录 + `applies_to` 约定 | 每体一个 .mjs |
 | [knowledge/](../knowledge/README.md) | 14 条事故档案：症状、根因、判据 | 每条一份 |
 | [docs/media/](media/) | 本仓库所有图与动图，全部本地生成 | 生成脚本在 `tools/media/` |
 
@@ -43,3 +44,4 @@
 | [lexicon.md](domains/lexicon.md) | 词库检索：900 条数据上翻页坏法才真的暴露 |
 | [cron.md](domains/cron.md) | 定时任务：`recurrence` 断言的出处，`recurrence` 生成变异体的必要性反证 |
 | [labaccess.md](domains/labaccess.md) | 实验室预约：时间窗 + 凭证签发的第六个真实后端（单实现，不计入「验过的域」） |
+| [coffee.md](domains/coffee.md) | 咖啡店：双观测通道（HTTP 行为 + H2 直读事实）+ Rego 语义层（八条规则、十一条判例） |
