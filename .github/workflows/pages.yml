@@ -8,6 +8,7 @@ on:
       - 'cases/coffee/**'
       - 'src/**'
       - 'bin/agent-web.mjs'
+      - 'VERSION'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 
