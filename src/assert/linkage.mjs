@@ -38,12 +38,23 @@ export function linkage(a, ctx) {
     return { status: 'unknown', code: 'invalid_case', message: 'linkage 必须给 to.on.from_field 与 to.on.to_field' };
   }
 
+  // to 侧按键建索引：先前每行 from 都对整张 rowsTo 做 filter，
+  // O(|from|×|to|) —— labaccess 的流水上千行时是几十万次比较。
+  // 索引一次 O(|to|)，查询 O(1)。undefined 键也入桶，与原先
+  // `get(r, on.to_field) === key` 对 undefined 的匹配语义保持一致。
+  const toIndex = new Map();
+  for (const r of rowsTo) {
+    const k = get(r, on.to_field);
+    const bucket = toIndex.get(k);
+    if (bucket) bucket.push(r); else toIndex.set(k, [r]);
+  }
+
   const checked = [];
   for (let i = 0; i < rowsFrom.length; i += 1) {
     const row = rowsFrom[i];
     if (!whereMatch(row, a.from.where)) continue;
     const key = get(row, on.from_field);
-    const matches = rowsTo.filter((r) => get(r, on.to_field) === key);
+    const matches = toIndex.get(key) ?? [];
     const hit = matches[0];
     checked.push({ row, key, hit });
     if (!hit) {

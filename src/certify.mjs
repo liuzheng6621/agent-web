@@ -199,11 +199,15 @@ function driftPaths(a, b) {
 
 /** 一个案例上，所有变异体的杀伤矩阵。 */
 export async function certifyCase(caseObj, adapterFactory, { adapterName = 'unknown', timeoutMs, mutations = MUTATIONS } = {}) {
-  const base = await probe(caseObj, await adapterFactory(), { adapterName, timeoutMs });
+  // 一个案例只 factory 一次：manifest 是静态声明，base 的实例就能答；
+  // base2 的漂移量测也复用同一实例（reset 语义保证复位到同一起点）。
+  // 先前这里 factory 三次，SQL 适配器每次都是多一轮 JVM 起停。
+  const baseAdapter = await adapterFactory();
+  const base = await probe(caseObj, baseAdapter, { adapterName, timeoutMs });
   const armed = base.results.map((r) => r.status === 'true');
-  const manifest = await (await adapterFactory()).manifest();
+  const manifest = await baseAdapter.manifest();
   // 先量一次漂移：把正确实现跑第二遍，两次之间本来就不一样的地方不算见证。
-  const base2 = await probe(caseObj, await adapterFactory(), { adapterName, timeoutMs });
+  const base2 = await probe(caseObj, baseAdapter, { adapterName, timeoutMs });
   const drift = driftPaths(base.ctx, base2.ctx);
   const rows = [];
 
@@ -219,20 +223,31 @@ export async function certifyCase(caseObj, adapterFactory, { adapterName = 'unkn
     // 出现两次（第 4 条在执行期、第 16 条在断言期），无法只凭代码区分；而第 16 条排在
     // assertion_false 之后，意味着断言变假时真判决会翻成 fail，fastProbe 推不出来。
     // 数量很少，直接退回重放。
-    const wrapped = m.wrap(await adapterFactory());
     // base 根本没跑起来时（环境连不上、适配器违约、可能已生效），ctx.initial / ctx.final 是
     // undefined。快路径拿它去变换，变异体第一行读 state.xxx 就 TypeError，整个 certify 当场
     // 崩掉，报出来的是「Cannot read properties of undefined」而不是「环境没起来」。
     // 这种情况只能退回重放：重放同样跑不通，但 probe 会把异常收成 unknown，照实报。
     const ctxUsable = Boolean(base.ctx) && base.ctx.initial !== undefined && base.ctx.final !== undefined;
+    // 快路径预检用哑实例：wrapState 是纯展开 + 挂凭据，不碰实例方法，
+    // wrap({}) 就能探出 _agentWebStateFn 是否存在。真实例只在确定要重放时才建——
+    // state 层变异体占大头，先前每条都白建一个（SQL 适配器即多一个 JVM 载体）。
+    // 自定义 wrap 在哑实例上抛错时，退回「建真实例探测」，行为与从前一致。
+    let stateFn = null;
+    if (m.layer === 'state') {
+      try {
+        stateFn = m.wrap({})._agentWebStateFn ?? null;
+      } catch {
+        stateFn = null;
+      }
+    }
     const reusable = process.env.AGENT_WEB_CERTIFY_SLOW !== '1'
       && ctxUsable
       && m.layer === 'state'
-      && typeof wrapped._agentWebStateFn === 'function'
+      && typeof stateFn === 'function'
       && !(base.verdict?.status === 'unknown' && base.verdict?.reason_code === 'missing_observation');
     const p = reusable
-      ? fastProbe(caseObj, base, wrapped._agentWebStateFn)
-      : await probe(caseObj, wrapped, { adapterName, timeoutMs });
+      ? fastProbe(caseObj, base, stateFn)
+      : await probe(caseObj, m.wrap(await adapterFactory()), { adapterName, timeoutMs });
     const cells = p.results.map((r, i) => {
       if (!armed[i]) return 'unarmed';
       if (r.status === 'false') return 'killed';

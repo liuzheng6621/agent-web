@@ -39,7 +39,10 @@ function findEvent(rows, spec) {
   const matches = rows.filter((r) => {
     if (!r || typeof r !== 'object') return false;
     if (spec.type !== undefined && r.type !== spec.type) return false;
-    if (spec.field !== undefined && spec.value !== undefined && r[spec.field] !== spec.value) return false;
+    // 'value' in spec 而不是 spec.value !== undefined：显式 value:null（比如
+    // 「operator_id 为空的系统行」）是合法匹配条件；用 !== undefined 判断会把
+    // 「想匹配 null」当成「没写条件」而放过所有行。
+    if (spec.field !== undefined && spec && 'value' in spec && r[spec.field] !== spec.value) return false;
     return true;
   });
   if (matches.length === 0) return null;

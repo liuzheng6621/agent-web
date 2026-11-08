@@ -6,6 +6,27 @@
 CI 也在查。这条规则是买来的：这个仓库曾经同时存在 `package.json` 0.16、README 0.9、
 Gitee Release v0.6.0 三个数，谁看都是三个项目。
 
+## 0.75.0
+
+**十处算法修复：断言层七洞与资源浪费三处。**
+
+先读完全部核心模块再动手的一次清扫。每一条都是「会产出错误判决」或「白烧资源」的洞，
+不是风格问题；回归测试七条全绿（`test/bugfix-algorithms.test.mjs`），`certify` 口径一处未漂（48/50）。
+
+- **getPath 不再遮蔽对象自有 `length`**（`src/values.mjs`）：`{length:5}` 这类普通对象此前会被数组的 `length` 特例吞掉，取值恒 `undefined`。现在特例只对数组与字符串生效。
+- **`sorted_by` 补类型一致检查**（`src/assert/shape.mjs`）：number 与 string 混合时 JS 裸 `<`/`>` 静默强转（`"9" > "10"` 按字符串比较为真），把有序误判成乱序。现在与 `relation` 的排序同一把尺子：类型不可比判 `unknown/invalid_case`，不猜。
+- **`unique`/`subset` 的对象键不再塌缩**（同上）：键原是 `typeof + String(v)`，两个不同对象同得 `object:[object Object]`——unique 误报重复、subset 误放行。改用 `stableStringify`。
+- **`relation.sum_by_equals` 补校验期检查**（`src/assert/index.mjs`）：四个必填字段此前要等到运行时才报 `invalid_case`，现在案例载入即报。
+- **`recurrence` 末槽容差**（`src/assert/recurrence.mjs`）：容差 ≥ 周期一半时，落在 `(to, to+tol]` 的准点行会被边界 `continue` 丢弃、误判漏跑；现在归入末槽交容差裁决。注释与实现对齐（槽位按 `[from,to]` 闭区间铺）。
+- **`timeliness` 显式 `value:null` 可作条件**（`src/assert/timeliness.mjs`）：`spec.value !== undefined` 把「想匹配 null」当成「没写条件」；改用 `'value' in spec`。
+- **`linkage` 配对索引化**（`src/assert/linkage.mjs`）：行×行双重 `.filter()` 改 `Map` 索引，labaccess 级流水（千行×几十行）从 4 万次比较降到线性。
+- **certify 一个案例只 factory 一次适配器**（`src/certify.mjs`）：基准与 manifest 此前各建一实例；manifest 是静态声明。SQL 适配器少一轮 JVM 起停。
+- **certify 判据快路径零实例**（同上）：探测 `_agentWebStateFn` 用哑对象，不再为每个变异体造真实适配器。
+- **probe 计时器清理**（`src/probe.mjs`）：`withTimeout` 赛跑后 `clearTimeout`，不再每次调用挂一个到期的 5s 定时器。
+
+测试 575 = 573 pass + 2 skip。
+
+---
 ## 0.74.0
 
 **S7 收口：架构守卫与第二后端复现——三层验证栈排期全部完成。**

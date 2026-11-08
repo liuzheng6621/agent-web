@@ -15,7 +15,11 @@
 
 import { TRUE, FALSE, UNKNOWN } from '../three-valued.mjs';
 import { selectEntities } from '../select.mjs';
-import { getPath } from '../values.mjs';
+import { getPath, stableStringify } from '../values.mjs';
+
+// 与 relation.opSorted 同一把尺子：只有双 number 或双 string 才可比较。
+// 裸关系运算符会在 number/string 混合时静默强转（"9" > "10" 按字符串比出 true），
+// 同一份数据换一种 kind 判出相反结论 —— 那比判错更糟。
 
 export const SHAPE_KINDS = Object.freeze(['sorted_by', 'unique', 'type_of', 'subset']);
 
@@ -64,6 +68,15 @@ export function sorted_by(a, ctx) {
   for (let i = 1; i < vals.length; i += 1) {
     const prev = vals[i - 1];
     const cur = vals[i];
+    const comparable = (typeof prev === 'number' && typeof cur === 'number')
+      || (typeof prev === 'string' && typeof cur === 'string');
+    if (!comparable) {
+      return {
+        status: UNKNOWN,
+        code: 'invalid_case',
+        message: `第 ${i - 1} 行 ${JSON.stringify(prev)} 与第 ${i} 行 ${JSON.stringify(cur)} 类型不一致，无法比较 —— 排序列必须是同类型`,
+      };
+    }
     const bad = desc ? prev < cur : prev > cur;
     if (bad) {
       return {
@@ -85,7 +98,9 @@ export function unique(a, ctx) {
     if (v === undefined) {
       return { status: UNKNOWN, code: 'missing_observation', message: `第 ${i} 行没有 ${a.path}` };
     }
-    const k = typeof v + ':' + String(v);
+    // 键必须区分两个不同的对象：typeof+String 会把 {a:1} 和 {b:2} 都压成
+    // "object:[object Object]"，把「无重复」判成「有重复」。stableStringify 键排序序列化。
+    const k = stableStringify(v);
     if (seen.has(k)) {
       return {
         status: FALSE,
@@ -134,14 +149,14 @@ export function subset(a, ctx) {
   if (!Array.isArray(a.values) || a.values.length === 0) {
     return { status: UNKNOWN, code: 'invalid_case', message: 'values 必须是非空数组' };
   }
-  const allowed = new Set(a.values.map((x) => typeof x + ':' + String(x)));
+  const allowed = new Set(a.values.map((x) => stableStringify(x)));
   for (let i = 0; i < rows.length; i += 1) {
     const v = getPath(rows[i], a.path);
     if (v === undefined) {
       return { status: UNKNOWN, code: 'missing_observation', message: `第 ${i} 行没有 ${a.path}` };
     }
     if (v === null) continue;
-    if (!allowed.has(typeof v + ':' + String(v))) {
+    if (!allowed.has(stableStringify(v))) {
       return {
         status: FALSE,
         code: 'shape_violated',

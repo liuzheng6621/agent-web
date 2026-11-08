@@ -73,16 +73,17 @@ export function getPath(root, path) {
   let cur = root;
   for (const p of parts) {
     if (cur === null || cur === undefined) return undefined;
-    if (p === 'length') {
-      if (Array.isArray(cur) || typeof cur === 'string') {
+    // 数组/字符串才有内建 length 与纯数字下标；普通对象一律走自有属性。
+    // 先前把 length 特例放在最前，{length: 5} 这种自有字段被遮蔽成 undefined。
+    if (Array.isArray(cur) || typeof cur === 'string') {
+      if (p === 'length') {
         cur = cur.length;
         continue;
       }
-      return undefined;
-    }
-    if (Array.isArray(cur) && /^\d+$/.test(p)) {
-      cur = cur[Number(p)];
-      continue;
+      if (/^\d+$/.test(p)) {
+        cur = cur[Number(p)];
+        continue;
+      }
     }
     cur = cur[p];
   }

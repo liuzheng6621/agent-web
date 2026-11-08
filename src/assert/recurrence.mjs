@@ -89,9 +89,10 @@ export function recurrence(a, ctx) {
   for (let t = from; t <= to; t += every) slots.push(t);
 
   // 每一行运行记录必须落在某个槽位的容差内；落在两个槽位之间（或容差外）算漂移。
-  // 窗口边界必须是半开区间 [from, to)：to 是「到这一刻为止」，不包含这一刻之后。
-  // 先前写成 [from, to] 并额外放行 to + every，结果是相邻两段窗口互相把对方的
-  // 行算成「落在窗口外」——暂停被切成两段时必然踩到。
+  // 槽位按 [from, to] 闭区间铺（最后一槽可以正好落在 to 上）；行侧只收
+  // [from - tol, to + tol] 的行——to 之后但仍在容差内的行算最后一槽的准点/漂移，
+  // 更外面的行属于别的窗口（暂停把时间线切成两段时必然出现），
+  // 把它们算成「越界」等于让两段窗口互相指控。
   // 只判窗口内的行：窗口外的行属于别的窗口（暂停把时间线切成两段时必然出现），
   // 把它们算成「越界」等于让两段窗口互相指控。多跑的那一次由 count_delta 或
   // event_absent 抓——一条断言只回答一个问题。
@@ -112,8 +113,12 @@ export function recurrence(a, ctx) {
     // 00:45 那一跑晚到 00:50，它仍然属于 00:45 这个槽位。
     // 只按 [from, to] 剪掉，会把「跑偏」误报成「漏跑」。
     if (at < from - tol || at > to + tol) continue;
-    const k = Math.round((at - from) / every);
-    if (k < 0 || k >= slots.length) continue;
+    let k = Math.round((at - from) / every);
+    // 容差 >= every/2 时，落在 (to, to + tol] 的行四舍五入会算出 k == slots.length，
+    // 但它明明还在最后一槽的容差里 —— 直接丢弃会把准点行误判成漏跑。
+    // clamp 到最后一槽，交由下面的容差检查决定它是准点还是跑偏。
+    if (k >= slots.length) k = slots.length - 1;
+    if (k < 0) continue;
     if (Math.abs(at - (from + k * every)) > tol) {
       // 先记成「这个槽位跑偏了」。它既不算填满，也不算漏跑——
       // 把跑偏的行当成漏跑，报告里就会出现「漏了 4 个槽位」这种

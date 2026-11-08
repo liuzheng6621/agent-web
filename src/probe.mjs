@@ -73,11 +73,15 @@ export async function probeAdapter({ adapter, adapterName = 'unknown', timeoutMs
   }
   add('contract', '适配器实现了五方法', PASS, FAIL, 'manifest / reset / observe / execute / close 都在');
 
-  const withTimeout = (p) =>
-    Promise.race([
-      p,
-      new Promise((_, rej) => setTimeout(() => rej(new Error(`调用超时（>${timeoutMs}ms）`)), timeoutMs)),
-    ]);
+  // timer 必须随结果清理：p 先完成时不清，每次调用都留一个 5s 的尾巴，
+  // 测试套件跑完还要等最长的那个 timer 自然过期，进程退出被无辜拖慢。
+  const withTimeout = (p) => {
+    let timer = null;
+    const gate = new Promise((_, rej) => {
+      timer = setTimeout(() => rej(new Error(`调用超时（>${timeoutMs}ms）`)), timeoutMs);
+    });
+    return Promise.race([p, gate]).finally(() => clearTimeout(timer));
+  };
 
   let manifest;
   try {

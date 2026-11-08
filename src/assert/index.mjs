@@ -275,6 +275,11 @@ export function validateAssertion(a, at = 'assertion') {
       if (typeof a.path !== 'string' || a.path === '') errors.push(`${at}.path 必填`);
     } else if (a.op === 'sorted') {
       if (typeof a.path !== 'string' || a.path === '') errors.push(`${at}.path 必填`);
+    } else if (a.op === 'sum_by_equals') {
+      if (typeof a.field !== 'string' || a.field === '') errors.push(`${at}.field 必填（求和的字段）`);
+      if (typeof a.group_field !== 'string' || a.group_field === '') errors.push(`${at}.group_field 必填（分组的字段）`);
+      if (typeof a.left !== 'string' || a.left === '') errors.push(`${at}.left 必填（左组键）`);
+      if (typeof a.right !== 'string' || a.right === '') errors.push(`${at}.right 必填（右组键）`);
     }
   }
 
