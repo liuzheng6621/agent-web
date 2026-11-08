@@ -3,76 +3,187 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>agent-web — 给 Agent 写机器可判的集成测试</title>
-<meta name="description" content="一份案例，跑多个实现，判决必须一致。我们给被测实现注入 72 种谎话，断言抓住 48 种。">
+<title>agent-web — 检验报告</title>
+<meta name="description" content="给被测实现注入 72 种谎话，适用口径下当场抓住 48 种。一份案例，跑多个实现，判决必须一致。">
+<meta name="color-scheme" content="light dark">
 <style>
-  :root { --bg:#0d1117; --fg:#e6edf3; --dim:#8b949e; --acc:#58a6ff; --ok:#3fb950; --bad:#f85149; --unk:#d29922; --card:#161b22; --line:#30363d; }
-  * { box-sizing:border-box; }
-  body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.7 -apple-system,"Segoe UI","Microsoft YaHei",sans-serif; }
-  .wrap { max-width:860px; margin:0 auto; padding:48px 20px 80px; }
-  h1 { font-size:34px; line-height:1.3; margin:0 0 8px; }
-  .sub { color:var(--dim); font-size:17px; margin:0 0 28px; }
-  .hook { background:var(--card); border:1px solid var(--line); border-left:4px solid var(--acc); border-radius:8px; padding:18px 22px; margin:0 0 32px; font-size:17px; }
-  .hook b { color:var(--fg); }
-  .cards { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin:0 0 32px; }
-  .card { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:18px; text-align:center; }
-  .card .n { font-size:34px; font-weight:700; }
-  .card .l { color:var(--dim); font-size:13px; margin-top:4px; }
-  .btns { display:flex; gap:12px; flex-wrap:wrap; margin:0 0 36px; }
-  a.btn { display:inline-block; background:var(--acc); color:#04121f; text-decoration:none; font-weight:600; padding:10px 20px; border-radius:6px; }
-  a.btn.ghost { background:transparent; color:var(--acc); border:1px solid var(--acc); }
-  h2 { font-size:22px; margin:36px 0 12px; }
-  .v { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; }
-  .v div { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:16px; }
-  .v .t { font-weight:700; font-size:18px; }
-  .v .pass .t, .t.pass { color:var(--ok); } .t.fail { color:var(--bad); } .t.unk { color:var(--unk); }
-  .v p { margin:6px 0 0; color:var(--dim); font-size:14px; }
-  .foot { margin-top:48px; padding-top:20px; border-top:1px solid var(--line); color:var(--dim); font-size:13px; }
-  code { background:#1f242c; padding:2px 6px; border-radius:4px; font-size:14px; }
-  @media (max-width:640px){ .cards,.v{grid-template-columns:1fr;} h1{font-size:26px;} }
+:root{
+  color-scheme:light;
+  --paper:#f7f7f3; --paper-2:#f0f1ec; --rule:#c9cdc5; --rule-strong:#9aa196;
+  --ink:#1a1c1a; --ink-2:#4a504b; --ink-3:#6b726b;
+  --seal:#9e2b25; --pass:#2f6b3f; --fail:#9e2b25; --unknown:#8a6a1f;
+  --serif:"Songti SC","STSong","Noto Serif CJK SC","Source Han Serif SC",Georgia,"Times New Roman",serif;
+  --sans:-apple-system,"Segoe UI","Microsoft YaHei","PingFang SC",sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",monospace;
+  --sp1:4px; --sp2:8px; --sp3:12px; --sp4:16px; --sp6:24px; --sp8:32px; --sp12:48px; --sp16:64px;
+}
+:root.dark,:root[data-theme="dark"],:root[data-color-mode="dark"]{
+  color-scheme:dark;
+  --paper:#1c211e; --paper-2:#232a25; --rule:#3b443d; --rule-strong:#5c665e;
+  --ink:#eceee8; --ink-2:#a9b2a8; --ink-3:#8f9a90;
+  --seal:#d9695f; --pass:#8fd0a0; --fail:#d9695f; --unknown:#e0bf76;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]):not(.light){
+    color-scheme:dark;
+    --paper:#1c211e; --paper-2:#232a25; --rule:#3b443d; --rule-strong:#5c665e;
+    --ink:#eceee8; --ink-2:#a9b2a8; --ink-3:#8f9a90;
+    --seal:#d9695f; --pass:#8fd0a0; --fail:#d9695f; --unknown:#e0bf76;
+  }
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.75 var(--sans)}
+a{color:var(--seal);text-decoration-thickness:1px;text-underline-offset:3px}
+a:focus-visible,button:focus-visible{outline:2px solid var(--seal);outline-offset:3px}
+::selection{background:var(--seal);color:var(--paper)}
+.sheet{max-width:1080px;margin:0 auto;padding:0 var(--sp8) var(--sp16);border-left:3px solid var(--seal)}
+@media(max-width:700px){.sheet{padding:0 var(--sp4) var(--sp12);border-left-width:2px}}
+.inner{max-width:860px;margin:0 auto}
+
+/* 抬头：字段：值，公文格式，不是 eyebrow */
+header.mast{padding:var(--sp12) 0 var(--sp8);border-bottom:1px solid var(--rule-strong)}
+.mast h1{font:700 clamp(32px,4.6vw,46px)/1.32 var(--serif);letter-spacing:.01em;margin:0 0 var(--sp6)}
+.mast .fields{display:grid;grid-template-columns:auto 1fr;gap:var(--sp1) var(--sp4);font-size:14px;color:var(--ink-2);margin:0 0 var(--sp8)}
+.mast .fields dt{color:var(--ink-3);white-space:nowrap}
+.mast .fields dd{margin:0}
+.mast .fields dd b{font-weight:600;color:var(--ink)}
+.lede{font-size:18px;line-height:1.85;max-width:720px;margin:0;color:var(--ink)}
+.lede em{font-style:normal;font-family:var(--serif);font-size:1.18em;color:var(--seal)}
+@media(max-width:700px){header.mast{padding-top:var(--sp8)}.mast .fields{grid-template-columns:1fr;gap:0}.mast .fields dt{margin-top:var(--sp2)}.lede{font-size:16px}}
+
+/* 分节横线：只组织真实内容 */
+section{padding-top:var(--sp12)}
+h2{font:700 22px/1.4 var(--serif);margin:0 0 var(--sp6);display:flex;align-items:baseline;gap:var(--sp3)}
+h2::after{content:"";flex:1;border-bottom:1px solid var(--rule-strong)}
+
+/* 结论条：leader dots，不是三张等大卡 */
+.findings{margin:0;max-width:calc(100% - 150px)}
+@media(max-width:700px){.findings{max-width:100%}}
+.finding{display:flex;align-items:baseline;gap:var(--sp3);padding:var(--sp2) 0;border-bottom:1px dotted var(--rule)}
+.finding .label{color:var(--ink-2);white-space:nowrap}
+.finding .dots{flex:1;border-bottom:1px dotted var(--rule-strong);transform:translateY(-4px)}
+.finding .val{font:600 22px/1.4 var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+.finding .val.hit{color:var(--seal)}
+.finding .val small{font:14px var(--sans);color:var(--ink-3);margin-left:var(--sp1)}
+@media(max-width:560px){.finding{flex-wrap:wrap}.finding .dots{display:none}.finding .val{margin-left:auto}}
+.note{font-size:14px;color:var(--ink-2);margin:var(--sp4) 0 0;max-width:720px}
+
+/* 朱印：全页唯一的记忆点，一次载入淡入；桌面绝对定位钉在结论区右上 */
+.sec-findings{position:relative}
+.seal{position:absolute;right:0;top:var(--sp8);width:118px;height:118px;background:var(--paper);
+  border:3px double var(--seal);color:var(--seal);display:grid;place-content:center;
+  text-align:center;transform:rotate(-5deg);font-family:var(--serif);
+  animation:stamp .5s cubic-bezier(.2,.8,.3,1) both}
+.seal .big{font-size:26px;font-weight:700;letter-spacing:.16em;line-height:1.2}
+.seal .small{font-size:12px;letter-spacing:.08em;margin-top:var(--sp1)}
+@keyframes stamp{from{opacity:0;transform:rotate(-5deg) scale(1.18)}to{opacity:1;transform:rotate(-5deg) scale(1)}}
+@media(prefers-reduced-motion:reduce){.seal{animation:none}}
+@media(max-width:700px){.sec-findings .seal{position:static;float:right;margin:0 0 var(--sp4) var(--sp6)}}
+@media(max-width:560px){.seal{width:92px;height:92px}.seal .big{font-size:20px}}
+
+/* 判决口径：真表格 */
+table{width:100%;border-collapse:collapse;font-size:15px}
+caption{text-align:left;color:var(--ink-3);font-size:14px;padding-bottom:var(--sp2)}
+th,td{text-align:left;padding:var(--sp3) var(--sp4) var(--sp3) 0;border-bottom:1px solid var(--rule);vertical-align:top}
+thead th{font-size:14px;font-weight:600;color:var(--ink-3);border-bottom:1px solid var(--rule-strong)}
+td.v{font-family:var(--mono);font-weight:600;white-space:nowrap}
+td.v.pass{color:var(--pass)}td.v.fail{color:var(--fail)}td.v.unk{color:var(--unknown)}
+td.yn{white-space:nowrap}
+@media(max-width:560px){table,tbody,tr,td{display:block;width:100%}thead{display:none}tr{padding:var(--sp3) 0;border-bottom:1px solid var(--rule)}td{border:0;padding:2px 0}td:not(:first-child){color:var(--ink-2)}td.v{font-size:17px}}
+
+/* 入口链接：朱红底线，不是实心蓝按钮；44px 点击区修基线 warn */
+.cta-row{margin:var(--sp6) 0 0}
+.cta{display:inline-flex;align-items:center;min-height:44px;padding:0 var(--sp1);
+  border-bottom:2px solid var(--seal);color:var(--seal);text-decoration:none;font-weight:600}
+.cta:hover{border-bottom-width:3px}
+/* 随附材料：附件是序列，编号合法；一行一种边线 */
+.attachments{list-style:none;margin:0;padding:0}
+.attachments li{display:flex;gap:var(--sp4);padding:var(--sp2) 0;
+  border-bottom:1px solid var(--rule);align-items:baseline}
+.attachments .ano{font:600 14px var(--mono);color:var(--ink-3);white-space:nowrap;min-width:76px}
+.attachments .atxt{flex:1}
+.attachments a{display:inline-flex;align-items:center;min-height:44px;min-width:44px;justify-content:center}
+@media(max-width:560px){.attachments li{display:block}.attachments .ano{display:block;min-width:0;margin-bottom:var(--sp1)}}
+.prose{max-width:720px}
+.prose p{margin:0 0 var(--sp4)}
+code{font:14px var(--mono);background:var(--paper-2);padding:2px var(--sp1)}
+strong{font-weight:600}
+.foot{margin-top:var(--sp16);padding-top:var(--sp6);border-top:1px solid var(--rule-strong)}
+.colophon{font-size:14px;color:var(--ink-2);margin:0 0 var(--sp4);max-width:720px}
+.foot-links{display:flex;flex-wrap:wrap;gap:var(--sp2) var(--sp8);margin:var(--sp6) 0}
+.foot-links a{display:inline-flex;align-items:center;min-height:44px;min-width:44px;padding:0 var(--sp1);font-size:14px}
 </style>
 </head>
 <body>
-<div class="wrap">
-  <h1>agent-web <span style="color:var(--dim);font-size:20px">v{{VERSION}}</span></h1>
-  <p class="sub">给 Agent 写机器可判的集成测试 · Machine-judgeable integration tests for agents</p>
+<div class="sheet">
+<div class="inner">
 
-  <div class="hook">
-    我们给被测实现注入了 <b>72 种谎话</b>——谎报成功、伪造账单、冒充别人、偷偷挪走别人的订单。
-    适用的 50 种里，断言当场抓住 <b>48 种</b>；漏掉的 2 种写在台账里，不在脚注里。
+<header class="mast">
+  <dl class="fields">
+    <dt>检验对象</dt><dd><b>agent-web</b>，给 Agent 写机器可判的集成测试</dd>
+    <dt>检验方式</dt><dd>注入变异体（谎话），由断言当场判决</dd>
+    <dt>样本</dt><dd><code>cases/coffee</code>，13 条案例，memory 实现</dd>
+    <dt>报告版本</dt><dd>v{{VERSION}}</dd>
+  </dl>
+  <h1>给 Agent 的测试，<br>做一次检验</h1>
+  <p class="lede">我们给被测实现注入了 <em>72 种谎话</em>——谎报成功、伪造账单、冒充别人、偷偷挪走别人的订单。适用的 50 种里，断言当场抓住 48 种；漏掉的 2 种写在台账里，不在脚注里。</p>
+  <p class="cta-row"><a class="cta" href="coffee.dashboard.html">打开真实判决总览（13 条案例）</a></p>
+</header>
+
+<section class="sec-findings">
+  <h2>检验结论</h2>
+  <div class="seal" aria-hidden="true"><span class="big">已验</span><span class="small">48 / 50</span></div>
+  <div class="findings">
+    <div class="finding"><span class="label">注入的变异体（谎话）</span><span class="dots"></span><span class="val">72</span></div>
+    <div class="finding"><span class="label">适用口径下的分母</span><span class="dots"></span><span class="val">50 种</span></div>
+    <div class="finding"><span class="label">断言当场抓住</span><span class="dots"></span><span class="val hit">48/50</span></div>
+    <div class="finding"><span class="label">抓获率</span><span class="dots"></span><span class="val hit">96.0%</span></div>
+    <div class="finding"><span class="label">漏网的 2 种</span><span class="dots"></span><span class="val">台账在案</span></div>
   </div>
+  <p class="note">22 个变异体在本域不适用，不进分母。漏掉的两种不是被四舍五入掉的，名字写在 <code>docs/LIMITS.md</code> 里。</p>
+</section>
 
-  <div class="cards">
-    <div class="card"><div class="n">72</div><div class="l">注入的变异体（谎话）</div></div>
-    <div class="card"><div class="n" style="color:var(--ok)">48/50</div><div class="l">适用口径下的抓获数（96.0%）</div></div>
-    <div class="card"><div class="n" style="color:var(--unk)">3</div><div class="l">判决值：pass / fail / unknown</div></div>
+<section>
+  <h2>判决口径</h2>
+  <table>
+    <caption>判决只有三种；unknown 留在分母里，不算通过</caption>
+    <thead><tr><th>判决值</th><th>什么时候给</th><th>计不计入</th></tr></thead>
+    <tbody>
+      <tr><td class="v pass">pass</td><td>每条断言都成立，且指出由哪条断言、在哪个观测上成立。</td><td class="yn">计入</td></tr>
+      <tr><td class="v fail">fail</td><td>有断言不成立，报告说清期望什么、实际什么、差在哪一步。</td><td class="yn">计入</td></tr>
+      <tr><td class="v unk">unknown</td><td>缺观测、环境故障、案例未确认。不算通过，留在分母里等观测被修好。</td><td class="yn">留分母</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>随附材料</h2>
+  <ol class="attachments">
+    <li><span class="ano">附件一</span><span class="atxt"><a href="coffee.dashboard.html">真实判决总览</a>：13 条案例，本次构建跑出来的 pass / fail / unknown。</span></li>
+    <li><span class="ano">附件二</span><span class="atxt"><a href="happy-path.flow.html">单案例判决页</a>：四个步骤，逐格看到断言在哪一步成立。</span></li>
+    <li><span class="ano">附件三</span><span class="atxt">仓库与台账：<a href="https://github.com/liuzheng6621/agent-web">GitHub</a>、<a href="https://gitee.com/liu-everything_impossble/agent-web">Gitee</a>。</span></li>
+  </ol>
+</section>
+
+<section>
+  <h2>这一页是活的</h2>
+  <div class="prose">
+    <p>不是截图。每次构建先跑 <code>verify cases/coffee --adapter=memory</code> 拿到真实判决，再用 <code>flow</code> 命令把判决渲染成上面两个页面。你看到的每一行 pass / fail，都来自这一次构建里真跑出来的判决，不是手工填的。</p>
+    <p>所以这一页的数字也跟着仓库走：变异体数量、适用分母、抓获率一旦被改坏，<code>test/site.test.mjs</code> 会在 CI 里直接把构建拦下来。</p>
   </div>
+</section>
 
-  <div class="btns">
-    <a class="btn" href="coffee.dashboard.html">打开真实判决总览（13 条案例）</a>
-    <a class="btn ghost" href="happy-path.flow.html">打开单案例判决页</a>
-    <a class="btn ghost" href="https://github.com/liuzheng6621/agent-web">GitHub</a>
-    <a class="btn ghost" href="https://gitee.com/liu-everything_impossble/agent-web">Gitee</a>
+<footer class="foot">
+  <p class="colophon">口径：72 个变异体中 22 个在本域不适用，不进分母；48/50 = 96.0% 出自 <code>certify-baseline --emit-limits</code> 机器实测（v{{VERSION}}）。本页不使用无分母百分比。</p>
+  <div class="foot-links">
+    <a href="https://github.com/liuzheng6621/agent-web">GitHub 仓库</a>
+    <a href="https://gitee.com/liu-everything_impossble/agent-web">Gitee 仓库</a>
   </div>
+  <p class="colophon">MIT 许可 · liuzheng6621/agent-web</p>
+</footer>
 
-  <h2>判决只有三种，unknown 留在分母里</h2>
-  <div class="v">
-    <div><div class="t pass">pass</div><p>每条断言都成立，且指出由哪条断言、在哪个观测上成立。</p></div>
-    <div><div class="t fail">fail</div><p>有断言不成立，报告说清期望什么、实际什么、差在哪一步。</p></div>
-    <div><div class="t unk">unknown</div><p>缺观测、环境故障、案例未确认。<b>不算通过</b>，留在分母里等观测被修好。</p></div>
-  </div>
-
-  <h2>这一页是怎么来的</h2>
-  <p>不是截图，是<strong>活的</strong>：GitHub Actions 每次构建时跑
-  <code>verify cases/coffee --adapter=memory</code> 得到真实判决，再用
-  <code>flow</code> 命令把判决渲染成你刚点的两个页面。你看到的每一行 pass/fail，
-  都来自这一次构建里真实跑出来的判决，不是手工填的。</p>
-
-  <div class="foot">
-    口径：72 个变异体中 22 个在本域不适用，不进分母；48/50 = 96.0% 出自
-    <code>certify-baseline</code> 机器实测（v{{VERSION}}）。本页不使用无分母百分比。
-    MIT · <a href="https://github.com/liuzheng6621/agent-web" style="color:var(--acc)">liuzheng6621/agent-web</a>
-  </div>
+</div>
 </div>
 </body>
 </html>
