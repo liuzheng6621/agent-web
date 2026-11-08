@@ -51,6 +51,7 @@ jobs:
       - name: 组装站点（版本号来自 VERSION）
         run: |
           mkdir -p _site
+          cp site/index.html _site/index.html
           cp build/coffee.dashboard.html build/happy-path.flow.html _site/
           V=$(cat VERSION)
           node -e '
