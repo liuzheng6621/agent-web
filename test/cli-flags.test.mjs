@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import fs from 'node:fs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const BIN = path.join(ROOT, 'bin', 'agent-web.mjs');
@@ -22,4 +23,25 @@ test('不传 --adapter 时仍然用内存适配器', () => {
   const r = run(['verify', 'cases/coffee/happy-path.json']);
   assert.equal(r.status, 0, r.stdout);
   assert.match(r.stdout, /pass/);
+});
+
+test('version 子命令兑现承诺：版本、最近变更、三处一致（机器可判）', () => {
+  const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
+  const r = run(['version']);
+  assert.equal(r.status, 0, r.stdout);
+  assert.match(r.stdout, new RegExp(`^${pkg.name} ${pkg.version}$`, 'm'));
+  assert.match(r.stdout, /最近一次变更/);
+  assert.match(r.stdout, /版本号三处/);
+  assert.match(r.stdout, /→ 一致/);
+});
+
+test('version --json 输出三处对账且 consistent 为真', () => {
+  const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
+  const r = run(['version', '--json']);
+  assert.equal(r.status, 0, r.stdout);
+  const j = JSON.parse(r.stdout);
+  assert.equal(j.version, pkg.version);
+  assert.equal(j.versionFile, pkg.version);
+  assert.equal(j.changelogVersion, pkg.version);
+  assert.equal(j.consistent, true);
 });

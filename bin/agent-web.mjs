@@ -61,6 +61,7 @@ import { preflightAll, formatPreflight, preflightExit } from '../src/preflight.m
 import { crosscheck } from '../src/crosscheck.mjs';
 import { formatCrosscheck } from '../src/assert/crosscheck.mjs';
 import { ingestReport, formatIngest, ingestExit } from '../src/ingest.mjs';
+import { collectVersionInfo } from '../src/version-info.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..');
@@ -654,6 +655,38 @@ function cmdVersion(flags) {
     console.log(`${PACKAGE.name} ${VERSION}`);
   }
   return 0;
+}
+
+// 「agent-web version」子命令：HELP 与 README 命令表承诺
+// 「版本、最近一次变更、以及版本号三处是否一致」。此前实现只打印一行
+// 版本号，承诺落空——用户照文档跑这条命令定版本时，拿到的是一句没有判决的话。
+function cmdVersionReport(flags) {
+  const info = collectVersionInfo({ root: ROOT, pkgVersion: VERSION });
+  const places = [
+    `package.json ${info.pkgVersion}`,
+    `VERSION ${info.versionFile ?? '（不存在）'}`,
+    `CHANGELOG ${info.changelogVersion ?? '（无首条版本）'}`,
+  ];
+  if (flags.json) {
+    console.log(JSON.stringify({
+      name: PACKAGE.name,
+      version: VERSION,
+      node: process.versions.node,
+      versionFile: info.versionFile,
+      changelogVersion: info.changelogVersion,
+      changelogHead: info.changelogHead,
+      latestSummary: info.latestSummary,
+      consistent: info.consistent,
+      problems: info.problems,
+    }));
+    return info.consistent ? 0 : 1;
+  }
+  console.log(`${PACKAGE.name} ${VERSION}`);
+  console.log(`最近一次变更  ${info.changelogHead ?? '（CHANGELOG 没有「## x.y.z」首条）'}`);
+  if (info.latestSummary) console.log(`  ${info.latestSummary}`);
+  console.log(`版本号三处  ${places.join(' · ')} → ${info.consistent ? '一致' : '不一致'}`);
+  for (const p of info.problems) console.log(`  - ${p}`);
+  return info.consistent ? 0 : 1;
 }
 
 async function cmdKnowledge(flags) {
@@ -2078,7 +2111,7 @@ async function main() {
       case 'accept':
         return cmdAccept(args, flags);
       case 'version':
-      return cmdVersion(flags);
+      return cmdVersionReport(flags);
       case 'knowledge':
       return cmdKnowledge(flags);
     case 'recall':
