@@ -33,6 +33,9 @@ export const VERDICT_REASONS = Object.freeze({
   invalid_action: '能力不在 allowed_capabilities，或参数绑定失败',
   contract_violation: '适配器返回了契约外的 outcome —— 判定权威被换掉了',
   effect_uncertain: '可能已经生效但结果没回来，不许重放',
+  observe_threw: '观测抛异常：状态看不见，与「可能已生效」是两回事',
+  adapter_threw: '执行抛异常：请求可能已发出，落 may_have_committed 不许重放',
+
   infrastructure_error: '适配器或下层故障，这次调用没发生，可以重试',
   unexpected_rejection: '该成功却被拒绝',
   expected_rejection: '该被拒绝却成功了',
@@ -108,6 +111,9 @@ export const PROBE_CHECKS = Object.freeze({
   'outcome-contract': '每次 execute 都回契约内的 outcome',
   'close-idempotent': 'close 可以重复调用',
   'clock-honest': '声明 frozen 的适配器时钟真的冻住',
+  'execute-replay-stable': '同一动作重放：形态稳定（不崩、不契约外、观测不挂）',
+  'concurrent-execute-safe': '并发写安全：两路 execute 交错不崩、观测不挂',
+  'half-fail-honest': '半途失败诚实：资源失效后不许回 applied（吞事故谎报）',
 });
 
 /**

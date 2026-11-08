@@ -74,6 +74,9 @@ import * as sqlLogTypeFlip from './m-sql-log-type-flip.mjs';
 import * as logOrderSwap from './m-log-order-swap.mjs';
 import * as sqlTotalDrift from './m-sql-total-drift.mjs';
 import * as unitPriceFlip from './m-unit-price-flip.mjs';
+import * as staleOracle from './m-stale-oracle.mjs';
+import * as uncommittedGhost from './m-uncommitted-ghost.mjs';
+import * as viewCollectionBleed from './m-view-collection-bleed.mjs';
 
 const ENTRIES = [
   ['m-money-off-by-cent', moneyOffByCent],
@@ -149,6 +152,9 @@ const ENTRIES = [
   ['m-log-order-swap', logOrderSwap],
   ['m-sql-total-drift', sqlTotalDrift],
   ['m-unit-price-flip', unitPriceFlip],
+  ['m-stale-oracle', staleOracle],
+  ['m-uncommitted-ghost', uncommittedGhost],
+  ['m-view-collection-bleed', viewCollectionBleed],
 
 ];
 

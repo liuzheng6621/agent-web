@@ -1,4 +1,4 @@
-# agent-web v0.71.0
+# agent-web v0.72.0
 
 <p align="center">
   <img src="docs/media/hero.png" alt="agent-web: integration tests an agent can be judged on" width="100%">
@@ -19,7 +19,7 @@
 </p>
 
 <p align="center">
-  <b>v0.71.0</b> · 21 assertion kinds · 32 commands · 69 mutants
+  <b>v0.72.0</b> · 21 assertion kinds · 32 commands · 72 mutants
 </p>
 
 <p align="center">
@@ -454,7 +454,7 @@ Two layers. These capabilities already have code and tests and should not be cou
 The remaining boundaries are numbered to match L1–L12 in [docs/LIMITS.md](docs/LIMITS.md).
 **Each entry states only the unsolved part** — what already works is in the list above and is not repeated here:
 
-A word on evidence grades: every number in this README (catch rates, agreement rates, timings) comes from this repo's own CI. The scripts are reproducible — but **reproduction runs the same scripts**, and as of v0.71.0 no third party has reproduced them independently. "Reproducible" is a machine fact, not external validity. The `knowledge/` and `docs/mutants/` contribution channels exist to turn self-attestation into outside evidence, one accepted submission at a time; until one arrives, read the numbers here as "the author's proof that his own ruler is self-consistent", not as correctness rates.
+A word on evidence grades: every number in this README (catch rates, agreement rates, timings) comes from this repo's own CI. The scripts are reproducible — but **reproduction runs the same scripts**, and as of v0.72.0 no third party has reproduced them independently. "Reproducible" is a machine fact, not external validity. The `knowledge/` and `docs/mutants/` contribution channels exist to turn self-attestation into outside evidence, one accepted submission at a time; until one arrives, read the numbers here as "the author's proof that his own ruler is self-consistent", not as correctness rates.
 
 1. **Write semantics still need a human (L1).** `tap` records what the app did, but cannot infer that "insufficient stock must be rejected"; a domain owner must approve the rule.
 2. **Field mappings still need review (L2).** Nested-array leaves and same-name/different-meaning fields across collections cannot be decided by machine; a human must sign.
@@ -463,7 +463,7 @@ A word on evidence grades: every number in this README (catch rates, agreement r
 5. **Mutant coverage is incomplete (L5).** `breed` only faults **observed shape** (13 operators, 63 mutants, 39/41 caught). Execution- and business-layer faults (oversell, refund above paid amount, skipped approval) still need submissions — the generator knows shape, not semantics.
 6. **Arbitrary mutant equivalence is undecidable in general (L6).** Finite-state or bounded scenarios can be proved or exhaustively checked; otherwise report "not distinguished within budget," never "equivalent."
 7. **Cross-entity ordering is still missing (L7).** Single-chain timing is covered — `timeliness` compares two event timestamps, requires a declared `timezone`, and reports `unknown` rather than false when a timestamp is absent (v0.48.0). What is missing is **across entities**: "the order must be created before stock is locked", "a refund must follow the original payment" need a domain with a dependency graph.
-8. **Adapters can still lie (L8).** `probe` checks nine mechanical properties and `crosscheck` (v0.54.0) re-fetches through an independent channel, so together they catch "declared but missing", "role ignored", "reads that write" and "tampering with the response body". What they still cannot catch is a liar that watches the prober (probe shuffles its five middle checks on every run, but the opening/leak/close anchors and each check's internal call pattern stay fixed, so an adapter that can read the source can still tell probing from running), or one that replaces the whole `globalThis.fetch`. Same-process loading also leaves the **blast radius** unisolated — an adapter can patch modules the judge itself imported; "loading an adapter = executing code with your credentials" is literal.
+8. **Adapters can still lie (L8).** `probe` checks fifteen mechanical properties and `crosscheck` (v0.54.0) re-fetches through an independent channel, so together they catch "declared but missing", "role ignored", "reads that write", "tampering with the response body" and "reporting success after the transport died". What they still cannot catch is a liar that watches the prober (probe shuffles its seven middle checks on every run, but the opening/leak/close anchors and each check's internal call pattern stay fixed, so an adapter that can read the source can still tell probing from running), or one that replaces the whole `globalThis.fetch`. Same-process loading also leaves the **blast radius** unisolated — an adapter can patch modules the judge itself imported; "loading an adapter = executing code with your credentials" is literal.
 9. **Parallel execution stays disabled for now (L9).** There is no parallel executor; re-enabling it requires byte-identical verdicts, failure causes and per-step receipts between serial and parallel runs.
 10. **Difficulty estimates depend on sample sources (L10).** Multiple independent submitters/batches are needed to interpret the result as external difficulty rather than self-test performance.
 11. **Real-backend validation covers only six domains (L11).** The threshold is two independent implementations plus 100% `compare` agreement. The first four domains each got a second implementation; the fifth (RealWorld) arrived in v0.55.0, the sixth (scheduled jobs) in v0.60.0. Adding more is still manual work.

@@ -18,9 +18,15 @@
         "kind": "precedence",
         "collection": "status_log",
         "expect": [
-          { "type": "order.making" },
-          { "type": "order.ready" },
-          { "type": "order.picked" }
+          {
+            "type": "order.making"
+          },
+          {
+            "type": "order.ready"
+          },
+          {
+            "type": "order.picked"
+          }
         ],
         "note": "相对序：接单→备好→取餐。不钉绝对下标——流水前面多插一行系统行也不误报；顺序反了（先备好后接单）判 precedence_inverted，被跳过判 precedence_missing。不含 order.created：真实后端下单不落流水（见 docs/domains/coffee.md），memory 通道才有。"
       }
@@ -38,6 +44,19 @@
           ]
         },
         "delta": 0
+      },
+      {
+        "kind": "window",
+        "from_step": 0,
+        "to_step": 1,
+        "of": {
+          "kind": "count_delta",
+          "selector": {
+            "collection": "orders"
+          },
+          "delta": 1
+        },
+        "note": "下单后的窗口里订单数必须已经变成 1 —— 这是按步看状态的断言：观测若冻结在首帧（m-stale-oracle），窗口内恒 0 → 判假。终态断言只有带写才碰巧抓得到冻结，这个不变量是语义正确的抓手。"
       }
     ]
   },

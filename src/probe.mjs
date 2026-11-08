@@ -26,7 +26,7 @@
 import { stableStringify, fingerprint } from './values.mjs';
 import { validateAdapter, validateManifest, OUTCOMES } from './adapter/contract.mjs';
 
-export const PROBE_VERSION = 'agent-web/probe-2';
+export const PROBE_VERSION = 'agent-web/probe-3';
 
 const PASS = 'pass';
 const FAIL = 'fail';
@@ -372,6 +372,100 @@ export async function probeAdapter({ adapter, adapterName = 'unknown', timeoutMs
     }
   }
 
+  async function checkExecuteReplayStable() {
+    // ---- 中段：同一 run 内重放同一动作 ----
+    // 靶子不是业务幂等（再下一次单=第二单是合法业务），是**适配器形态**：
+    // 重放同一调用不许崩、不许返回契约外 outcome、不许把 runId 玩坏。
+    // 红了说明适配器内部把「同一 runId 的第二次调用」当成了新状态机起点。
+    try {
+        runId = (await withTimeout(adapter.reset({}))).runId;
+      const cap = (manifest.capabilities ?? [])[0];
+      if (!cap) {
+        add('execute-replay-stable', '同一 run 重放同一动作不崩', 'skipped', WARN, 'manifest 没有声明任何能力，无从重放');
+        return;
+      }
+      const role = (manifest.roles ?? [])[0];
+      const call = () => adapter.execute(runId, { as: role, capability: cap.id, arguments: {} });
+      const r1 = await withTimeout(call());
+      const r2 = await withTimeout(call());
+      const off = [r1, r2].filter((r) => !OUTCOMES.includes(r && r.outcome));
+      if (off.length > 0) {
+        add('execute-replay-stable', '同一 run 重放同一动作不崩', FAIL, FAIL,
+          `重放返回了契约外 outcome：${JSON.stringify(off[0] && off[0].outcome)} —— 只认 ${OUTCOMES.join('/')}`);
+        return;
+      }
+      await withTimeout(adapter.observe(runId));
+      add('execute-replay-stable', '同一 run 重放同一动作不崩', PASS, FAIL,
+        `重放两次均回契约内 outcome（${r1.outcome} → ${r2.outcome}），观测仍可用；第二次是 applied 还是 rejected 属业务语义，不在此判`);
+    } catch (e) {
+      add('execute-replay-stable', '同一 run 重放同一动作不崩', FAIL, FAIL, `重放抛未分类异常：${e && e.message}`);
+    }
+  }
+
+  async function checkConcurrentExecuteSafe() {
+    // ---- 中段：两路 execute 打同一个 runId ----
+    // JS 单线程下两路只在 await 点交错 —— 但适配器内部的 runId 状态表、
+    // 外部子进程、token 缓存全是真并发点。靶子是「不崩、不未分类、observe 不挂」；
+    // 业务不变量（两路写只该成一笔）归案例层与 L9 台账，这里不越权。
+    try {
+        runId = (await withTimeout(adapter.reset({}))).runId;
+      const cap = (manifest.capabilities ?? [])[0];
+      if (!cap) {
+        add('concurrent-execute-safe', '两路并发 execute 不崩', 'skipped', WARN, 'manifest 没有声明任何能力，无从并发');
+        return;
+      }
+      const role = (manifest.roles ?? [])[0];
+      const mk = () => adapter.execute(runId, { as: role, capability: cap.id, arguments: {} });
+      const rs = await Promise.all([withTimeout(mk()), withTimeout(mk())]);
+      const off = rs.filter((r) => !OUTCOMES.includes(r && r.outcome));
+      if (off.length > 0) {
+        add('concurrent-execute-safe', '两路并发 execute 不崩', FAIL, FAIL,
+          `并发返回了契约外 outcome：${JSON.stringify(off[0] && off[0].outcome)}`);
+        return;
+      }
+      await withTimeout(adapter.observe(runId));
+      add('concurrent-execute-safe', '两路并发 execute 不崩', PASS, FAIL,
+        `两路并发均回契约内 outcome（${rs.map((r) => r.outcome).join(' / ')}），观测仍可用；并发下的业务不变量归案例层判`);
+    } catch (e) {
+      add('concurrent-execute-safe', '两路并发 execute 不崩', FAIL, FAIL, `并发抛未分类异常：${e && e.message}`);
+    }
+  }
+
+  async function checkHalfFailHonest() {
+    // ---- 锚点：no-leak 之后、close 幂等之前 ----
+    // 半途失败的靶子只有一个：**吞掉事故谎报成功**。close 掉资源再调 execute，
+    // 是最容易复现「传输层已死」的黑盒场景：这时回 applied = 谎报（最危险）；
+    // 回 rejected / unsupported / infra_error / may_have_committed 都是诚实；
+    // 抛异常属于契约未规定的拒绝方式，也不算谎报 —— 报 skipped 不判死。
+    try {
+      if (!runId) {
+        add('half-fail-honest', '资源失效后 execute 不谎报成功', 'skipped', WARN, '没有拿到 runId，无从制造失效场景');
+        return;
+      }
+      try { await adapter.close(runId); } catch { /* close 本身坏了不是本项的靶子 */ }
+      const cap = (manifest.capabilities ?? [])[0];
+      if (!cap) {
+        add('half-fail-honest', '资源失效后 execute 不谎报成功', 'skipped', WARN, 'manifest 没有声明任何能力，无从触发');
+        return;
+      }
+      const role = (manifest.roles ?? [])[0];
+      const r = await withTimeout(adapter.execute(runId, { as: role, capability: cap.id, arguments: {} }));
+      const oc = r && r.outcome;
+      if (!OUTCOMES.includes(oc)) {
+        add('half-fail-honest', '资源失效后 execute 不谎报成功', FAIL, FAIL,
+          `返回了契约外 outcome ${JSON.stringify(oc)} —— 契约只认 ${OUTCOMES.join('/')}`);
+      } else if (oc === 'applied') {
+        add('half-fail-honest', '资源失效后 execute 不谎报成功', FAIL, FAIL,
+          '资源已释放仍回 applied —— 传输层死了还能「成功」，等于吞掉事故谎报。半途失败必须落 may_have_committed / infra_error，让判决层知道这步不许重放');
+      } else {
+        add('half-fail-honest', '资源失效后 execute 不谎报成功', PASS, FAIL,
+          `资源释放后返回 ${oc} —— 诚实拒绝，没有谎报成功`);
+      }
+    } catch (e) {
+      add('half-fail-honest', '资源失效后 execute 不谎报成功', 'skipped', WARN,
+        `以异常拒绝失效后的调用（${e && e.message}）—— 契约未规定 close 后的 execute 形态，异常拒绝不算谎报`);
+    }
+  }
   async function checkCloseIdempotent() {
     // ---- 10：close 必须幂等 ----
     // 不幂等的 close 会在重试路径上炸：调用方重跑一次收尾就报错，
@@ -390,17 +484,20 @@ export async function probeAdapter({ adapter, adapterName = 'unknown', timeoutMs
     }
   }
 
-  // ---- 中段五项互相独立（各自带 reset），每次跑都洗牌 ----
+  // ---- 中段七项互相独立（各自带 reset），每次跑都洗牌 ----
   // 对抗「读得到源码的适配器」：它不能再靠「第 N 次 reset 之后必然是哪项检查」
-  // 区分探测与运行。洗牌只覆盖这五项；开场复位三件套、no-leak（必须在所有
-  // 执行器之后抓写残留）与 close 幂等（必须最后）三个锚点仍固定 —— 每项内部
-  // 的交互模式也固定，微观指纹仍可区分。这条局限写在 LIMITS L8。
+  // 区分探测与运行。洗牌只覆盖这七项；开场复位三件套、no-leak（必须在所有
+  // 执行器之后抓写残留）、half-fail-honest（要制造资源失效，必须在 close
+  // 幂等之前）与 close 幂等（必须最后）锚点仍固定 —— 每项内部的交互模式
+  // 也固定，微观指纹仍可区分。这条局限写在 LIMITS L8。
   const middleChecks = [
     ['clock-honest', checkClockHonest],
     ['empty-args', checkEmptyArgs],
     ['declared-vs-behavior', checkDeclaredVsBehavior],
     ['role-effective', checkRoleEffective],
     ['read-no-side-effect', checkReadNoSideEffect],
+    ['execute-replay-stable', checkExecuteReplayStable],
+    ['concurrent-execute-safe', checkConcurrentExecuteSafe],
   ];
   for (let i = middleChecks.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -409,8 +506,10 @@ export async function probeAdapter({ adapter, adapterName = 'unknown', timeoutMs
   const probeOrder = middleChecks.map(([id]) => id);
   for (const [, fn] of middleChecks) await fn();
 
-  // no-leak 固定在执行器检查之后；close 幂等永远最后（close 后适配器不再保证可用）。
+  // no-leak 固定在执行器检查之后；half-fail-honest 要先 close 制造失效场景；
+  // close 幂等永远最后（close 后适配器不再保证可用）。
   await checkNoLeak();
+  await checkHalfFailHonest();
   await checkCloseIdempotent();
 
   return report(checks, probeOrder);

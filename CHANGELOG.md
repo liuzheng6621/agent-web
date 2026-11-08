@@ -6,6 +6,17 @@
 CI 也在查。这条规则是买来的：这个仓库曾经同时存在 `package.json` 0.16、README 0.9、
 Gitee Release v0.6.0 三个数，谁看都是三个项目。
 
+## 0.72.0 — 2026-11-08
+
+**半途失败不再谎报，观测污染有了专门的变异体与按步抓手。**
+
+- **runner/draft 半途兜底（S5 判据一）**：execute 抛异常不再落 `infrastructure_error`（允许重试），改落 `may_have_committed` / `effect_uncertain`（不许重放）——异常可能发生在请求已发出之后，重试等于重复下单；observe 抛异常单独落 `missing_observation`（`observe_threw`，与「可能已生效」是两条相反语义）。`docs/SPEC.md` 第 7 章补 19/20 两行。
+- **probe-3（三项新检查）**：`execute-replay-stable`（同一动作重放形态稳定）、`concurrent-execute-safe`（两路 execute 交错不崩）、`half-fail-honest`（close 后 execute，回 `applied` 即判死——吞事故谎报）。中段洗牌五→七项，检查共 15 项。
+- **三个观测污染变异体（69→72）**：`m-stale-oracle`（observe 冻结首帧——终态断言只碰巧抓得到，窗口断言才是语义正确的工具）、`m-uncommitted-ghost`（注入后端不存在的幻影行，与 m-duplicate-row 分工：改行数抓 count_delta vs 复制行抓 unique）、`m-view-collection-bleed`（明细集合渗进流水行，JOIN 键错位）。
+- **`coffee/log-precedence` 案例加窗口不变量**：下单后 [0,1) 窗口 count_delta=1——按步看状态的断言，观测冻结即判假；memory/SQL 双通道 pass 判决一致。
+
+**547 测试，21 种断言，32 条命令，72 个变异体。**
+
 ## 0.71.0 — 2026-11-08
 
 **三条线一起落：探针随机化、第 21 种断言、H2 通道两个真 bug。**

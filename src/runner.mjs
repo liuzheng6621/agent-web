@@ -35,10 +35,19 @@ function makeVerdict(base, status, reason_code, extra = {}) {
 }
 
 async function observeState(adapter, runId, scopes) {
-  const r = await adapter.observe(runId, scopes);
+  // observe 炸掉 ≠ 没发生：看不见状态就诚实报看不见（missing_observation），
+  // 让断言层落 unknown，而不是把整个案例炸成 infrastructure_error。
+  // 与 may_have_committed 的区别：那是「可能已生效，不许重放」；这是「根本看不见」。
+  let r;
+  try {
+    r = await adapter.observe(runId, scopes);
+  } catch (e) {
+    r = { state: null, missingScopes: [], error: { code: 'observe_threw', message: String((e && e.message) || e) } };
+  }
   return {
     state: r?.state ?? null,
     missingScopes: r?.missingScopes ?? [],
+    observeError: r?.error ?? null,
   };
 }
 
@@ -237,11 +246,22 @@ async function judgeInner({ case: c, adapter, adapterName = 'unknown', trajector
       }
 
       const before = await observeState(adapter, runId, scopes);
-      const res = await adapter.execute(runId, {
-        capability: step.capability,
-        arguments: args,
-        as: step.as,
-      });
+      // 半途失败兜底：适配器 execute 抛异常（连接断、超时、进程死），请求可能
+      // 已经发出、响应没回来。落 may_have_committed（不许重放）——不能落
+      // infra_error，那条重放指令是「可以重试」，重复下单就是它放出来的。
+      let res;
+      try {
+        res = await adapter.execute(runId, {
+          capability: step.capability,
+          arguments: args,
+          as: step.as,
+        });
+      } catch (e) {
+        res = {
+          outcome: 'may_have_committed',
+          error: { code: 'adapter_threw', message: String((e && e.message) || e) },
+        };
+      }
       const after = await observeState(adapter, runId, scopes);
 
       trace.push({

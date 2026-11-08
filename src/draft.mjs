@@ -307,7 +307,14 @@ export async function replayTrajectory({ adapter, steps, scopes, seed, clockPoli
       }
 
       const before = await adapter.observe(runId, scopes);
-      const res = await adapter.execute(runId, { capability: step.capability, arguments: args, as: step.as });
+      // 与 runner 同一条兜底：execute 抛异常 = 半途失败，落 may_have_committed
+      // 再走同一份 classifyStepOutcome——录制路径不许有自己的分类语义。
+      let res;
+      try {
+        res = await adapter.execute(runId, { capability: step.capability, arguments: args, as: step.as });
+      } catch (e) {
+        res = { outcome: 'may_have_committed', error: { code: 'adapter_threw', message: String((e && e.message) || e) } };
+      }
       const after = await adapter.observe(runId, scopes);
 
       trace.push({

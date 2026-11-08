@@ -658,6 +658,8 @@ manifest 校验失败 → `unknown / invalid_environment`。
 | 11a | 适配器返回 `may_have_committed` | unknown | `effect_uncertain` |
 | 11b | 适配器返回 `unsupported` | unknown | `coverage_gap` |
 | 12 | 适配器返回 `infra_error` | unknown | `infrastructure_error` |
+| 19 | 执行抛异常（请求可能已发出） | unknown | `effect_uncertain`，error.code 为 `adapter_threw`（同 11a 不许重放） |
+| 20 | 观测抛异常（状态看不见） | unknown | `missing_observation`，error.code 为 `observe_threw`（与「可能已生效」相反：无从断言，也不是重放信号） |
 | 13 | 应成功却被拒绝 | fail | `unexpected_rejection` |
 | 14 | 应被拒绝却成功了 | fail | `expected_rejection` |
 | 15 | 目标断言为假 | fail | `assertion_false` |

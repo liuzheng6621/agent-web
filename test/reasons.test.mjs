@@ -115,7 +115,7 @@ test('判决层的码在 SPEC 第 7 章都提过', () => {
 });
 
 test('探针层的 id 与 probe 实际跑的项数一致', () => {
-  assert.equal(Object.keys(PROBE_CHECKS).length, 15);
+  assert.equal(Object.keys(PROBE_CHECKS).length, 18);
   const src = fs.readFileSync(path.join(ROOT, 'src/probe.mjs'), 'utf8');
   const ids = [...src.matchAll(RE_PROBE_ADD)].map((m) => m[1]);
   // 两种写法都要扫：add('x', ...) 单行、折行的 add( 换行 'x'、checks.push({ id: 'x' })。

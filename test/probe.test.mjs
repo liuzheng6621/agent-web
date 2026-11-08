@@ -209,21 +209,40 @@ test('探针：每条能力各挑自己的局外人（角色集合不同不许�
   assert.match(c.detail, /public\.post\(forbidden\)/);
 });
 
-test('探针 probe-2：中段五项洗牌落报告，no-leak 在执行器后，close 最后', async () => {
+test('探针 probe-3：中段七项洗牌落报告，half-fail 在 no-leak 后，close 最后', async () => {
   const adapter = createMemoryAdapter();
   const r = await probeAdapter({ adapter });
-  const FIVE = ['clock-honest', 'empty-args', 'declared-vs-behavior', 'role-effective', 'read-no-side-effect'];
-  assert.equal(r.probe_version, 'agent-web/probe-2');
-  assert.ok(Array.isArray(r.probe_order) && r.probe_order.length === 5, 'probe_order 必须是五项的排列');
-  assert.deepEqual([...r.probe_order].sort(), [...FIVE].sort());
+  const SEVEN = [
+    'clock-honest', 'empty-args', 'declared-vs-behavior', 'role-effective',
+    'read-no-side-effect', 'execute-replay-stable', 'concurrent-execute-safe',
+  ];
+  assert.equal(r.probe_version, 'agent-web/probe-3');
+  assert.ok(Array.isArray(r.probe_order) && r.probe_order.length === 7, 'probe_order 必须是七项的排列');
+  assert.deepEqual([...r.probe_order].sort(), [...SEVEN].sort());
   const ids = r.checks.map((c) => c.id);
-  const filtered = ids.filter((id) => FIVE.includes(id));
+  const filtered = ids.filter((id) => SEVEN.includes(id));
   assert.deepEqual(filtered, r.probe_order, 'checks 的出现顺序必须与 probe_order 一致');
   const noLeakIdx = ids.indexOf('no-leak');
   assert.ok(noLeakIdx >= 0);
-  for (const ex of FIVE) {
+  for (const ex of SEVEN) {
     const i = ids.indexOf(ex);
     assert.ok(i < noLeakIdx, `${ex} 必须先于 no-leak（写残留必须被抓）`);
   }
+  const halfIdx = ids.indexOf('half-fail-honest');
+  assert.ok(halfIdx > noLeakIdx, 'half-fail 必须在 no-leak 之后（要制造资源失效）');
   assert.equal(ids[ids.length - 1], 'close-idempotent', 'close 幂等必须最后');
+  const half = r.checks.find((c) => c.id === 'half-fail-honest');
+  assert.ok(half && half.status !== 'fail', half && half.detail);
+});
+
+test('探针 half-fail：吞事故谎报成功的适配器必须判死', async () => {
+  // 半途失败最危险的坏法：资源死了还回 applied。探针必须红它。
+  // 真实适配器（memory）close 后 execute 回 infra_error —— 诚实；
+  // 这里构造一个谎报者：close 掏空 + execute 恒回 applied。
+  const adapter = createMemoryAdapter();
+  const liar = { ...adapter, close: async () => {} };
+  const r = await probeAdapter({ adapter: liar });
+  const half = r.checks.find((c) => c.id === 'half-fail-honest');
+  assert.ok(half, 'half-fail-honest 检查必须存在');
+  assert.equal(half.status, 'fail', '吞事故谎报 applied 必须判死：' + half.detail);
 });
