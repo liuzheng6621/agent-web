@@ -1,4 +1,4 @@
-# agent-web v0.75.0
+# agent-web v0.76.0
 
 <p align="center">
   <img src="docs/media/hero.png" alt="agent-web: integration tests an agent can be judged on" width="100%">
@@ -26,7 +26,7 @@
 </p>
 
 <p align="center">
-  <b>v0.75.0</b> · 21 assertion kinds · 33 commands · 72 mutants
+  <b>v0.76.0</b> · 21 assertion kinds · 33 commands · 72 mutants
 </p>
 
 <p align="center">
@@ -58,7 +58,7 @@
 | A mock implementation and a real backend, but nobody proved they behave alike | `compare`: run one case twice, verdicts must agree line by line |
 | Tests fail and you can't tell whether the code broke or the environment didn't start | Three-valued verdicts: `unknown` is its own conclusion, not a euphemism for failure |
 | Many assertions, no idea which ones actually do anything | `certify` + mutants: deliberately break the implementation, see which assertion catches it |
-| You want an agent to edit code but can't let it decide whether the edit was right | Assertions are machine-judgeable; no LLM judge. `selftest` labels 12 cases by mechanism |
+| You want an agent to edit code but can't let it decide whether the edit was right | Assertions are machine-judgeable; no LLM judge. `selftest` labels 13 cases by mechanism |
 | An API but no tests, and no idea where to start | `discover`: give it a URL, get a runnable adapter and case drafts |
 
 In one line: **you want an answer to "is the code the agent wrote actually correct" that doesn't depend on trust.**
@@ -395,7 +395,7 @@ pass for an adapter that does nothing at all.
 | `mutants` | Mutant directory: whose fault, how to catch, how to submit |
 | `ingest` | Translate another tool's test report into three-valued verdicts, and count what "green" really proved |
 | `audit` | False-green audit: use the real backend as a ruler |
-| `gate` | Four-line gate: coverage / mutation resistance / independent evidence / unknown share in one output; any missing line exits 1 |
+| `gate` | Four-line gate: coverage / mutation resistance / independent evidence / unknown share in one output; any missing line exits 1; the evidence line carries a comparable denominator (zero comparable = missing line), `--min-comparable` sets a floor |
 | `traps` | Trap census: how many verdicts in this batch are blind |
 | `knowledge` / `recall` | Incident archive / recidivism detection (second hit exits 1) |
 | `init` | Generate a case template |
@@ -465,7 +465,7 @@ Two layers. These capabilities already have code and tests and should not be cou
 The remaining boundaries are numbered to match L1–L12 in [docs/LIMITS.md](docs/LIMITS.md).
 **Each entry states only the unsolved part** — what already works is in the list above and is not repeated here:
 
-A word on evidence grades: every number in this README (catch rates, agreement rates, timings) comes from this repo's own CI. The scripts are reproducible — but **reproduction runs the same scripts**, and as of v0.75.0 no third party has reproduced them independently. "Reproducible" is a machine fact, not external validity. The `knowledge/` and `docs/mutants/` contribution channels exist to turn self-attestation into outside evidence, one accepted submission at a time; until one arrives, read the numbers here as "the author's proof that his own ruler is self-consistent", not as correctness rates.
+A word on evidence grades: every number in this README (catch rates, agreement rates, timings) comes from this repo's own CI. The scripts are reproducible — but **reproduction runs the same scripts**, and as of v0.76.0 no third party has reproduced them independently. "Reproducible" is a machine fact, not external validity. The `knowledge/` and `docs/mutants/` contribution channels exist to turn self-attestation into outside evidence, one accepted submission at a time; until one arrives, read the numbers here as "the author's proof that his own ruler is self-consistent", not as correctness rates.
 **If you cannot wait for the contribution channel, there is a faster route** — the [blind kit](scripts/build-blind-kit.mjs):
 one command builds a self-contained zip (every adapter plus the five zero-dependency case domains, **with no verdicts inside**).
 Run two commands on your own machine, send the results back, and we reconcile them case by case against the baseline
@@ -476,7 +476,7 @@ the builder saw — the minimal form of "independent reproduction", already repr
 2. **Field mappings still need review (L2).** Nested-array leaves and same-name/different-meaning fields across collections cannot be decided by machine; a human must sign.
 3. **No universal flow-quality score (L3).** Define domain goals, metrics and weights first; keep quality scoring separate from legality verdicts.
 4. **Negative expectations still need a human signature (L4).** Whether a request *should* be rejected is a business decision; candidates only produce a review sheet and never enter verdicts.
-5. **Mutant coverage is incomplete (L5).** `breed` only faults **observed shape** (13 operators, 63 mutants, 39/41 caught). Execution- and business-layer faults (oversell, refund above paid amount, skipped approval) still need submissions — the generator knows shape, not semantics.
+5. **Mutant coverage is incomplete (L5).** `breed` only faults **observed shape** (13 operators; repo-wide: 72 mutants, 48 of 50 applicable caught). Execution- and business-layer faults (oversell, refund above paid amount, skipped approval) still need submissions — the generator knows shape, not semantics.
 6. **Arbitrary mutant equivalence is undecidable in general (L6).** Finite-state or bounded scenarios can be proved or exhaustively checked; otherwise report "not distinguished within budget," never "equivalent."
 7. **Cross-entity ordering is still missing (L7).** Single-chain timing is covered — `timeliness` compares two event timestamps, requires a declared `timezone`, and reports `unknown` rather than false when a timestamp is absent (v0.48.0). What is missing is **across entities**: "the order must be created before stock is locked", "a refund must follow the original payment" need a domain with a dependency graph.
 8. **Adapters can still lie (L8).** `probe` checks fifteen mechanical properties and `crosscheck` (v0.54.0) re-fetches through an independent channel, so together they catch "declared but missing", "role ignored", "reads that write", "tampering with the response body" and "reporting success after the transport died". What they still cannot catch is a liar that watches the prober (probe shuffles its seven middle checks on every run, but the opening/leak/close anchors and each check's internal call pattern stay fixed, so an adapter that can read the source can still tell probing from running), or one that replaces the whole `globalThis.fetch`. Same-process loading also leaves the **blast radius** unisolated — an adapter can patch modules the judge itself imported; "loading an adapter = executing code with your credentials" is literal.

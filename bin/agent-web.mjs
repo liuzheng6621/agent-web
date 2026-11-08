@@ -1080,8 +1080,9 @@ async function cmdAccept(args, flags) {
 // 行缺（没跑 certify、没跑 compare、判决为零）= exit 1；行值低不红——口径门禁不管质量。
 async function cmdGate(args, flags) {
   if (args.length === 0) {
-    console.error('用法：agent-web gate <案例目录> [--adapter=memory] [--compare=SPEC2] [--no-certify] [--no-policy] [--timeout=5000] [--json]');
+    console.error('用法：agent-web gate <案例目录> [--adapter=memory] [--compare=SPEC2] [--no-certify] [--no-policy] [--min-comparable=N] [--timeout=5000] [--json]');
     console.error('  四行：契约覆盖率/判据抗变异率/独立证据判决率/unknown 占比；unknown 留在分母。');
+    console.error('  独立证据行带可比分母（两侧都非 unknown 的对数）：可比为 0 视同缺行；--min-comparable=N 设下限，击穿 exit 1。');
     return 2;
   }
   const adapterName = flags.adapter ?? 'memory';
@@ -1124,12 +1125,15 @@ async function cmdGate(args, flags) {
   if (typeof flags.compare === 'string') {
     const adapter2 = await makeAdapter(flags.compare);
     let agree = 0;
+    let comparable = 0;
     for (const f of files) {
       const a = await runOne(f, adapter, { adapterName, timeoutMs });
       const b = await runOne(f, adapter2, { adapterName: flags.compare, timeoutMs });
+      if (a.status === 'unknown' || b.status === 'unknown') continue; // unknown 对不进可比分母
+      comparable += 1;
       if (a.status === b.status) agree += 1;
     }
-    compare = { agree, total: files.length, left: adapterName, right: flags.compare };
+    compare = { agree, total: files.length, comparable, left: adapterName, right: flags.compare };
   }
 
   let certifyReport = null;
@@ -1151,7 +1155,8 @@ async function cmdGate(args, flags) {
     }
   }
 
-  const report = gateReport({ coverage, certify: certifyReport && { summary: certifyReport.summary }, verdicts, compare, policy });
+  const minComparable = numFlag(flags['min-comparable']) ?? 0;
+  const report = gateReport({ coverage, certify: certifyReport && { summary: certifyReport.summary }, verdicts, compare, policy, minComparable });
   if (flags.json) console.log(JSON.stringify(report, null, 2));
   else console.log(formatGate(report));
   return report.sound ? 0 : 1;
@@ -2120,7 +2125,7 @@ const HELP = `agent-web —— 给 Agent 写机器可判的集成测试
   agent-web negatives <案例或目录> --adapter=SPEC  按声明派生负例候选（全部 disputed，只出审阅表）
   agent-web preflight <案例或目录> --adapter=SPEC  跑之前预检：预测 ready / unknown / fail，与预期对账
   agent-web audit <真实.jsonl> <候选.jsonl>    假绿审计：拿真实后端当尺子量候选实现
-  agent-web gate <案例目录> --adapter=SPEC --compare=SPEC2  四行口径门禁：契约覆盖率/抗变异/独立证据/unknown；缺行即红
+  agent-web gate <案例目录> --adapter=SPEC --compare=SPEC2  四行口径门禁：契约覆盖率/抗变异/独立证据/unknown；缺行即红，可比证据为零同缺行
   agent-web traps <结果.jsonl> --cases=DIR    陷阱普查：这批判决有多少是盲的
   agent-web knowledge                         事故档案：这个仓库踩过的 ${ENTRIES.length} 个坑
   agent-web recall [案例目录]                 比对档案：这次有没有重犯旧错（第二次拦下）

@@ -88,3 +88,44 @@ test('真适配器 e2e：gate 单案例四行齐 → rc=0', { skip: process.plat
   assert.ok(out.includes('memory vs taixianglian-sql'), '对照双方必须写明');
   assert.ok(out.includes('四行齐全'), '放行句必须出现');
 });
+
+// ---- 可比证据闸（v0.76.0，外部测评发现 1）----
+
+test('compare 全列 unknown（comparable=0）→ independent 视同缺行', () => {
+  const r = gateReport({
+    coverage: goodCoverage,
+    certify: goodCertify,
+    verdicts: goodVerdicts,
+    compare: { agree: 1, total: 13, comparable: 0, left: 'memory', right: 'taixianglian' },
+  });
+  assert.equal(r.sound, false);
+  assert.ok(r.missing.includes('independent'), `missing=${JSON.stringify(r.missing)}`);
+});
+
+test('--min-comparable 下限被击穿 → violations 非空、sound=false', () => {
+  const r = gateReport({
+    coverage: goodCoverage,
+    certify: goodCertify,
+    verdicts: goodVerdicts,
+    compare: { agree: 1, total: 13, comparable: 1, left: 'memory', right: 'taixianglian' },
+    minComparable: 8,
+  });
+  assert.equal(r.sound, false);
+  assert.equal(r.missing.length, 0);
+  assert.equal(r.violations.length, 1);
+  assert.ok(r.violations[0].includes('1/13'), r.violations[0]);
+});
+
+test('可比 < total 时行里显式报 unknown 对数（不冒充一致）', () => {
+  const r = gateReport({
+    coverage: goodCoverage,
+    certify: goodCertify,
+    verdicts: goodVerdicts,
+    compare: { agree: 11, total: 13, comparable: 11, left: 'memory', right: 'taixianglian' },
+  });
+  assert.equal(r.sound, true);
+  assert.equal(r.rows.independent.comparable, 11);
+  const t = formatGate(r);
+  assert.ok(t.includes('可比 11/13'), t);
+  assert.ok(t.includes('2 对判决里含 unknown'), t);
+});

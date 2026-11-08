@@ -52,7 +52,7 @@
 
 `cases/coffee/happy-path` 与 `linkage-events` 在两条通道上都 fail，原因是
 **memory 适配器下单时 push 一条 `order.created`**，真实后端不落这条。
-这是域语义差异，不是通道差异——B 通道忠实复现了 A 的形状。
+这是域语义差异，不是通道差异——B 通道忠实复现了 A 的形状。 这组分歧已被机器守卫锁定：`test/coffee-divergence.test.mjs`（后端在线才跑）每次把双通道 compare 的分歧集合对账受控清单，冒出第三处分歧直接红。
 改案例断言或改后端都行，但两边必须一起改，否则 `compare` 会一直报同一处。
 
 ## 架构守卫与 schema 盘点（S7，v0.74.0）

@@ -32,7 +32,7 @@
 | [CHANGELOG.md](../CHANGELOG.md) | 每个版本做了什么、因为什么 | 随版本增长 |
 | [docs/domains/](domains/) | 四个域的实测细节 | 每域一份 |
 | [docs/museum/](museum/README.md) | 假判决博物馆：12 件可运行的展品 | 每件一个 .mjs |
-| [docs/mutants/](mutants/README.md) | 67 个变异体目录 + `applies_to` 约定 | 每体一个 .mjs |
+| [docs/mutants/](mutants/README.md) | 72 个变异体目录 + `applies_to` 约定 | 每体一个 .mjs |
 | [knowledge/](../knowledge/README.md) | 14 条事故档案：症状、根因、判据 | 每条一份 |
 | [docs/media/](media/) | 本仓库所有图与动图，全部本地生成 | 生成脚本在 `tools/media/` |
 

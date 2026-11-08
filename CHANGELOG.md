@@ -6,6 +6,27 @@
 CI 也在查。这条规则是买来的：这个仓库曾经同时存在 `package.json` 0.16、README 0.9、
 Gitee Release v0.6.0 三个数，谁看都是三个项目。
 
+## 0.76.0
+
+外部测评报告（v0.75.0 测评，综合 7.8/10）的四项发现，逐条核实为真、逐条修复：
+
+- **gate 可比证据闸**：后端离线时「独立证据判决率」整列 unknown，此前按 1/13 放行——
+  「跑了但无可比判决」与「全部一致」在门禁眼里无区分。现在 unknown 对不进可比分母，
+  可比为零按缺行处理（exit 1），`--min-comparable=N` 可设下限，红线击穿 exit 1。
+  第三行带 `── 可比 x/y` 分母与 unknown 注意行；agree 口径同步收紧（双 unknown 不再冒充一致）。
+- **受控分歧守卫**：coffee 双通道两条已知语义分歧（happy-path / linkage-events，
+  memory 适配器 push order.created 而后端不落）此前只在文档里记着，CI 起不了 Spring 后端跑不了 compare。
+  新增 `test/coffee-divergence.test.mjs`：后端在线才跑，把 compare 的分歧集合对账受控清单，
+  冒出第三处分歧直接红——本地开发时随时可验，CI 外红路径由开发者复跑。
+- **数字卫生**：README（zh/en）selftest 条数 12→13（实测 `selftest --json` total）、
+  L5 口径行 67 变异体 43/45→全仓 72 变异体适用 50 抓到 48、docs/README.md 变异体数 67→72。
+  根因：边界节的数字此前不在 readme-boundary 守卫范围内。
+- **测试名单防漂守卫**：3 个测试文件（version-info / sql-shell-dispose / assert-precedence）
+  不在 `npm test` 显式名单，CI 每轮少跑 14 用例——已补齐，
+  并加 `test/fact-drift.test.mjs` 四条守卫（磁盘测试文件数==名单数、README selftest 条数==实测、
+  zh/en L5 口径==LIMITS、docs/README 变异体数==LIMITS），数字再漂 CI 即红。
+
+597 测试（594 pass + 3 skip），gate 9 条、fact-drift 4 条、coffee-divergence 1 条（后端在线才跑，守卫把解析出的 BASE_URL 显式传给 compare 子进程——适配器默认 8080 会打到无关容器）。
 ## 0.75.0
 
 **十处算法修复：断言层七洞与资源浪费三处。**
