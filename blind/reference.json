@@ -1,0 +1,154 @@
+{
+  "version": "0.74.0",
+  "generated_at": "2026-11-08T14:21:07.556Z",
+  "cases": {
+    "coffee/cancel-before-pickup": {
+      "verdict": "pass",
+      "reason_code": "ok"
+    },
+    "coffee/foreign-pickup": {
+      "verdict": "fail",
+      "reason_code": "unexpected_rejection"
+    },
+    "coffee/goal-not-reached": {
+      "verdict": "fail",
+      "reason_code": "assertion_false"
+    },
+    "coffee/happy-path": {
+      "verdict": "pass",
+      "reason_code": "ok"
+    },
+    "coffee/linkage-events": {
+      "verdict": "pass",
+      "reason_code": "ok"
+    },
+    "coffee/log-precedence": {
+      "verdict": "pass",
+      "reason_code": "ok"
+    },
+    "coffee/paged-orders": {
+      "verdict": "pass",
+      "reason_code": "ok"
+    },
+    "coffee/payload-echo": {
+      "verdict": "pass",
+      "reason_code": "ok"
+    },
+    "coffee/readonly-menu": {
+      "verdict": "pass",
+      "reason_code": "ok"
+    },
+    "coffee/shape": {
+      "verdict": "pass",
+      "reason_code": "ok"
+    },
+    "coffee/skip-ready-stage": {
+      "verdict": "fail",
+      "reason_code": "unexpected_rejection"
+    },
+    "coffee/two-items": {
+      "verdict": "pass",
+      "reason_code": "ok"
+    },
+    "coffee/unknown-capability": {
+      "verdict": "unknown",
+      "reason_code": "coverage_gap"
+    },
+    "ledger/post-balanced": {
+      "verdict": "pass",
+      "reason_code": "ok"
+    },
+    "ledger/reject-negative": {
+      "verdict": "pass",
+      "reason_code": "ok"
+    },
+    "ledger/reject-unbalanced": {
+      "verdict": "pass",
+      "reason_code": "ok"
+    },
+    "ledger/reject-unknown-account": {
+      "verdict": "pass",
+      "reason_code": "ok"
+    },
+    "lexicon/lookup-miss": {
+      "verdict": "pass",
+      "reason_code": "ok"
+    },
+    "lexicon/paged-prefix": {
+      "verdict": "pass",
+      "reason_code": "ok"
+    },
+    "lexicon/segment": {
+      "verdict": "pass",
+      "reason_code": "ok"
+    },
+    "lexicon/shape": {
+      "verdict": "pass",
+      "reason_code": "ok"
+    },
+    "cron/recurrence-drift": {
+      "verdict": "pass",
+      "reason_code": "ok"
+    },
+    "cron/recurrence-full": {
+      "verdict": "pass",
+      "reason_code": "ok"
+    },
+    "cron/recurrence-gap": {
+      "verdict": "pass",
+      "reason_code": "ok"
+    },
+    "realworld/articles": {
+      "verdict": "pass",
+      "reason_code": "ok"
+    },
+    "realworld/auth": {
+      "verdict": "pass",
+      "reason_code": "ok"
+    },
+    "realworld/comments": {
+      "verdict": "pass",
+      "reason_code": "ok"
+    },
+    "realworld/errors_articles": {
+      "verdict": "pass",
+      "reason_code": "ok"
+    },
+    "realworld/errors_auth": {
+      "verdict": "pass",
+      "reason_code": "ok"
+    },
+    "realworld/errors_authorization": {
+      "verdict": "pass",
+      "reason_code": "ok"
+    },
+    "realworld/errors_comments": {
+      "verdict": "pass",
+      "reason_code": "ok"
+    },
+    "realworld/errors_profiles": {
+      "verdict": "pass",
+      "reason_code": "ok"
+    },
+    "realworld/favorites": {
+      "verdict": "pass",
+      "reason_code": "ok"
+    },
+    "realworld/feed": {
+      "verdict": "pass",
+      "reason_code": "ok"
+    },
+    "realworld/pagination": {
+      "verdict": "pass",
+      "reason_code": "ok"
+    },
+    "realworld/profiles": {
+      "verdict": "pass",
+      "reason_code": "ok"
+    },
+    "realworld/tags": {
+      "verdict": "pass",
+      "reason_code": "ok"
+    }
+  }
+}
