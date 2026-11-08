@@ -1,0 +1,71 @@
+name: pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'site/**'
+      - 'cases/coffee/**'
+      - 'src/**'
+      - 'bin/agent-web.mjs'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 同一时刻只允许一个部署，但别把排队的取消掉：后到的那次才是最新内容。
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # 零依赖：没有 npm install。这一页上的判决必须是这次构建真跑出来的。
+      - name: 跑真实判决（memory 内置适配器，无需后端）
+        run: |
+          node bin/agent-web.mjs verify cases/coffee --adapter=memory \
+            --out=build/verdicts.jsonl
+      - name: 渲染判决页
+        run: |
+          node bin/agent-web.mjs flow cases/coffee \
+            --result=build/verdicts.jsonl --out=build/coffee.dashboard.html
+          node bin/agent-web.mjs flow cases/coffee/happy-path.json \
+            --result=build/verdicts.jsonl --out=build/happy-path.flow.html
+      - name: 组装站点（版本号来自 VERSION）
+        run: |
+          mkdir -p _site
+          cp build/coffee.dashboard.html build/happy-path.flow.html _site/
+          V=$(cat VERSION)
+          node -e '
+            const fs = require("fs");
+            const v = process.argv[1];
+            let s = fs.readFileSync("site/index.html", "utf8");
+            s = s.split("{{VERSION}}").join(v);
+            fs.writeFileSync("_site/index.html", s);
+          ' "$V"
+          # 禁止把口令、token 之类打进产物
+          ! grep -rEi 'aed6e04e|admin1234567|access_token=' _site/
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site/
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

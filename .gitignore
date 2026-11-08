@@ -22,3 +22,6 @@ agent-web-site/
 .tmp-out/
 .ci-clone/
 .env-*
+# GitHub Pages 本地构建产物（CI 里由 workflow 生成，不进仓库）
+/build/
+/_site/

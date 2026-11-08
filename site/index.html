@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>agent-web — 给 Agent 写机器可判的集成测试</title>
+<meta name="description" content="一份案例，跑多个实现，判决必须一致。我们给被测实现注入 72 种谎话，断言抓住 48 种。">
+<style>
+  :root { --bg:#0d1117; --fg:#e6edf3; --dim:#8b949e; --acc:#58a6ff; --ok:#3fb950; --bad:#f85149; --unk:#d29922; --card:#161b22; --line:#30363d; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.7 -apple-system,"Segoe UI","Microsoft YaHei",sans-serif; }
+  .wrap { max-width:860px; margin:0 auto; padding:48px 20px 80px; }
+  h1 { font-size:34px; line-height:1.3; margin:0 0 8px; }
+  .sub { color:var(--dim); font-size:17px; margin:0 0 28px; }
+  .hook { background:var(--card); border:1px solid var(--line); border-left:4px solid var(--acc); border-radius:8px; padding:18px 22px; margin:0 0 32px; font-size:17px; }
+  .hook b { color:var(--fg); }
+  .cards { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin:0 0 32px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:18px; text-align:center; }
+  .card .n { font-size:34px; font-weight:700; }
+  .card .l { color:var(--dim); font-size:13px; margin-top:4px; }
+  .btns { display:flex; gap:12px; flex-wrap:wrap; margin:0 0 36px; }
+  a.btn { display:inline-block; background:var(--acc); color:#04121f; text-decoration:none; font-weight:600; padding:10px 20px; border-radius:6px; }
+  a.btn.ghost { background:transparent; color:var(--acc); border:1px solid var(--acc); }
+  h2 { font-size:22px; margin:36px 0 12px; }
+  .v { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; }
+  .v div { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:16px; }
+  .v .t { font-weight:700; font-size:18px; }
+  .v .pass .t, .t.pass { color:var(--ok); } .t.fail { color:var(--bad); } .t.unk { color:var(--unk); }
+  .v p { margin:6px 0 0; color:var(--dim); font-size:14px; }
+  .foot { margin-top:48px; padding-top:20px; border-top:1px solid var(--line); color:var(--dim); font-size:13px; }
+  code { background:#1f242c; padding:2px 6px; border-radius:4px; font-size:14px; }
+  @media (max-width:640px){ .cards,.v{grid-template-columns:1fr;} h1{font-size:26px;} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>agent-web <span style="color:var(--dim);font-size:20px">v{{VERSION}}</span></h1>
+  <p class="sub">给 Agent 写机器可判的集成测试 · Machine-judgeable integration tests for agents</p>
+
+  <div class="hook">
+    我们给被测实现注入了 <b>72 种谎话</b>——谎报成功、伪造账单、冒充别人、偷偷挪走别人的订单。
+    适用的 50 种里，断言当场抓住 <b>48 种</b>；漏掉的 2 种写在台账里，不在脚注里。
+  </div>
+
+  <div class="cards">
+    <div class="card"><div class="n">72</div><div class="l">注入的变异体（谎话）</div></div>
+    <div class="card"><div class="n" style="color:var(--ok)">48/50</div><div class="l">适用口径下的抓获数（96.0%）</div></div>
+    <div class="card"><div class="n" style="color:var(--unk)">3</div><div class="l">判决值：pass / fail / unknown</div></div>
+  </div>
+
+  <div class="btns">
+    <a class="btn" href="coffee.dashboard.html">打开真实判决总览（13 条案例）</a>
+    <a class="btn ghost" href="happy-path.flow.html">打开单案例判决页</a>
+    <a class="btn ghost" href="https://github.com/liuzheng6621/agent-web">GitHub</a>
+    <a class="btn ghost" href="https://gitee.com/liu-everything_impossble/agent-web">Gitee</a>
+  </div>
+
+  <h2>判决只有三种，unknown 留在分母里</h2>
+  <div class="v">
+    <div><div class="t pass">pass</div><p>每条断言都成立，且指出由哪条断言、在哪个观测上成立。</p></div>
+    <div><div class="t fail">fail</div><p>有断言不成立，报告说清期望什么、实际什么、差在哪一步。</p></div>
+    <div><div class="t unk">unknown</div><p>缺观测、环境故障、案例未确认。<b>不算通过</b>，留在分母里等观测被修好。</p></div>
+  </div>
+
+  <h2>这一页是怎么来的</h2>
+  <p>不是截图，是<strong>活的</strong>：GitHub Actions 每次构建时跑
+  <code>verify cases/coffee --adapter=memory</code> 得到真实判决，再用
+  <code>flow</code> 命令把判决渲染成你刚点的两个页面。你看到的每一行 pass/fail，
+  都来自这一次构建里真实跑出来的判决，不是手工填的。</p>
+
+  <div class="foot">
+    口径：72 个变异体中 22 个在本域不适用，不进分母；48/50 = 96.0% 出自
+    <code>certify-baseline</code> 机器实测（v{{VERSION}}）。本页不使用无分母百分比。
+    MIT · <a href="https://github.com/liuzheng6621/agent-web" style="color:var(--acc)">liuzheng6621/agent-web</a>
+  </div>
+</div>
+</body>
+</html>
