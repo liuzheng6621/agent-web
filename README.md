@@ -11,6 +11,12 @@
 </p>
 
 <p align="center">
+  我们给被测实现注入了 <b>72 种谎话</b>——谎报成功、伪造账单、冒充别人、偷偷挪走别人的订单。
+  适用的 50 种里，断言当场抓住 <b>48 种</b>；漏掉的 2 种写在台账里，不在脚注里。
+  （<a href="#判据准入一条断言要证明自己有用">怎么验证的</a> · <a href="#边界已实现与仍未解决">哪些抓不到</a>）
+</p>
+
+<p align="center">
   <img alt="node" src="docs/media/badge-node.svg">
   <img alt="dependencies" src="docs/media/badge-deps.svg">
   <img alt="license" src="docs/media/badge-license.svg">

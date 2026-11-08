@@ -12,6 +12,13 @@
 </p>
 
 <p align="center">
+  We injected <b>72 kinds of lies</b> into the implementation — phantom success, forged bills,
+  impersonation, quietly moving someone else's orders. Assertions catch <b>48</b> of the 50 that apply.
+  The 2 that survive are in the ledger, not in a footnote.
+  (<a href="#admission-test-an-assertion-must-prove-it-is-useful">how this is verified</a> · <a href="#boundaries-implemented-vs-still-open">what still slips through</a>)
+</p>
+
+<p align="center">
   <img alt="node" src="docs/media/badge-node.svg">
   <img alt="dependencies" src="docs/media/badge-deps.svg">
   <img alt="license" src="docs/media/badge-license.svg">
