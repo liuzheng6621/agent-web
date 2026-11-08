@@ -105,6 +105,32 @@ v0.63.1 之前 `certify` 的分母是 20，其中 13 个是咖啡域专用的老
 （顺带一提，「有效期 ≤ 结束时间」还缺一种有序比较断言：`relation` 只有 `eq/sum_equals/product_equals/sorted/sum_by_equals`，
 `payload` 只有 `exists/equals/is_string/is_list/not_empty/count_gte/count_equals/contains`，都比不了两个时刻的先后。）
 
+## 第二后端复现（S7，v0.74.0）：H2 → MySQL
+
+咖啡店域用 H2 文件库当了第二观测通道；本域反过来，把后端从「开发态 H2 内存库」换到
+**MySQL 8.0.43（Windows 服务，127.0.0.1:3306/lab_access，Flyway 19 个迁移）**，验证同一套
+适配器与案例在第二个后端上结论一致。
+
+```bash
+cd D:/hos/appointment-check-in-system
+set -a && . services/backend/.env && set +a
+"E:/java/IntelliJ IDEA 2025.1.1.1/jbr/bin/java.exe" -jar   services/backend/target/lab-access-backend-0.1.0-SNAPSHOT.jar --server.port=8182
+
+cd E:/SKIl.1/agent-web
+export LABACCESS_BASE_URL=http://127.0.0.1:8182
+export LABACCESS_ADMIN_PASSWORD=$(grep '^APP_DEV_ADMIN_PASSWORD='   /d/hos/appointment-check-in-system/services/backend/.env | cut -d= -f2)
+node bin/agent-web.mjs verify cases/labaccess --adapter=labaccess
+```
+
+实测（2026-11-08）：
+
+- `verify` **6/6 判决与 expected 一致**（MySQL 后端与开发态 H2 内存库结论相同）。
+- 写后事实直读 MySQL：`reservations` 421 行（RES-202611081846xx，student_user_id 1530–1542）、
+  `reservation_status_histories` 1056 行——execute 发出的每个动作都在库里找得到。
+- 杀后端进程 → `SELECT` 仍读全量数据 → 重启 → 同一批 id 原样可读（持久性）。
+- schema 盘点：`docs/schema/labaccess-mysql.txt`（35 张表）与 `docs/schema/coffee-h2.txt`
+  （6 张表）由 SchemaCrawler 18.0.1 生成，同口径工具盘点两个后端。
+
 ## 还没做
 
 - 只覆盖「预约—审批—口令」和「借用—批准—归还」两条链；课表导入、权限申报、设备事件、人脸登记都没接。

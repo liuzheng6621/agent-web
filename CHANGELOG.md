@@ -6,6 +6,20 @@
 CI 也在查。这条规则是买来的：这个仓库曾经同时存在 `package.json` 0.16、README 0.9、
 Gitee Release v0.6.0 三个数，谁看都是三个项目。
 
+## 0.74.0
+
+**S7 收口：架构守卫与第二后端复现——三层验证栈排期全部完成。**
+
+- **S7a ArchUnit**：咖啡店 `mvn test` 嵌入三规则（状态机只被 service 引用 / controller
+  不摸 repository / service 不依赖 controller），抓到并修复一处真违例
+  （KitchenController 直注 MenuRepository → 归位 `MenuService.updateImage`）。
+- **S7b SchemaCrawler 盘点**：`docs/schema/coffee-h2.txt`（6 表）与
+  `docs/schema/labaccess-mysql.txt`（35 表），同一工具同口径盘点两个后端。
+- **S7c MySQL 复现**：lab-access 后端从 H2 内存库切 MySQL 8.0.43（Flyway 19 迁移），
+  `verify cases/labaccess` 6/6 判决与开发态一致；写后事实直读 MySQL（reservations
+  421 行 / status_histories 1056 行）；杀后端重启数据原样可读。
+- 域文档补 S7 节（`docs/domains/coffee.md` / `docs/domains/labaccess.md`）。
+
 ## 0.73.0
 
 **gate 命令：三层验证栈四行口径一次出齐，缺任一行 exit 1。**

@@ -55,6 +55,17 @@
 这是域语义差异，不是通道差异——B 通道忠实复现了 A 的形状。
 改案例断言或改后端都行，但两边必须一起改，否则 `compare` 会一直报同一处。
 
+## 架构守卫与 schema 盘点（S7，v0.74.0）
+
+- **ArchUnit**（`mvn test` 阶段红）：`src/test/java/com/coffee/taixianglian/arch/ArchitectureTest.java`
+  三规则——R-A1 状态机只被 service 层两处引用、R-A2 controller 不摸 repository、
+  R-A3 service 不依赖 controller。R-A2 抓到过**真违例**（KitchenController 直注
+  MenuRepository），已归位成 `MenuService.updateImage`。红路径实测：往 main 源码集
+  放一个 controller 直连 repository 的类，R-A2 报 3 处引用，mvn 红。
+- **SchemaCrawler 18.0.1 盘点**：`docs/schema/coffee-h2.txt`（6 张表，
+  T_FORTUNE/T_MENU/T_ORDER/T_ORDER_ITEM/T_ORDER_STATUS_LOG/T_USER）。同口径的
+  lab-access 盘点在 `docs/schema/labaccess-mysql.txt`（35 张表）。
+
 ## 怎么跑
 
 ```bash
