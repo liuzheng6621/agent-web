@@ -15,7 +15,7 @@
   We injected <b>72 kinds of lies</b> into the implementation — phantom success, forged bills,
   impersonation, quietly moving someone else's orders. Assertions catch <b>48</b> of the 50 that apply.
   The 2 that survive are in the ledger, not in a footnote.
-  (<a href="#admission-test-an-assertion-must-prove-it-is-useful">how this is verified</a> · <a href="#boundaries-implemented-vs-still-open">what still slips through</a>)
+  (<a href="#admission-test-an-assertion-must-prove-it-is-useful">how this is verified</a> · <a href="#boundaries-implemented-vs-still-open">what still slips through</a> · <a href="https://liuzheng6621.github.io/agent-web/"><b>open a live verdict page ↗</b></a>)
 </p>
 
 <p align="center">
@@ -37,6 +37,7 @@
 ---
 
 <p align="center">
+  <a href="https://liuzheng6621.github.io/agent-web/"><b>Live demo ↗</b></a> ·
   <a href="#should-you-use-this-thirty-seconds">Thirty seconds</a> ·
   <a href="#sixty-seconds">Sixty seconds</a> ·
   <a href="#three-verdicts-not-two">Three verdicts</a> ·
@@ -287,6 +288,8 @@ The ledger stores the item id, status, per-assertion cells and a submission fing
 So 11/11 reads `100.0% [74.1%, 100.0%]` instead of "100%"; a task needs 5 gradings before it earns a difficulty band, and `drill --order=empirical` serves the hard ones first.
 
 ## What a verdict looks like: a page you can open
+
+<p align="center"><b>Want to see it without running anything? <a href="https://liuzheng6621.github.io/agent-web/">Both pages from this section are live on GitHub Pages, built from real verdicts in CI ↗</a></b></p>
 
 <img src="docs/media/flow.png" alt="single-case verdict page" width="100%">
 

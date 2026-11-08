@@ -13,7 +13,7 @@
 <p align="center">
   我们给被测实现注入了 <b>72 种谎话</b>——谎报成功、伪造账单、冒充别人、偷偷挪走别人的订单。
   适用的 50 种里，断言当场抓住 <b>48 种</b>；漏掉的 2 种写在台账里，不在脚注里。
-  （<a href="#判据准入一条断言要证明自己有用">怎么验证的</a> · <a href="#边界已实现与仍未解决">哪些抓不到</a>）
+  （<a href="#判据准入一条断言要证明自己有用">怎么验证的</a> · <a href="#边界已实现与仍未解决">哪些抓不到</a> · <a href="https://liuzheng6621.github.io/agent-web/"><b>打开能点的判决页 ↗</b></a>）
 </p>
 
 <p align="center">
@@ -35,6 +35,7 @@
 ---
 
 <p align="center">
+  <a href="https://liuzheng6621.github.io/agent-web/"><b>在线演示 ↗</b></a> ·
   <a href="#三十秒判断该不该用">三十秒判断</a> ·
   <a href="#六十秒上手">六十秒上手</a> ·
   <a href="#判决只有三种">三种判决</a> ·
@@ -304,6 +305,8 @@ FAIL todo/recorded   assertion_false
 `drill --order=empirical` 按台账里的经验难度出题，难的在前。
 
 ## 判决长什么样：一个能打开的页面
+
+<p align="center"><b>不想自己跑？<a href="https://liuzheng6621.github.io/agent-web/">这一节的两个页面已经托管在 GitHub Pages 上，点开就是本次 CI 真跑出来的判决 ↗</a>。</b></p>
 
 <img src="docs/media/flow.png" alt="单案例判决页" width="100%">
 
