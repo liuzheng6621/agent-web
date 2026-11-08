@@ -18,7 +18,7 @@ const slot = (k, stepMin = 15) =>
   new Date(Date.parse('2026-01-01T00:00:00Z') + k * stepMin * 60000).toISOString();
 
 test('注册表：第 20 种，相位固定 final', () => {
-  assert.equal(KINDS.length, 20, '节律上线后是 20 种');
+  assert.equal(KINDS.length, 21, '相对序上线后是 21 种');
   assert.ok(KINDS.includes('recurrence'));
   assert.deepEqual(PHASE_MATRIX.recurrence.allowed, ['final']);
   assert.equal(phaseOf({ kind: 'recurrence' }), 'final');

@@ -136,7 +136,7 @@ src/certify.mjs       变异体抓获率（快路径 + 重放）
 src/probe.mjs         十二项机械性质探针
 src/traps.mjs         盲区/作废判决的判据（UNUSABLE_CODES）
 src/adapter/          适配器契约与内置适配器
-src/assert/           20 种断言
+src/assert/           21 种断言
 cases/<domain>/       案例（一条案例 = 一次真实业务操作）
 docs/mutants/         63 个变异体
 docs/museum/          11 件展品（每个真 bug 一件，带 naive/caught 对照）

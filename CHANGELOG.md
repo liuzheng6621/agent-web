@@ -6,6 +6,17 @@
 CI 也在查。这条规则是买来的：这个仓库曾经同时存在 `package.json` 0.16、README 0.9、
 Gitee Release v0.6.0 三个数，谁看都是三个项目。
 
+## 0.71.0 — 2026-11-08
+
+**三条线一起落：探针随机化、第 21 种断言、H2 通道两个真 bug。**
+
+- **probe-2**：十二项检查里中段五项（clock-honest / empty-args / declared-vs-behavior / role-effective / read-no-side-effect）每次跑都洗牌，报告带 `probe_order`。开场指纹、no-leak、close-idempotent 三个锚点固定——洗牌抬高「背探测器」的门槛，不消除边界（L8 同步改写）。
+- **第 21 种断言 `precedence`**：流水行之间的相对序约束。expect 按顺序对终态流水做贪心子序列匹配（允许夹行），两种失败码 `precedence_missing`（被跳过）/ `precedence_inverted`（顺序反了），插行不误报。判据准入仪式实测：能杀 6 个变异体，其中 `m-history-empty`、`m-log-order-swap` 只有它杀得动。
+- **两个新变异体**：`m-unit-price-flip`（单价与小计脱钩，coffee-sql 域空转断言的杀手）、`m-log-order-swap`（流水行序对调）。口径刷新：69 个变异体 / 13 条案例 / 适用 47 / 抓到 45（95.7%）。
+- **taixianglian-sql 两修**：① `close(runId)` 在无活 run 时立即 dispose H2 Shell 子进程——certify 一次跑造 71 个一次性适配器，全靠 30s 空闲自退会堆 33 个 JVM 把真后端压死，这就是「谁排最后谁 unarmed」的根因（新增进程数守卫 `test/sql-shell-dispose.test.mjs`）；② stop() 的优雅退出不再污染 error 粘性标记，懒启动失败退避重试。
+
+546 测试（+11），21 种断言，32 条命令，69 个变异体。
+
 ## 0.70.0 — 2026-11-08
 
 **L3 语义层的第一个真实落地**：咖啡店规则写成 Rego 第二副本，`conftest` 判 allow/deny。

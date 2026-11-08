@@ -78,11 +78,11 @@ test('preflight：预测与 expected.json 对不上才判红', () => {
   assert.equal(consistency({ predicted: 'fail' }, undefined), true);
 });
 
-test('preflight：咖啡域 12 条全部与预期自洽', () => {
+test('preflight：咖啡域 13 条全部与预期自洽', () => {
   const cases = readDir('cases/coffee');
   const expected = readJson('cases/coffee/expected.json');
   const results = preflightAll({ cases, manifest, expected });
-  assert.equal(results.length, 12);
+  assert.equal(results.length, 13);
   for (const r of results) {
     assert.ok(r.consistent, `${r.case_id} 预测 ${r.predicted} 与预期 ${r.expected} 不符`);
   }
@@ -106,7 +106,7 @@ test('preflight：报告把预测、预期和差异分开写', () => {
   const cases = readDir('cases/coffee');
   const expected = readJson('cases/coffee/expected.json');
   const text = formatPreflight(preflightAll({ cases, manifest, expected }), { detail: true });
-  assert.match(text, /预测 ready 10 \/ unknown 1 \/ fail 1/);
+  assert.match(text, /预测 ready 11 \/ unknown 1 \/ fail 1/);
   assert.match(text, /order\.refund/);
   assert.match(text, /order\.pick 不接受 customer2/);
   assert.doesNotMatch(text, /与预期不符/);

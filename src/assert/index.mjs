@@ -21,6 +21,7 @@ import { pagination as evalPagination } from './pagination.mjs';
 import { payload as evalPayload, PAYLOAD_OPS } from './payload.mjs';
 import { linkage as evalLinkage } from './linkage.mjs';
 import { timeliness as evalTimeliness, durationMs, TIMELINESS_VERSION } from './timeliness.mjs';
+import { precedence as evalPrecedence, PRECEDENCE_VERSION } from './precedence.mjs';
 import { recurrence as evalRecurrence, RECURRENCE_VERSION } from './recurrence.mjs';
 import { state_machine as evalStateMachine, STATE_MACHINE_VERSION } from './state_machine.mjs';
 
@@ -42,6 +43,7 @@ export const KINDS = Object.freeze([
   'timeliness',
   'state_machine',
   'recurrence',
+  'precedence',
 ]);
 
 export { WINDOW_INNER };
@@ -85,6 +87,9 @@ export const PHASE_MATRIX = Object.freeze({
   // 状态机看的是「走过的每一步」，所以固定 trace：只判终态等于只看终点，
   // 中途跳态（PENDING→PICKED 再没有别的）会被当成合法。
   state_machine: { default: 'trace', allowed: ['trace'] },
+  // 相对序看的是终态流水全集：中途那一段永远「还没发生完」，按 trace 求值
+  // 会把正常实现判红。想看「某一步之后不许再追加」用 window 套 unchanged。
+  precedence: { default: 'final', allowed: ['final'] },
 });
 
 const SELECTOR_KINDS = new Set([
@@ -137,6 +142,27 @@ export function validateAssertion(a, at = 'assertion') {
     // 时区不给就在求值期报 unknown —— 但校验期先提醒一次，别等人跑完才发现。
     if (a.timezone === undefined) {
       errors.push(`${at}.timezone 必须显式声明（如 "UTC"）：时间比较不能靠猜时区`);
+    }
+  }
+  if (a.kind === 'precedence') {
+    if (!Array.isArray(a.expect) || a.expect.length === 0) {
+      errors.push(`${at}.expect 必填：按先后顺序列事件（如 [{type:"order.making"},{type:"order.ready"}]）`);
+    } else {
+      a.expect.forEach((e, i) => {
+        if (!e || typeof e !== 'object') {
+          errors.push(`${at}.expect[${i}] 必须是对象（{type} 或 {field,value}）`);
+          return;
+        }
+        if (e.type === undefined && e.field === undefined) {
+          errors.push(`${at}.expect[${i}] 至少给 type，或 field+value`);
+        }
+        if (e.field !== undefined && e.value === undefined) {
+          errors.push(`${at}.expect[${i}] 只有 field 没有 value 是空条件（匹配任何行），必须 field+value 成对`);
+        }
+      });
+    }
+    if (a.collection !== undefined && typeof a.collection !== 'string') {
+      errors.push(`${at}.collection 必须是字符串（集合名，默认 status_log）`);
     }
   }
   if (a.kind === 'recurrence') {
@@ -332,6 +358,8 @@ export function evalAssertion(a, ctx, depth = 0) {
       return evalTimeliness(a, ctx);
     case 'state_machine':
       return evalStateMachine(a, ctx);
+    case 'precedence':
+      return evalPrecedence(a, ctx);
     case 'recurrence':
       return evalRecurrence(a, ctx);
     default:

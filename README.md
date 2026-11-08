@@ -1,4 +1,4 @@
-# agent-web v0.70.0
+# agent-web v0.71.0
 
 <p align="center">
   <img src="docs/media/hero.png" alt="agent-web：给 Agent 写机器可判的集成测试" width="100%">
@@ -18,7 +18,7 @@
 </p>
 
 <p align="center">
-  <b>当前版本 0.70.0</b> · 20 种断言 · 32 条命令 · 67 个变异体
+  <b>当前版本 0.71.0</b> · 21 种断言 · 32 条命令 · 69 个变异体
 </p>
 
 <p align="center">
@@ -180,7 +180,7 @@ FAIL todo/recorded   assertion_false
 
 ## 断言能说的，比「第 0 行等于 56」多
 
-20 种 kind，全部机器可判，没有一种是「让模型看看对不对」：
+21 种 kind，全部机器可判，没有一种是「让模型看看对不对」：
 
 | kind | 说什么 |
 |---|---|
@@ -199,6 +199,7 @@ FAIL todo/recorded   assertion_false
 | `timeliness` | 终态 | 两个事件的真实时间戳之差不得超过上限（`max:"24h"`），必须声明 `timezone` |
 | `state_machine` | trace | 只许走声明的那些边（`transitions`）；`walk:"rows"` 把流水集合当序列 |
 | `recurrence` | 定时任务：窗口内按固定间隔铺槽，抓重复跑、跑偏、漏跑、总数不符 |
+| `precedence` | 流水相对序：expect 按先后列事件做贪心子序列匹配，抓「被跳过」（precedence_missing）与「顺序反了」（precedence_inverted）——插行不误报，位置型断言做不到 |
 
 关系式比写死具体值更耐移植：`totalAmount == Σ items.subTotal` 在哪个实现上都该成立，
 而 `totalAmount == 56` 只在菜单价格不变时成立。形状断言同理——「列表不重」不依赖任何具体编号。
@@ -479,7 +480,7 @@ node bin/agent-web.mjs verify cases/realworld --adapter=realworld --detail
 
 这一节分两层。以下能力已经有代码和测试守着，不该再算成「没做」：
 
-- **断言 20 种**（完整清单见 [docs/SPEC.md](docs/SPEC.md) 第 4 章）。其中
+- **断言 21 种**（完整清单见 [docs/SPEC.md](docs/SPEC.md) 第 4 章）。其中
   `window` / `every_step` / `pagination` / `linkage` / `payload` / `timeliness` / `state_machine`
   曾经被写成「缺的能力」，现在都有了，各自配一个**只有它能抓**的变异体（`kind-necessity` 会验）。
 - **`align`** 能提出跨命名映射并附证据，含嵌套数组下钻与语义重叠检测；低置信度留给人签。
@@ -494,7 +495,7 @@ node bin/agent-web.mjs verify cases/realworld --adapter=realworld --detail
 **每条只写没解决的那部分**——已经做到的在上面的清单里，这里不再重复：
 
 先交代证据的等级：本 README 里的一切数字（抓获率、一致率、耗时）全部出自本仓自己的 CI，
-脚本可复现——但**复现跑的是同一套脚本**，到 v0.70.0 为止没有第三方独立复现过。
+脚本可复现——但**复现跑的是同一套脚本**，到 v0.71.0 为止没有第三方独立复现过。
 「可复现」是机器事实，不是外部效度。`knowledge/` 与 `docs/mutants/` 的投稿通道
 就是为把自证变成他证开的，进来一单算一单；在那之前，把这里的数字读作
 「作者对他自己这把尺子的自洽性证明」，比读作「正确率」诚实。
@@ -506,7 +507,7 @@ node bin/agent-web.mjs verify cases/realworld --adapter=realworld --detail
 5. **变异体覆盖不完整（L5）。** `breed` 只从**观测形状**造故障（13 个算子，67 个变异体，抓到 43/45）。执行层与业务层的坏法（超卖、退款超过实付、审批跳过）仍靠投稿——生成器知道形状，不知道语义。
 6. **任意等价变异不能普遍判定（L6）。** 有限状态/有界场景可做证明或穷举；其余只能记为「预算内未区分」，不能宣称等价。
 7. **跨实体时序仍缺（L7）。** 单条链路的时间已经能判了——`timeliness` 比两个事件的真实时间戳，强制声明 `timezone`，缺时间戳记 `unknown` 而不是判假（v0.48.0）。缺的是**跨实体**：「订单必须在库存锁定之前创建」「退款必须在原支付之后」这类约束要等有依赖图的域才验得了。
-8. **适配器仍可撒谎（L8）。** `probe` 查十二项机械性质，`crosscheck`（v0.54.0）再用独立通道复核响应，两件加起来能抓「声明了却不存在」「忽略角色」「读偷偷写」「返回体做手脚」。仍抓不到的是**会看探测器的骗子**（probe 的检查项与顺序固定，读得到源码的适配器能区分探测与运行），以及「把整个 `globalThis.fetch` 换掉」；同进程加载的**爆炸半径**也没有隔离——适配器 patch 得到裁判自己 import 的模块，「加载适配器 = 以你的身份执行代码」是字面意思。
+8. **适配器仍可撒谎（L8）。** `probe` 查十二项机械性质，`crosscheck`（v0.54.0）再用独立通道复核响应，两件加起来能抓「声明了却不存在」「忽略角色」「读偷偷写」「返回体做手脚」。仍抓不到的是**会看探测器的骗子**（probe 中段五项已每次洗牌，但开场/泄漏/close 三个锚点与每项内部的交互模式仍固定，读得到源码的适配器仍能区分探测与运行），以及「把整个 `globalThis.fetch` 换掉」；同进程加载的**爆炸半径**也没有隔离——适配器 patch 得到裁判自己 import 的模块，「加载适配器 = 以你的身份执行代码」是字面意思。
 9. **并发暂不开放（L9）。** 没有并行执行器；恢复前要证明串行与并行的判决、死因、逐步回执逐字一致。
 10. **难度仍受样本来源限制（L10）。** 需要多个独立提交者/批次，才可把统计解释为外部难度，而不只是自测结果。
 11. **真实后端只覆盖六个领域（L11）。** 门槛是「两个独立实现 + `compare` 一致率 100%」。前四个域各自补上了第二实现，第五个（RealWorld）在 v0.55.0 补齐，第六个（定时任务）在 v0.60.0 补齐；再往上加域仍然是手工活。
@@ -518,7 +519,7 @@ node bin/agent-web.mjs verify cases/realworld --adapter=realworld --detail
 **先看 [docs/README.md](docs/README.md)——文档地图**：每份文档答一个问题，按你此刻的问题分流；下面是完整列表。
 
 - [docs/GUIDE.md](docs/GUIDE.md) —— 怎么用：从一个网址开始、从日志到正式判分、接入自己的应用
-- [docs/SPEC.md](docs/SPEC.md) —— 规范：案例格式、20 种断言与相位、判决顺序表、各机制的判定规则
+- [docs/SPEC.md](docs/SPEC.md) —— 规范：案例格式、21 种断言与相位、判决顺序表、各机制的判定规则
 - [docs/ADAPTER-GUIDE.md](docs/ADAPTER-GUIDE.md) —— 接自己的应用：三档路径、只改四处、验收顺序
 - [docs/LIMITS.md](docs/LIMITS.md) —— 11 条限制的台账：状态、验收命令、为什么这条不解决
 - [docs/ROADMAP.md](docs/ROADMAP.md) —— 接下来做什么、按什么顺序、每条怎么验收

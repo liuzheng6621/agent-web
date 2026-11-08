@@ -1,4 +1,4 @@
-# agent-web v0.70.0
+# agent-web v0.71.0
 
 <p align="center">
   <img src="docs/media/hero.png" alt="agent-web: integration tests an agent can be judged on" width="100%">
@@ -19,7 +19,7 @@
 </p>
 
 <p align="center">
-  <b>v0.70.0</b> · 20 assertion kinds · 32 commands · 67 mutants
+  <b>v0.71.0</b> · 21 assertion kinds · 32 commands · 69 mutants
 </p>
 
 <p align="center">
@@ -181,7 +181,7 @@ Three things it does not do: guess business rules (recording a successful delist
 
 ## Assertions say more than "row 0 equals 56"
 
-20 kinds, all machine-judgable, none of them "let the model eyeball it":
+21 kinds, all machine-judgable, none of them "let the model eyeball it":
 
 | kind | What it says |
 |---|---|
@@ -200,6 +200,7 @@ Three things it does not do: guess business rules (recording a successful delist
 | `timeliness` | final | Two events' real timestamps must differ by no more than a bound (`max:"24h"`); `timezone` is required |
 | `state_machine` | trace | Only declared edges are allowed (`transitions`); `walk:"rows"` walks the event log itself |
 | `recurrence` | Scheduled jobs: slots laid out at fixed intervals inside a window; catches duplicate runs, drift, gaps and wrong counts |
+| `precedence` | Log relative order: `expect` lists events in order and greedy-matches them as a subsequence; catches skipped events (`precedence_missing`) and reversed order (`precedence_inverted`) — immune to extra rows, which index-pinned assertions are not |
 
 Relations are more portable than hardcoded values: `totalAmount == Σ items.subTotal` should hold on any implementation, while `totalAmount == 56` only holds when menu prices have not changed. Shape assertions work the same way — "no duplicates" does not depend on any specific id.
 
@@ -440,7 +441,7 @@ For compatibility with a real implementation, point `REALWORLD_BASE_URL` at that
 
 Two layers. These capabilities already have code and tests and should not be counted as "not implemented":
 
-- **20 assertion kinds** (full list in [docs/SPEC.md](docs/SPEC.md) chapter 4). Among them
+- **21 assertion kinds** (full list in [docs/SPEC.md](docs/SPEC.md) chapter 4). Among them
   `window` / `every_step` / `pagination` / `linkage` / `payload` / `timeliness` / `state_machine`
   were once written down as "missing capabilities" — each now exists and has a mutant **only it can kill** (`kind-necessity` checks this).
 - **`align`** proposes evidence-backed cross-schema mappings, including nested-array drill-down and semantic-overlap detection; low-confidence matches require human acceptance.
@@ -453,7 +454,7 @@ Two layers. These capabilities already have code and tests and should not be cou
 The remaining boundaries are numbered to match L1–L12 in [docs/LIMITS.md](docs/LIMITS.md).
 **Each entry states only the unsolved part** — what already works is in the list above and is not repeated here:
 
-A word on evidence grades: every number in this README (catch rates, agreement rates, timings) comes from this repo's own CI. The scripts are reproducible — but **reproduction runs the same scripts**, and as of v0.70.0 no third party has reproduced them independently. "Reproducible" is a machine fact, not external validity. The `knowledge/` and `docs/mutants/` contribution channels exist to turn self-attestation into outside evidence, one accepted submission at a time; until one arrives, read the numbers here as "the author's proof that his own ruler is self-consistent", not as correctness rates.
+A word on evidence grades: every number in this README (catch rates, agreement rates, timings) comes from this repo's own CI. The scripts are reproducible — but **reproduction runs the same scripts**, and as of v0.71.0 no third party has reproduced them independently. "Reproducible" is a machine fact, not external validity. The `knowledge/` and `docs/mutants/` contribution channels exist to turn self-attestation into outside evidence, one accepted submission at a time; until one arrives, read the numbers here as "the author's proof that his own ruler is self-consistent", not as correctness rates.
 
 1. **Write semantics still need a human (L1).** `tap` records what the app did, but cannot infer that "insufficient stock must be rejected"; a domain owner must approve the rule.
 2. **Field mappings still need review (L2).** Nested-array leaves and same-name/different-meaning fields across collections cannot be decided by machine; a human must sign.
@@ -462,7 +463,7 @@ A word on evidence grades: every number in this README (catch rates, agreement r
 5. **Mutant coverage is incomplete (L5).** `breed` only faults **observed shape** (13 operators, 63 mutants, 39/41 caught). Execution- and business-layer faults (oversell, refund above paid amount, skipped approval) still need submissions — the generator knows shape, not semantics.
 6. **Arbitrary mutant equivalence is undecidable in general (L6).** Finite-state or bounded scenarios can be proved or exhaustively checked; otherwise report "not distinguished within budget," never "equivalent."
 7. **Cross-entity ordering is still missing (L7).** Single-chain timing is covered — `timeliness` compares two event timestamps, requires a declared `timezone`, and reports `unknown` rather than false when a timestamp is absent (v0.48.0). What is missing is **across entities**: "the order must be created before stock is locked", "a refund must follow the original payment" need a domain with a dependency graph.
-8. **Adapters can still lie (L8).** `probe` checks nine mechanical properties and `crosscheck` (v0.54.0) re-fetches through an independent channel, so together they catch "declared but missing", "role ignored", "reads that write" and "tampering with the response body". What they still cannot catch is a liar that watches the prober (probe's checks are fixed and ordered, so an adapter that can read the source can tell probing from running), or one that replaces the whole `globalThis.fetch`. Same-process loading also leaves the **blast radius** unisolated — an adapter can patch modules the judge itself imported; "loading an adapter = executing code with your credentials" is literal.
+8. **Adapters can still lie (L8).** `probe` checks nine mechanical properties and `crosscheck` (v0.54.0) re-fetches through an independent channel, so together they catch "declared but missing", "role ignored", "reads that write" and "tampering with the response body". What they still cannot catch is a liar that watches the prober (probe shuffles its five middle checks on every run, but the opening/leak/close anchors and each check's internal call pattern stay fixed, so an adapter that can read the source can still tell probing from running), or one that replaces the whole `globalThis.fetch`. Same-process loading also leaves the **blast radius** unisolated — an adapter can patch modules the judge itself imported; "loading an adapter = executing code with your credentials" is literal.
 9. **Parallel execution stays disabled for now (L9).** There is no parallel executor; re-enabling it requires byte-identical verdicts, failure causes and per-step receipts between serial and parallel runs.
 10. **Difficulty estimates depend on sample sources (L10).** Multiple independent submitters/batches are needed to interpret the result as external difficulty rather than self-test performance.
 11. **Real-backend validation covers only six domains (L11).** The threshold is two independent implementations plus 100% `compare` agreement. The first four domains each got a second implementation; the fifth (RealWorld) arrived in v0.55.0, the sixth (scheduled jobs) in v0.60.0. Adding more is still manual work.
@@ -474,7 +475,7 @@ A word on evidence grades: every number in this README (catch rates, agreement r
 **Start at [docs/README.md](docs/README.md) — the docs map**: every document answers one question, routed by what you need right now. Full list below.
 
 - [docs/GUIDE.md](docs/GUIDE.md) — How to use it: start from a URL, from logs to formal grading, connect your own app
-- [docs/SPEC.md](docs/SPEC.md) — Spec: case format, 20 assertion kinds and phases, verdict order table, per-mechanism rules
+- [docs/SPEC.md](docs/SPEC.md) — Spec: case format, 21 assertion kinds and phases, verdict order table, per-mechanism rules
 - [docs/ADAPTER-GUIDE.md](docs/ADAPTER-GUIDE.md) — Connect your own app: three-tier paths, change only four places, verification order
 - [docs/LIMITS.md](docs/LIMITS.md) — Ledger of the 11 limits: status, acceptance command, why it stays
 - [docs/ROADMAP.md](docs/ROADMAP.md) — What comes next, in what order, and how each item is verified

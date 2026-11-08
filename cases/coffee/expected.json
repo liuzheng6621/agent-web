@@ -10,5 +10,6 @@
   "coffee/paged-orders": "pass",
   "coffee/shape": "pass",
   "coffee/payload-echo": "pass",
-  "coffee/linkage-events": "pass"
+  "coffee/linkage-events": "pass",
+  "coffee/log-precedence": "pass"
 }

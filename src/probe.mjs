@@ -26,17 +26,18 @@
 import { stableStringify, fingerprint } from './values.mjs';
 import { validateAdapter, validateManifest, OUTCOMES } from './adapter/contract.mjs';
 
-export const PROBE_VERSION = 'agent-web/probe-1';
+export const PROBE_VERSION = 'agent-web/probe-2';
 
 const PASS = 'pass';
 const FAIL = 'fail';
 const WARN = 'warn';
 
-function report(checks) {
+function report(checks, probeOrder = []) {
   const failed = checks.filter((c) => c.status === FAIL);
   const warned = checks.filter((c) => c.status === WARN);
   return {
     probe_version: PROBE_VERSION,
+    probe_order: probeOrder,
     checks,
     summary: {
       total: checks.length,
@@ -144,6 +145,7 @@ export async function probeAdapter({ adapter, adapterName = 'unknown', timeoutMs
   // 这一项只做单向判定：两次同 seed 复位指纹相同**不证明**它冻住了（可能刚好
   // 落在同一毫秒），但指纹不同就**证明**它在撒谎。所以「相同」时给 pass 并把
   // 这条局限写在 detail 里，不假装验过了。
+  async function checkClockHonest() {
   const claims = Array.isArray(manifest.clock_policies) ? manifest.clock_policies : [];
   if (!claims.includes('frozen')) {
     add('clock-honest', '声明 frozen 的适配器时钟真的冻住', 'skipped', WARN,
@@ -167,10 +169,9 @@ export async function probeAdapter({ adapter, adapterName = 'unknown', timeoutMs
       add('clock-honest', '声明 frozen 的适配器时钟真的冻住', FAIL, FAIL, String(e && e.message));
     }
   }
+  }
 
-  return finish();
-
-  async function finish() {
+  async function checkEmptyArgs() {
     // ---- 4/5：空参调用与「写了要变」 ----
     const writes = (manifest.capabilities ?? []).filter((c) => c.kind === 'write');
     let sawWrite = null;
@@ -203,7 +204,9 @@ export async function probeAdapter({ adapter, adapterName = 'unknown', timeoutMs
           '但如果这条是你要断言的写操作，它就是「假执行」的典型样子',
       );
     }
+  }
 
+  async function checkNoLeak() {
     // ---- 无状态泄漏：写完再复位，必须回到第一份初态 ----
     try {
       runId = (await withTimeout(adapter.reset({}))).runId;
@@ -221,7 +224,9 @@ export async function probeAdapter({ adapter, adapterName = 'unknown', timeoutMs
     } catch (e) {
       add('no-leak', '无状态泄漏', FAIL, FAIL, String(e && e.message));
     }
+  }
 
+  async function checkDeclaredVsBehavior() {
     // ---- 7：声明了的能力必须真的存在 ----
     // 覆盖率统计信的是 manifest 的声明。声明了、实现却回 unsupported，
     // 覆盖率会把它算成「已声明未使用」，而案例永远拿不到证据。
@@ -265,7 +270,9 @@ export async function probeAdapter({ adapter, adapterName = 'unknown', timeoutMs
     } catch (e) {
       add('declared-vs-behavior', '声明了的能力真的存在', FAIL, FAIL, String(e && e.message));
     }
+  }
 
+  async function checkRoleEffective() {
     // ---- 8：角色必须真的生效 ----
     // 越权案例的全部价值在于「换个身份就做不成」。适配器若忽略 as，
     // 越权案例会稳定地 pass，而实际测的是同一个人的行为。
@@ -325,7 +332,9 @@ export async function probeAdapter({ adapter, adapterName = 'unknown', timeoutMs
     } catch (e) {
       add('role-effective', '角色真的生效', FAIL, FAIL, String(e && e.message));
     }
+  }
 
+  async function checkReadNoSideEffect() {
     // ---- 9：读操作不许偷偷写 ----
     // 「读」声明了 kind: read。读却改了状态，count_delta 会莫名其妙地漂，
     // 而且它是最容易伪造的谎：观测看起来永远正常。
@@ -361,7 +370,9 @@ export async function probeAdapter({ adapter, adapterName = 'unknown', timeoutMs
     } catch (e) {
       add('read-no-side-effect', '读操作不改状态', FAIL, FAIL, String(e && e.message));
     }
+  }
 
+  async function checkCloseIdempotent() {
     // ---- 10：close 必须幂等 ----
     // 不幂等的 close 会在重试路径上炸：调用方重跑一次收尾就报错，
     // 而"收尾失败"看起来像被测系统的问题。这条不是洁癖 ——
@@ -377,8 +388,32 @@ export async function probeAdapter({ adapter, adapterName = 'unknown', timeoutMs
     } catch (e) {
       add('close-idempotent', 'close 可以重复调用', FAIL, FAIL, `第二次 close 抛错：${e && e.message}`);
     }
-    return report(checks);
   }
+
+  // ---- 中段五项互相独立（各自带 reset），每次跑都洗牌 ----
+  // 对抗「读得到源码的适配器」：它不能再靠「第 N 次 reset 之后必然是哪项检查」
+  // 区分探测与运行。洗牌只覆盖这五项；开场复位三件套、no-leak（必须在所有
+  // 执行器之后抓写残留）与 close 幂等（必须最后）三个锚点仍固定 —— 每项内部
+  // 的交互模式也固定，微观指纹仍可区分。这条局限写在 LIMITS L8。
+  const middleChecks = [
+    ['clock-honest', checkClockHonest],
+    ['empty-args', checkEmptyArgs],
+    ['declared-vs-behavior', checkDeclaredVsBehavior],
+    ['role-effective', checkRoleEffective],
+    ['read-no-side-effect', checkReadNoSideEffect],
+  ];
+  for (let i = middleChecks.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [middleChecks[i], middleChecks[j]] = [middleChecks[j], middleChecks[i]];
+  }
+  const probeOrder = middleChecks.map(([id]) => id);
+  for (const [, fn] of middleChecks) await fn();
+
+  // no-leak 固定在执行器检查之后；close 幂等永远最后（close 后适配器不再保证可用）。
+  await checkNoLeak();
+  await checkCloseIdempotent();
+
+  return report(checks, probeOrder);
 }
 
 export function probeExit(result) {

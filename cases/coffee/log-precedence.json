@@ -1,0 +1,94 @@
+{
+  "schema_version": "agent-web/0.1",
+  "id": "coffee/log-precedence",
+  "environment": {
+    "adapter": "memory",
+    "seed": {}
+  },
+  "task": {
+    "natural_goal": "顾客点一杯拿铁，店员接单、做好，顾客本人取走。流水只关心先后：接单在前，备好在后，取餐收尾。",
+    "goal_assertions": [
+      {
+        "kind": "entity_exists",
+        "selector": {
+          "collection": "orders"
+        }
+      },
+      {
+        "kind": "precedence",
+        "collection": "status_log",
+        "expect": [
+          { "type": "order.making" },
+          { "type": "order.ready" },
+          { "type": "order.picked" }
+        ],
+        "note": "相对序：接单→备好→取餐。不钉绝对下标——流水前面多插一行系统行也不误报；顺序反了（先备好后接单）判 precedence_inverted，被跳过判 precedence_missing。不含 order.created：真实后端下单不落流水（见 docs/domains/coffee.md），memory 通道才有。"
+      }
+    ],
+    "invariants": [
+      {
+        "kind": "count_delta",
+        "selector": {
+          "collection": "status_log",
+          "where": [
+            {
+              "field": "type",
+              "eq": "order.canceled"
+            }
+          ]
+        },
+        "delta": 0
+      }
+    ]
+  },
+  "reference_trajectory": [
+    {
+      "id": "s1",
+      "capability": "order.create",
+      "as": "customer",
+      "expected_outcome": "applied",
+      "arguments": {
+        "items": [
+          {
+            "dishName": "拿铁",
+            "qty": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "s2",
+      "capability": "kitchen.accept",
+      "as": "staff",
+      "expected_outcome": "applied",
+      "bindings": {
+        "orderId": "$s1.orderId"
+      }
+    },
+    {
+      "id": "s3",
+      "capability": "kitchen.ready",
+      "as": "staff",
+      "expected_outcome": "applied",
+      "bindings": {
+        "orderId": "$s1.orderId"
+      }
+    },
+    {
+      "id": "s4",
+      "capability": "order.pick",
+      "as": "customer",
+      "expected_outcome": "applied",
+      "bindings": {
+        "orderId": "$s1.orderId"
+      }
+    }
+  ],
+  "observability": {
+    "declared_scopes": [
+      "menu",
+      "orders",
+      "status_log"
+    ]
+  }
+}

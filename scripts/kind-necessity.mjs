@@ -155,6 +155,24 @@ const RECURRENCE_SPEC = {
   adapter: 'cron-a',
 };
 
+// 相对序：流水只许按「接单→备好→取餐」的先后出现。
+// 去掉这条断言，m-log-order-swap（making/ready 对调）就该漏网 —— 位置型
+// 断言抓它，但流水插一行系统行就误报；相对序是对这个坏法的最小充分约束。
+const PRECEDENCE_SPEC = {
+  kind: 'precedence',
+  caseId: 'happy-path',
+  assertion: {
+    kind: 'precedence',
+    collection: 'status_log',
+    expect: [
+      { type: 'order.making' },
+      { type: 'order.ready' },
+      { type: 'order.picked' },
+    ],
+  },
+  baseline: [{ kind: 'entity_exists', selector: { collection: 'orders' } }],
+};
+
 const SHAPE = [
   { kind: 'entity_exists', selector: { collection: 'orders', index: 0 } },
   { kind: 'count_delta', selector: { collection: 'orders' }, delta: 2 },
@@ -297,6 +315,20 @@ async function run() {
     console.log(`      只有它能杀：${necessary.join(' ') || '—'}`);
   }
 
+  {
+    const spec = PRECEDENCE_SPEC;
+    const withIt = await certify({ cases: [withGoal(spec.caseId, [...spec.baseline, spec.assertion])], adapterFactory: factory, adapterName: 'memory', mutations: pool });
+    const without = await certify({ cases: [withGoal(spec.caseId, [...spec.baseline])], adapterFactory: factory, adapterName: 'memory', mutations: pool });
+    const kills = withIt.mutations.filter((m) => (m.killedBy ?? []).some((k) => (typeof k === 'string' ? k : k.kind) === spec.kind));
+    const caughtWith = new Set(withIt.mutations.filter((m) => m.status === 'caught').map((m) => m.id));
+    const caughtWithout = new Set(without.mutations.filter((m) => m.status === 'caught').map((m) => m.id));
+    const necessary = [...caughtWith].filter((id) => !caughtWithout.has(id));
+    const ok = kills.length > 0 && necessary.length > 0;
+    if (!ok) failed += 1;
+    console.log(`${ok ? 'PASS' : 'FAIL'}  ${spec.kind} (${spec.caseId})`);
+    console.log(`      kills ${kills.length}: ${kills.map((m) => m.id).join(' ') || '-'}`);
+    console.log(`      only-it: ${necessary.join(' ') || '-'}`);
+  }
   for (const kind of shapeKinds) {
     const kills = full.mutations.filter((m) =>
       (m.killedBy ?? []).some((k) => (typeof k === 'string' ? k : k.kind) === kind),
@@ -310,7 +342,7 @@ async function run() {
   }
 
   console.log('\n' + (failed === 0
-    ? '形状四种 + 时序三种都换得回东西：去掉任何一条，都有变异体会漏网。'
+    ? '形状四种 + 时序四种都换得回东西：去掉任何一条，都有变异体会漏网。'
     : failed + ' 种没有独占战功 —— 按宪法不该进。'));
   return failed === 0 ? 0 : 1;
 }

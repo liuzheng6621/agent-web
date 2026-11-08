@@ -6,7 +6,8 @@
 // 份 canonical view。compare 两通道判决一致，写后事实层才成立。
 //
 // 观测通道实现：常驻 H2 Shell 子进程（stdin 发 SQL，stdout 收结果表），
-// 30 秒空闲自动退出，下一条查询自动重启 —— 适配器不泄漏进程。
+// 30 秒空闲自动退出，下一条查询自动重启；close(runId) 在无活 run 时立即
+// dispose（见 close 注释）—— 适配器不泄漏进程。
 // 编码：-Dstdout.encoding=UTF-8 保证中文列值完好。
 
 import { spawn } from 'node:child_process';
@@ -31,6 +32,7 @@ class H2Shell {
     this.buf = '';
     this.pending = null;
     this.error = null;
+    this.stopping = false;
     this.idleTimer = null;
   }
 
@@ -58,7 +60,27 @@ class H2Shell {
     this.idleTimer = setTimeout(() => this.stop(), this.opt.idleQuitMs);
     if (this.idleTimer.unref) this.idleTimer.unref();
   }
+  // AUTO_SERVER 服务表在旧连接死掉后要 ~2s 才清条目：紧跟着 start 的那次连接
+  // 会拿到死服务器地址，Shell 打印错误即退出（code=0）。失败退避重试两次。
+  async #startSafe() {
+    let lastErr = null;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      if (attempt > 0) await new Promise((r) => setTimeout(r, 700 * attempt));
+      try {
+        await this.start();
+        if (this.proc) return;
+      } catch (e) {
+        lastErr = e;
+        this.proc = null;
+        this.pending = null;
+      }
+    }
+    throw lastErr || new Error('h2 shell 重试三次仍起不来');
+  }
+
   async start() {
+    this.error = null;
+    this.stopping = false;
     if (!this.opt.dbUrl || !this.opt.h2Jar) {
       throw new Error('taixianglian-sql 需要显式 dbUrl 与 h2Jar（env TAIXIANGLIAN_SQL_DB_URL / TAIXIANGLIAN_SQL_H2_JAR 或 options）');
     }
@@ -68,9 +90,9 @@ class H2Shell {
       '-url', this.opt.dbUrl, '-user', 'sa', '-password', '',
     ], { stdio: ['pipe', 'pipe', 'pipe'] });
     this.proc.stdout.on('data', (d) => this.#ingest(d));
-    this.proc.stderr.on('data', (d) => { if (!this.error) this.error = String(d).trim(); });
+    this.proc.stderr.on('data', (d) => { const t = String(d).trim(); if (t) this.error = t.slice(-400); });
     this.proc.on('close', (code) => {
-      if (!this.error) this.error = `h2 shell 意外退出 code=${code}`;
+      if (!this.stopping && !this.error) this.error = `h2 shell 意外退出 code=${code}`;
       if (this.pending) { const p = this.pending; this.pending = null; p(); }
     });
     this.#armIdle();
@@ -80,10 +102,16 @@ class H2Shell {
       throw new Error(this.error || e.message);
     }
     this.buf = '';
+    if (this.proc && this.proc.exitCode !== null) {
+      const err = new Error(this.error || ('h2 shell 启动即退出 code=' + this.proc.exitCode));
+      this.proc = null;
+      this.pending = null;
+      throw err;
+    }
   }
 
   async query(sql) {
-    if (!this.proc) await this.start();
+    if (!this.proc) await this.#startSafe();
     if (this.error) { const msg = this.error; await this.stop(); throw new Error(msg); }
     this.buf = '';
     this.#armIdle();
@@ -120,19 +148,29 @@ class H2Shell {
   }
 
   async stop() {
+    this.stopping = true;
     clearTimeout(this.idleTimer);
     const p = this.proc;
     this.proc = null;
     this.pending = null;
     if (!p) return;
-    try { p.stdin.write('quit;\n'); p.stdin.end(); } catch { /* 已死就算了 */ }
-    const t = setTimeout(() => { try { p.kill(); } catch { /* 同上 */ } }, 1500);
-    if (t.unref) t.unref();
+    // 等 Shell 真退出再返回：AUTO_SERVER 混连下，上一个 Shell 还在退、
+    // 下一个 Shell 就去连，会在服务表刷新窗口里撞车（连接失败即退出），
+    // 表现为 h2 shell 意外退出 code=0。close 后 start 的懒重启才有保障。
+    await new Promise((resolve) => {
+      let settled = false;
+      const finish = () => { if (!settled) { settled = true; clearTimeout(killT); resolve(); } };
+      const killT = setTimeout(() => { try { p.kill(); } catch { finish(); } }, 1500);
+      if (killT.unref) killT.unref();
+      p.once('close', finish);
+      try { p.stdin.write('quit;\n'); p.stdin.end(); } catch { finish(); }
+    });
   }
 }
 
 const num = (v) => (v === null ? null : Number(v));
 const sq = (s) => String(s).replace(/'/g, "''"); // SQL 字面量转义；身份锚点是适配器自己生成的 ASCII 用户名，转义是纵深防御
+
 export function createTaixianglianSqlAdapter(options = {}) {
   const opt = { ...SQL_DEFAULTS, ...options };
   const inner = createTaixianglianAdapter(options); // execute 通道：与 HTTP 适配器同源，一字不改
@@ -215,6 +253,9 @@ export function createTaixianglianSqlAdapter(options = {}) {
   async function close(runId) {
     runs.delete(runId);
     await inner.close(runId);
+    // 没有活着的 run 就立刻收 Shell，不等 30s 空闲自退。certify 一次跑会造
+    // 几十个一次性适配器，全靠 idle 自退会在峰值堆出几十个 JVM，把后端压垮。
+    if (runs.size === 0) shell.stop();
   }
 
   return {

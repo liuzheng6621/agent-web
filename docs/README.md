@@ -10,7 +10,7 @@
 | 怎么 3 分钟跑起来 | [GUIDE · 3 分钟试跑](GUIDE.md#3-分钟试跑)，或 README「六十秒上手」 |
 | 手上有接口，怎么长出适配器和案例 | [GUIDE · 从一个网址开始](GUIDE.md#从一个网址开始) · [ADAPTER-GUIDE](ADAPTER-GUIDE.md) |
 | 有现成接口测试套件（hurl），能不能直接用 | [GUIDE · 现成的案例从哪来](../README.md#现成的案例从哪来) 与 `import hurl` |
-| 断言怎么写、有哪些、各管什么 | [SPEC 第 4 章](SPEC.md)（20 种断言） |
+| 断言怎么写、有哪些、各管什么 | [SPEC 第 4 章](SPEC.md)（21 种断言） |
 | 判决为什么是 unknown，unknown 去哪了 | [SPEC 第 7 章](SPEC.md)（判决顺序表）+ [LIMITS L8](LIMITS.md) |
 | 规则对不对——案例断言之外还有第二条通道吗 | [policy/DECISIONS.md](../policy/DECISIONS.md)（规则的第二次声明 + `conftest`） |
 | 它做不了什么、哪些永远做不了 | [LIMITS.md](LIMITS.md)（12 条台账，每条带验收命令） |

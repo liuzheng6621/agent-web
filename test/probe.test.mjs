@@ -208,3 +208,22 @@ test('探针：每条能力各挑自己的局外人（角色集合不同不许�
   assert.match(c.detail, /admin\.purge\(forbidden\)/);
   assert.match(c.detail, /public\.post\(forbidden\)/);
 });
+
+test('探针 probe-2：中段五项洗牌落报告，no-leak 在执行器后，close 最后', async () => {
+  const adapter = createMemoryAdapter();
+  const r = await probeAdapter({ adapter });
+  const FIVE = ['clock-honest', 'empty-args', 'declared-vs-behavior', 'role-effective', 'read-no-side-effect'];
+  assert.equal(r.probe_version, 'agent-web/probe-2');
+  assert.ok(Array.isArray(r.probe_order) && r.probe_order.length === 5, 'probe_order 必须是五项的排列');
+  assert.deepEqual([...r.probe_order].sort(), [...FIVE].sort());
+  const ids = r.checks.map((c) => c.id);
+  const filtered = ids.filter((id) => FIVE.includes(id));
+  assert.deepEqual(filtered, r.probe_order, 'checks 的出现顺序必须与 probe_order 一致');
+  const noLeakIdx = ids.indexOf('no-leak');
+  assert.ok(noLeakIdx >= 0);
+  for (const ex of FIVE) {
+    const i = ids.indexOf(ex);
+    assert.ok(i < noLeakIdx, `${ex} 必须先于 no-leak（写残留必须被抓）`);
+  }
+  assert.equal(ids[ids.length - 1], 'close-idempotent', 'close 幂等必须最后');
+});

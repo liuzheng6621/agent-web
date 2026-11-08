@@ -81,6 +81,8 @@ export const ASSERTION_CODES = Object.freeze({
   recurrence_drift: '触发时刻偏离槽位超出容差',
   recurrence_gap: '应触发的槽位没有触发',
   recurrence_count_mismatch: '触发总次数与窗口算出来的不符',
+  precedence_missing: 'precedence：expect 里的某个事件整条流水都没有（被跳过）',
+  precedence_inverted: 'precedence：事件存在但相对顺序反了',
   not_http: 'crosscheck：适配器不走 HTTP，查不了',
   missing_response: 'crosscheck：拿不到另一通道的响应',
   response_mismatch: 'crosscheck：两个通道看到的不一样',

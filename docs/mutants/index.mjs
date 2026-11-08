@@ -71,7 +71,9 @@ import * as labApproveNotPending from './m-lab-approve-not-pending.mjs';
 import * as sqlPhantomSuccess from './m-sql-phantom-success.mjs';
 import * as sqlCrossUserLeak from './m-sql-cross-user-leak.mjs';
 import * as sqlLogTypeFlip from './m-sql-log-type-flip.mjs';
+import * as logOrderSwap from './m-log-order-swap.mjs';
 import * as sqlTotalDrift from './m-sql-total-drift.mjs';
+import * as unitPriceFlip from './m-unit-price-flip.mjs';
 
 const ENTRIES = [
   ['m-money-off-by-cent', moneyOffByCent],
@@ -144,7 +146,9 @@ const ENTRIES = [
   ['m-sql-phantom-success', sqlPhantomSuccess],
   ['m-sql-cross-user-leak', sqlCrossUserLeak],
   ['m-sql-log-type-flip', sqlLogTypeFlip],
+  ['m-log-order-swap', logOrderSwap],
   ['m-sql-total-drift', sqlTotalDrift],
+  ['m-unit-price-flip', unitPriceFlip],
 
 ];
 
