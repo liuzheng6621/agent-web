@@ -6,6 +6,33 @@
 CI 也在查。这条规则是买来的：这个仓库曾经同时存在 `package.json` 0.16、README 0.9、
 Gitee Release v0.6.0 三个数，谁看都是三个项目。
 
+## 0.78.0
+
+分母与建议两处一起收口：`applies_to` 补上执行语义，建议断言补上机读原因，
+定时任务域补上第一个真实负例。三件事互相咬合——适用范围判错会把不存在的故障算进分母，
+建议断言判错会给出一条跨实现必红的假账，两者都会让分子和分母同时说谎。
+
+- **`applies_to` 执行语义**：`adapters` 此前只是写了没判，现在任一命中才算适用，SQL 专用变异体不再混进内存通道；
+  新增 `capabilities_any`（任一命中）、`capability_kinds`（每种 kind 都要有）、`roles_min`（`manifest.roles` 至少这么多）。
+  纯读域不背「重复写」，单角色域不背「换错身份」，没有迁移动作的域不背「丢中间态」。
+  三个跨域执行变异体随之收窄：`m-exec-duplicate-write` 用 `capability_kinds:['write']`、
+  `m-exec-role-ignore` 用 `roles_min:2`、`m-exec-drop-intermediate` 用 `capabilities_any` 列真实迁移能力。
+- **口径随之变化**：适用 50→46、抓到 48→44（95.7%）、不适用 22→26。词库 10/10、账本 7/7、定时任务 6/6（补负例后）。
+  分母缩小不是放宽，是去掉造不出差异的条目。
+- **建议断言分原因**：新增 `suggestionBlockedReason`，把「给不出建议」拆成机读原因——
+  `row_order`（纯集合重排，按索引写断言会钉死实现行序）、`non_portable`（id / 时间 / 取餐号这类字段）、
+  以及 `trace_path` / `initial_state` / `missing_initial` / `unsupported_shape` / `verification_failed`。
+  `isPureReorder` 先于字段可移植性判断：见证常先落在 `orders.0.id` 上，但真正的坏法是行序。
+  同时去掉 `VIEW_COLLECTIONS` 那六个硬编码域名——集合能否建议由实际视图决定。
+  `--suggest` 与准入基线都按原因分组点名，不再把行序问题笼统写成「不可移植字段」。
+- **`cases/cron/forbidden-write.json`**：viewer 推进调度时钟必须被拒（`expected_outcome: rejected`）+ `unchanged runs`，
+  定时任务域第一个真实负例，让 `m-exec-role-ignore` 有拒绝分支可走。
+- **`cases/ledger/post-balanced.json`** 补 `count_delta accounts 2`，账本域开始量「重复写」。
+- 文档：`docs/SPEC.md` 12.8.1 补四个新字段的判据与 AND 组合、12.9 补 `suggestionBlockedReason` 全表；
+  `docs/LIMITS.md` L5 口径与 L11 各域数字同步；`docs/mutants/README.md` 把「v0.63.1 之前」改成「曾经有两层漏洞」；
+  `docs/domains/cron.md` 四条案例、`docs/domains/lexicon.md` 100%。
+- `602` 测试全绿（598 pass + 4 skip）；六守卫 rc=0。
+
 ## 0.77.0
 
 npm 包上线：包名 `agent-case`（npm 上的 agent-web 已被无关项目占用）。CLI 与仓库名不变，`npx agent-case selftest` 一行可跑。
@@ -14,7 +41,7 @@ npm 包上线：包名 `agent-case`（npm 上的 agent-web 已被无关项目占
 - 两份 README「六十秒上手 / Sixty-second tour」加 `npx agent-case selftest` 一行入口。
 - Pages 封面加同款 npx 行。
 - 版本联动 v0.77.0（VERSION / package.json / CITATION / ROADMAP / CHANGELOG / 两 README）。
-- `602` 测试全绿（598 pass + 4 skip），72 个变异体口径为适用 46 抓到 44（95.7%）。
+- `597` 测试全绿（594 pass + 3 skip），72 个变异体口径不变（适用 50 抓到 48 = 96.0%）。
 
 
 外部测评报告（v0.75.0 测评，综合 7.8/10）的四项发现，逐条核实为真、逐条修复：
