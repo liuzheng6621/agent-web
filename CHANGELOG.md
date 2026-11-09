@@ -6,7 +6,16 @@
 CI 也在查。这条规则是买来的：这个仓库曾经同时存在 `package.json` 0.16、README 0.9、
 Gitee Release v0.6.0 三个数，谁看都是三个项目。
 
-## 0.76.0
+## 0.77.0
+
+npm 包上线：包名 `agent-case`（npm 上的 agent-web 已被无关项目占用）。CLI 与仓库名不变，`npx agent-case selftest` 一行可跑。
+
+- `package.json` name 改 agent-case，`bin` 同时提供 `agent-case` 与 `agent-web` 两个命令名（后者保留兼容）。
+- 两份 README「六十秒上手 / Sixty-second tour」加 `npx agent-case selftest` 一行入口。
+- Pages 封面加同款 npx 行。
+- 版本联动 v0.77.0（VERSION / package.json / CITATION / ROADMAP / CHANGELOG / 两 README）。
+- `597` 测试全绿（594 pass + 3 skip），72 个变异体口径不变（适用 50 抓到 48 = 96.0%）。
+
 
 外部测评报告（v0.75.0 测评，综合 7.8/10）的四项发现，逐条核实为真、逐条修复：
 

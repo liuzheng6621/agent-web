@@ -1,4 +1,4 @@
-# agent-web v0.76.0
+# agent-web v0.77.0
 
 <p align="center">
   <img src="docs/media/hero.png" alt="agent-web: integration tests an agent can be judged on" width="100%">
@@ -26,7 +26,7 @@
 </p>
 
 <p align="center">
-  <b>v0.76.0</b> · 21 assertion kinds · 33 commands · 72 mutants
+  <b>v0.77.0</b> · 21 assertion kinds · 33 commands · 72 mutants
 </p>
 
 <p align="center">
@@ -69,7 +69,13 @@ What it is not, stated plainly: no performance testing, no UI testing, no securi
 
 <img src="docs/media/terminal.png" alt="agent-web: selftest first, then record traffic to grow an adapter" width="100%">
 
-The first command needs no preparation:
+The first command needs no preparation. The npm package is named `agent-case` (the repo and the CLI are both called agent-web — same thing). One line, no clone:
+
+```bash
+npx agent-case selftest
+```
+
+Or run it straight from the repo:
 
 ```bash
 git clone https://gitee.com/liu-everything_impossble/agent-web.git
@@ -465,7 +471,7 @@ Two layers. These capabilities already have code and tests and should not be cou
 The remaining boundaries are numbered to match L1–L12 in [docs/LIMITS.md](docs/LIMITS.md).
 **Each entry states only the unsolved part** — what already works is in the list above and is not repeated here:
 
-A word on evidence grades: every number in this README (catch rates, agreement rates, timings) comes from this repo's own CI. The scripts are reproducible — but **reproduction runs the same scripts**, and as of v0.76.0 no third party has reproduced them independently. "Reproducible" is a machine fact, not external validity. The `knowledge/` and `docs/mutants/` contribution channels exist to turn self-attestation into outside evidence, one accepted submission at a time; until one arrives, read the numbers here as "the author's proof that his own ruler is self-consistent", not as correctness rates.
+A word on evidence grades: every number in this README (catch rates, agreement rates, timings) comes from this repo's own CI. The scripts are reproducible — but **reproduction runs the same scripts**, and as of v0.77.0 no third party has reproduced them independently. "Reproducible" is a machine fact, not external validity. The `knowledge/` and `docs/mutants/` contribution channels exist to turn self-attestation into outside evidence, one accepted submission at a time; until one arrives, read the numbers here as "the author's proof that his own ruler is self-consistent", not as correctness rates.
 **If you cannot wait for the contribution channel, there is a faster route** — the [blind kit](scripts/build-blind-kit.mjs):
 one command builds a self-contained zip (every adapter plus the five zero-dependency case domains, **with no verdicts inside**).
 Run two commands on your own machine, send the results back, and we reconcile them case by case against the baseline

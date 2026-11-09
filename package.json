@@ -1,6 +1,6 @@
 {
-  "name": "agent-web",
-  "version": "0.76.0",
+  "name": "agent-case",
+  "version": "0.77.0",
   "description": "给 Agent 写机器可判的集成测试：一份案例，多个实现，判决必须一致。",
   "repository": {
     "type": "git",
@@ -13,6 +13,7 @@
   "author": "YG <liuzheng6621>",
   "type": "module",
   "bin": {
+    "agent-case": "bin/agent-web.mjs",
     "agent-web": "bin/agent-web.mjs"
   },
   "exports": {
@@ -98,7 +99,15 @@
     "src",
     "cases",
     "examples",
-    "docs",
+    "knowledge",
+    "docs/mutants",
+    "docs/LIMITS.md",
+    "docs/GUIDE.md",
+    "docs/README.md",
+    "docs/ROADMAP.md",
+    "docs/domains",
+    "docs/schema",
+    "docs/museum",
     "scripts",
     "README.md",
     "README.en.md",

@@ -67,6 +67,12 @@ h2::after{content:"";flex:1;border-bottom:1px solid var(--rule-strong)}
 .finding .val.hit{color:var(--seal)}
 .finding .val small{font:14px var(--sans);color:var(--ink-3);margin-left:var(--sp1)}
 @media(max-width:560px){.finding{flex-wrap:wrap}.finding .dots{display:none}.finding .val{margin-left:auto}}
+.try{border:1px solid var(--rule);border-left:3px solid var(--seal);background:var(--paper-2);padding:14px 18px;margin:20px 0 28px;max-width:calc(100% - 150px)}
+.try-label{margin:0 0 8px;font-weight:600}
+.try pre{margin:0;padding:10px 14px;background:var(--paper);border:1px solid var(--rule);overflow-x:auto}
+.try code{font-family:var(--mono);font-size:14px;color:var(--ink)}
+.try-note{margin:10px 0 0;font-size:13px;color:var(--ink-3)}
+@media(max-width:700px){.try{max-width:100%}}
 .note{font-size:14px;color:var(--ink-2);margin:var(--sp4) 0 0;max-width:720px}
 
 /* 朱印：全页唯一的记忆点，一次载入淡入；桌面绝对定位钉在结论区右上 */
@@ -168,6 +174,11 @@ strong{font-weight:600}
 </section>
 
 <section>
+  <div class="try">
+    <p class="try-label">三十秒，亲手跑一次（不用 clone）：</p>
+    <pre tabindex="0"><code>npx agent-case selftest</code></pre>
+    <p class="try-note">内置内存实现跑内置案例，四种谎话当场被抓。npm 包名叫 agent-case，仓库和命令都叫 agent-web——同一份东西。</p>
+  </div>
   <h2>这一页是活的</h2>
   <div class="prose">
     <p>不是截图。每次构建先跑 <code>verify cases/coffee --adapter=memory</code> 拿到真实判决，再用 <code>flow</code> 命令把判决渲染成上面两个页面。你看到的每一行 pass / fail，都来自这一次构建里真跑出来的判决，不是手工填的。</p>

@@ -7,11 +7,11 @@
 
 ---
 
-## 0. 现在的实际状态（v0.76.0，全部实测）
+## 0. 现在的实际状态（v0.77.0，全部实测）
 
 | 项 | 数字 | 怎么核 |
 |---|---|---|
-| 版本 | 0.76.0 | `node bin/agent-web.mjs version` |
+| 版本 | 0.77.0 | `node bin/agent-web.mjs version` |
 | 断言 | 21 种 | `--help` 里的断言表 |
 | 命令 | 33 条 | 同上 |
 | 变异体 | 72 个 | `node bin/agent-web.mjs mutants` |
