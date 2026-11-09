@@ -1,4 +1,4 @@
-# agent-web v0.78.0
+# agent-web v0.78.1
 
 <p align="center">
   <img src="docs/media/hero.png" alt="agent-web：给 Agent 写机器可判的集成测试" width="100%">
@@ -24,7 +24,7 @@
 </p>
 
 <p align="center">
-  <b>当前版本 0.78.0</b> · 21 种断言 · 33 条命令 · 72 个变异体
+  <b>当前版本 0.78.1</b> · 21 种断言 · 33 条命令 · 72 个变异体
 </p>
 
 <p align="center">
@@ -511,7 +511,7 @@ node bin/agent-web.mjs verify cases/realworld --adapter=realworld --detail
 **每条只写没解决的那部分**——已经做到的在上面的清单里，这里不再重复：
 
 先交代证据的等级：本 README 里的一切数字（抓获率、一致率、耗时）全部出自本仓自己的 CI，
-脚本可复现——但**复现跑的是同一套脚本**，到 v0.78.0 为止没有第三方独立复现过。
+脚本可复现——但**复现跑的是同一套脚本**，到 v0.78.1 为止没有第三方独立复现过。
 「可复现」是机器事实，不是外部效度。`knowledge/` 与 `docs/mutants/` 的投稿通道
 就是为把自证变成他证开的，进来一单算一单；在那之前，把这里的数字读作
 「作者对他自己这把尺子的自洽性证明」，比读作「正确率」诚实。

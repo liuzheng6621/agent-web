@@ -22,10 +22,24 @@ const db = {
   favorites: new Set(), // `${username}|${slug}`
   follows: new Set(), // `${follower}|${following}`
   seq: 0,
+  lastStamp: 0,
 };
 
 const slugify = (title) => `${String(title).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}-${(db.seq += 1)}`;
 const token = () => crypto.randomBytes(16).toString('hex');
+
+// 单调递增的 ISO 时间戳：同一毫秒内连续创建也严格递增。
+// 列表按 createdAt 倒序排，两个时间戳相等时 sort 是稳定的 —— 顺序就退化成插入序，
+// 「翻页拿到刚建的那条」会错一页。CI 机器上两次创建落在同一毫秒是常态，不是巧合。
+// REALWORLD_FIXTURE_FROZEN_MS 把「现在」钉死在某个毫秒上，用来确定性地测上面这条性质：
+// 时钟不走的时候，连建三条也必须拿到三个严格递增的时间戳。不设就正常走系统时钟。
+const FROZEN_MS = Number(process.env.REALWORLD_FIXTURE_FROZEN_MS || 0);
+
+function stamp() {
+  const now = FROZEN_MS > 0 ? FROZEN_MS : Date.now();
+  db.lastStamp = now > db.lastStamp ? now : db.lastStamp + 1;
+  return new Date(db.lastStamp).toISOString();
+}
 
 function send(res, status, body) {
   const text = body === undefined ? '' : JSON.stringify(body);
@@ -93,6 +107,7 @@ const server = http.createServer(async (req, res) => {
     db.favorites.clear();
     db.follows.clear();
     db.seq = 0;
+    db.lastStamp = 0;
     return send(res, 200, { reset: true });
   }
   // POST /users
@@ -223,7 +238,7 @@ const server = http.createServer(async (req, res) => {
     const a = (body && body.article) || {};
     const missing = ['title', 'description', 'body'].filter((k) => !a[k]);
     if (missing.length) return errs(res, 422, Object.fromEntries(missing.map((k) => [k, ["can't be blank"]])));
-    const now = new Date().toISOString();
+    const now = stamp();
     const rec = {
       slug: slugify(a.title), title: a.title, description: a.description, body: a.body,
       tagList: Array.isArray(a.tagList) ? a.tagList : [], author: viewer.username, createdAt: now, updatedAt: now,
@@ -250,7 +265,7 @@ const server = http.createServer(async (req, res) => {
         const b = body && body.comment && body.comment.body;
         if (!b) return errs(res, 422, { body: ["can't be blank"] });
         const id = (db.seq += 1);
-        const rec = { id, slug, body: b, author: viewer.username, createdAt: new Date().toISOString() };
+        const rec = { id, slug, body: b, author: viewer.username, createdAt: stamp() };
         db.comments.set(id, rec);
         return send(res, 201, { comment: { id, body: b, createdAt: rec.createdAt, author: profileOf(viewer, viewer) } });
       }
@@ -279,7 +294,7 @@ const server = http.createServer(async (req, res) => {
       const a = (body && body.article) || {};
       if (a.tagList !== undefined && !Array.isArray(a.tagList)) return errs(res, 422, { tagList: ['is invalid'] });
       for (const k of ['title', 'description', 'body', 'tagList']) if (a[k] !== undefined) art[k] = a[k];
-      art.updatedAt = new Date().toISOString();
+      art.updatedAt = stamp();
       return send(res, 200, { article: articleOf(art, viewer) });
     }
     if (method === 'DELETE') {

@@ -6,6 +6,15 @@
 CI 也在查。这条规则是买来的：这个仓库曾经同时存在 `package.json` 0.16、README 0.9、
 Gitee Release v0.6.0 三个数，谁看都是三个项目。
 
+## 0.78.1
+
+修一个只在 CI 上露过一次头的失败，顺手把它的成因变成可确定复现的测试。
+
+- **`examples/realworld/fake-server.mjs` 的时钟改成单调递增**（和 `fake-server-b.mjs` 早就一致的写法）。原来用 `new Date().toISOString()` 取真实毫秒，两次创建落在同一毫秒时 `createdAt` 相等；列表按 `createdAt` 倒序，相等时 `sort` 退化成插入序，「翻页拿到刚建的那条」就错一页，`realworld/pagination` 判 `assertion_false`。本地两次 HTTP 往返超过 1ms，所以本地永远不复现——这类 bug 只在机器够快的时候出现。
+- **夹具新增 `REALWORLD_FIXTURE_FROZEN_MS` 开关**，把「现在」钉死在某个毫秒上。时钟不走的时候，连建三条也必须拿到三个严格递增的时间戳，于是「同毫秒」从偶发变成必然。
+- **新增 `test/realworld-clock.test.mjs`**：先断言夹具真的吃了冻结开关（否则真实时钟会让下面那条断言白白通过——第一版守卫就有这个漏洞，旧代码也能过），再断言三个时间戳互不相同且严格递增，最后端到端跑一遍 `pagination` 必须判 `pass`。拿旧实现跑这条测试会红在「夹具没吃开关」上，拿新实现跑绿。
+- 603 测试（599 pass + 4 skip），72 个变异体口径不变（适用 46 / 抓到 44 = 95.7%）。
+
 ## 0.78.0
 
 分母与建议两处一起收口：`applies_to` 补上执行语义，建议断言补上机读原因，
