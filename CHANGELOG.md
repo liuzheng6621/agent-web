@@ -14,7 +14,7 @@ npm 包上线：包名 `agent-case`（npm 上的 agent-web 已被无关项目占
 - 两份 README「六十秒上手 / Sixty-second tour」加 `npx agent-case selftest` 一行入口。
 - Pages 封面加同款 npx 行。
 - 版本联动 v0.77.0（VERSION / package.json / CITATION / ROADMAP / CHANGELOG / 两 README）。
-- `597` 测试全绿（594 pass + 3 skip），72 个变异体口径不变（适用 50 抓到 48 = 96.0%）。
+- `602` 测试全绿（598 pass + 4 skip），72 个变异体口径为适用 46 抓到 44（95.7%）。
 
 
 外部测评报告（v0.75.0 测评，综合 7.8/10）的四项发现，逐条核实为真、逐条修复：

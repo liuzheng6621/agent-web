@@ -5,7 +5,8 @@ export const meta = {
   symptom: '同一个请求谁调都成功；界面上看不出来，因为调用者本来也有权限',
   mechanism: '执行前把 action.as 换成 manifest 里的第一个角色（管理员），越权检查形同虚设',
   catch_hint: '越权案例必须证明有断言抓得住：换个身份还能过，说明案例没测到权限',
-  applies_to: {},
+  // 单角色域没有“换错身份”这回事：唯一角色就是自己。
+  applies_to: { roles_min: 2 },
 };
 
 export function wrap(adapter) {

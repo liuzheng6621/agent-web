@@ -975,8 +975,12 @@ a(P⁺) = true   且   a(m) = false
 把它们建议成 `field_equals`，写进去的人会得到一个**跨实现必红**的检查项 ——
 比不给建议更糟，因为它长得像一条建议。
 
-给不出建议时不许沉默：该变异体标 `suggestionBlocked: true`，`--suggest` 末尾点名，
-准入基线把它单列成「不可移植」而不是「缺模板」。沉默会被读成「工具没找到洞」。
+给不出建议时不许沉默：该变异体标 `suggestionBlocked: true`，并用
+`suggestionBlockedReason` 说明原因。`row_order` 表示差异只是集合重排，按索引写断言
+会依赖实现行序；`non_portable` 表示差异落在上表的不可移植字段。其他值覆盖
+`trace_path` / `initial_state` / `missing_initial` / `unsupported_shape` /
+`verification_failed` 这些模板或证据缺口。`--suggest` 按原因分组点名，
+准入基线也分开报告，不能把行序问题笼统写成「不可移植字段」。
 
 ### 12.9.2 为什么 certify 是串行的
 
@@ -1045,11 +1049,26 @@ export function wrap(adapter) {
 造不出差异的条目稀释了：一个已经验得不错的域会被报成烂域。
 
 ```js
-applies_to: { capabilities: ['order.cancel'], collections: ['orders'] }
+applies_to: {
+  adapters: ['taixianglian-sql'],          // 任一命中
+  capabilities: ['order.cancel'],          // 全部命中
+  capabilities_any: ['kitchen.accept', 'kitchen.ready'], // 任一命中
+  capability_kinds: ['write'],             // 每种 kind 都要有
+  collections: ['orders'],                 // 全部命中
+  roles_min: 2,                            // manifest.roles 至少这么多个
+}
 ```
 
-判据（`src/certify.mjs` 的 `appliesTo`）：声明的能力全在 `manifest.capabilities` 里、
-声明的集合全在 `manifest.scopes` 里，才判适用。两个字段都可省略，**全空 = 所有域都适用**。
+判据（`src/certify.mjs` 的 `appliesTo`）：
+
+- `adapters`：`manifest.adapter` 命中其中任意一个；用于只在特定观测通道成立的变异体。
+- `capabilities`：每一项都在 `manifest.capabilities[].id` 里，语义是**全部命中**。
+- `capabilities_any`：至少命中一个能力 ID，语义是**任一命中**。用于同一类坏法可由多种能力触发的场合。
+- `capability_kinds`：每一项都能在 `manifest.capabilities[].kind` 里找到；用于「纯读域不可能重复写」这类形状判断。
+- `collections`：每一项都在 `manifest.scopes` 里。
+- `roles_min`：`manifest.roles` 的数量至少达到这个值；单角色域没有「换错身份」的空间。
+
+所有字段都可省略，**全空 = 所有域都适用**；多个字段同时出现时按 AND 组合。
 
 三个约定：
 

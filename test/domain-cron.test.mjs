@@ -5,10 +5,10 @@ import { validateCase } from '../src/case.mjs';
 import { loadAdapter } from '../src/adapter/load.mjs';
 
 const dir = new URL('../cases/cron/', import.meta.url);
-const files = ['recurrence-full.json', 'recurrence-gap.json', 'recurrence-drift.json'];
+const files = ['recurrence-full.json', 'recurrence-gap.json', 'recurrence-drift.json', 'forbidden-write.json'];
 const load = (f) => JSON.parse(readFileSync(new URL(f, dir), 'utf8'));
 
-test('三条案例都通过校验，且 id 与文件名对得上', () => {
+test('四条案例都通过校验，且 id 与文件名对得上', () => {
   for (const f of files) {
     const c = load(f);
     const errors = validateCase(c);
@@ -61,7 +61,7 @@ test('角色分组：advance/pause/resume/create 是 operator，读能力两个�
   assert.deepEqual(byId.get('runs.list').roles, ['operator', 'viewer']);
 });
 
-test('recurrence 断言在三条案例里都真的出现了', () => {
+test('recurrence 断言在三条节律案例里都真的出现了', () => {
   const kinds = (f) => load(f).task.goal_assertions.map((a) => a.kind);
   assert.ok(kinds('recurrence-full.json').includes('recurrence'));
   assert.equal(kinds('recurrence-gap.json').filter((k) => k === 'recurrence').length, 2, '暂停被切成两段');
@@ -73,4 +73,15 @@ test('recurrence 断言在三条案例里都真的出现了', () => {
 test('漂移案例必须带 unique：光有节律不足以说明「没有跑两次」', () => {
   const kinds = load('recurrence-drift.json').task.goal_assertions.map((a) => a.kind);
   assert.ok(kinds.includes('unique'));
+});
+
+test('viewer 不能推进调度时钟：负例走真实角色拒绝，而不是把写能力藏起来', () => {
+  const c = load('forbidden-write.json');
+  assert.equal(c.reference_trajectory.length, 2);
+  assert.equal(c.reference_trajectory[0].capability, 'job.create');
+  assert.equal(c.reference_trajectory[0].expected_outcome, 'applied');
+  assert.equal(c.reference_trajectory[1].capability, 'scheduler.advance');
+  assert.equal(c.reference_trajectory[1].as, 'viewer');
+  assert.equal(c.reference_trajectory[1].expected_outcome, 'rejected');
+  assert.ok(c.task.goal_assertions.some((a) => a.kind === 'unchanged' && a.scopes.includes('runs')));
 });

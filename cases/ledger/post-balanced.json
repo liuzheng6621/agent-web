@@ -32,6 +32,13 @@
         "delta": 1
       },
       {
+        "kind": "count_delta",
+        "selector": {
+          "collection": "accounts"
+        },
+        "delta": 2
+      },
+      {
         "kind": "field_equals",
         "selector": {
           "collection": "trial",

@@ -74,11 +74,12 @@ const shrunk = known.filter((id) => !survivors.includes(id));
 // 如果某个变异体在任何案例上都造不出差异，它可能等价于原程序 —— 那不是欠账，
 // 那是目录写错了。这种情况直接把基线判失败，让人回去看，而不是挂着一条永远清不掉的账。
 const undetermined = report.mutations.filter((m) => !m.caught && m.status !== 'killable' && m.status !== 'not_applicable');
-// 第三种合法状态：杀得掉、但差异全落在不可移植字段上（id / 时间 / 取餐号）。
-// 那不是缺模板，是「换个实现必变」—— 硬写成断言等于给自己造一条会红的假账。
-// 这种不判失败，只要求它被显式标出来（suggestionBlocked），否则沉默会被读成工具没找到洞。
+// 第三种合法状态：杀得掉、但没有可移植的断言模板。
+// 原因分两类：非可移植字段（id / 时间 / 取餐号）与纯重排（索引依赖行序）。
+// 两种都不判失败，但必须由 suggestionBlockedReason 显式标出来，
+// 否则沉默会被读成工具没找到洞，笼统的「不可移植」也会把原因说错。
 const blocked = report.mutations.filter((m) => !m.caught && m.status === 'killable' && !m.suggestion && m.suggestionBlocked);
-const noSuggestion = report.mutations.filter((m) => !m.caught && m.status === 'killable' && !m.suggestion && !m.suggestionBlocked);
+const noSuggestion = report.mutations.filter((m) => !m.caught && m.status === 'killable' && !m.suggestion && (!m.suggestionBlocked || !m.suggestionBlockedReason));
 
 if (undetermined.length > 0) {
   console.error(`准入基线：${undetermined.length} 个漏网变异体连"可观测差异"都造不出来`);
@@ -98,8 +99,17 @@ if (noSuggestion.length > 0) {
 }
 
 if (blocked.length > 0) {
-  console.log('  不可移植（杀得掉，但没有跨实现的断言可写）：');
-  for (const m of blocked) console.log(`    ${m.id}  差异在 ${m.witness?.path}`);
+  const groups = new Map([
+    ['row_order', '行序依赖（差异是集合重排，索引字段会依赖实现行序）'],
+    ['non_portable', '不可移植（差异落在 id / 时间 / 取餐号这类字段）'],
+    [null, '其他模板缺口'],
+  ]);
+  for (const [reason, label] of groups) {
+    const rows = blocked.filter((m) => m.suggestionBlockedReason === reason);
+    if (rows.length === 0) continue;
+    console.log(`  ${label}：`);
+    for (const m of rows) console.log(`    ${m.id}  差异在 ${m.witness?.path}`);
+  }
 }
 
 if (grew.length === 0 && shrunk.length === 0) {

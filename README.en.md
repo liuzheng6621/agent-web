@@ -13,7 +13,7 @@
 
 <p align="center">
   We injected <b>72 kinds of lies</b> into the implementation — phantom success, forged bills,
-  impersonation, quietly moving someone else's orders. Assertions catch <b>48</b> of the 50 that apply.
+  impersonation, quietly moving someone else's orders. Assertions catch <b>44</b> of the 46 that apply.
   The 2 that survive are in the ledger, not in a footnote.
   (<a href="#admission-test-an-assertion-must-prove-it-is-useful">how this is verified</a> · <a href="#boundaries-implemented-vs-still-open">what still slips through</a> · <a href="https://liuzheng6621.github.io/agent-web/"><b>open a live verdict page ↗</b></a>)
 </p>
@@ -344,7 +344,7 @@ reported as needing a human signature. A wrong mapping makes a case pass on a fi
 | Lexicon search `cases/lexicon` | Two custom implementations (trie + greedy segmentation / sorted array + reverse DP) | 900 rows, 10 per page, three pages: cross-page duplicates, boundary drops and lying `total` only show up at this scale — [details](docs/domains/lexicon.md) |
 
 | RealWorld contract `cases/realworld` | Two independent implementations (`fake-server.mjs` is Map-backed, `fake-server-b.mjs` is array-backed) | One OpenAPI contract plus 13 official hurl suites converted verbatim: 100% verdict agreement — and when B is deliberately broken, `compare` names the exact case that disagrees |
-| Scheduled jobs `cases/cron` | Two custom implementations (array + slot Set with stored nextDue / slot-key Map with lastSlot) | Time is a slot sequence, not a scalar: `recurrence` catches double-fires, drift and gaps; 3/3 verdict agreement — [details](docs/domains/cron.md) |
+| Scheduled jobs `cases/cron` | Two custom implementations (array + slot Set with stored nextDue / slot-key Map with lastSlot) | Time is a slot sequence, not a scalar: `recurrence` catches double-fires, drift and gaps; 4/4 verdict agreement — [details](docs/domains/cron.md) |
 
 The third domain forced a mechanism: mutants can declare `applies_to`. A ledger-domain mutant in the coffee domain is "not applicable", not counted — otherwise the catch rate gets smashed by irrelevant mutants into a false pit.
 
@@ -482,7 +482,7 @@ the builder saw — the minimal form of "independent reproduction", already repr
 2. **Field mappings still need review (L2).** Nested-array leaves and same-name/different-meaning fields across collections cannot be decided by machine; a human must sign.
 3. **No universal flow-quality score (L3).** Define domain goals, metrics and weights first; keep quality scoring separate from legality verdicts.
 4. **Negative expectations still need a human signature (L4).** Whether a request *should* be rejected is a business decision; candidates only produce a review sheet and never enter verdicts.
-5. **Mutant coverage is incomplete (L5).** `breed` only faults **observed shape** (13 operators; repo-wide: 72 mutants, 48 of 50 applicable caught). Execution- and business-layer faults (oversell, refund above paid amount, skipped approval) still need submissions — the generator knows shape, not semantics.
+5. **Mutant coverage is incomplete (L5).** `breed` only faults **observed shape** (13 operators; repo-wide: 72 mutants, 44 of 46 applicable caught). Execution- and business-layer faults (oversell, refund above paid amount, skipped approval) still need submissions — the generator knows shape, not semantics.
 6. **Arbitrary mutant equivalence is undecidable in general (L6).** Finite-state or bounded scenarios can be proved or exhaustively checked; otherwise report "not distinguished within budget," never "equivalent."
 7. **Cross-entity ordering is still missing (L7).** Single-chain timing is covered — `timeliness` compares two event timestamps, requires a declared `timezone`, and reports `unknown` rather than false when a timestamp is absent (v0.48.0). What is missing is **across entities**: "the order must be created before stock is locked", "a refund must follow the original payment" need a domain with a dependency graph.
 8. **Adapters can still lie (L8).** `probe` checks fifteen mechanical properties and `crosscheck` (v0.54.0) re-fetches through an independent channel, so together they catch "declared but missing", "role ignored", "reads that write", "tampering with the response body" and "reporting success after the transport died". What they still cannot catch is a liar that watches the prober (probe shuffles its seven middle checks on every run, but the opening/leak/close anchors and each check's internal call pattern stay fixed, so an adapter that can read the source can still tell probing from running), or one that replaces the whole `globalThis.fetch`. Same-process loading also leaves the **blast radius** unisolated — an adapter can patch modules the judge itself imported; "loading an adapter = executing code with your credentials" is literal.

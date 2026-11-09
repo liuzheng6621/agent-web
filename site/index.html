@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>agent-web — 检验报告</title>
-<meta name="description" content="给被测实现注入 72 种谎话，适用口径下当场抓住 48 种。一份案例，跑多个实现，判决必须一致。">
+<meta name="description" content="给被测实现注入 72 种谎话，适用口径下当场抓住 44 种。一份案例，跑多个实现，判决必须一致。">
 <meta name="color-scheme" content="light dark">
 <style>
 :root{
@@ -133,21 +133,21 @@ strong{font-weight:600}
     <dt>报告版本</dt><dd>v{{VERSION}}</dd>
   </dl>
   <h1>给 Agent 的测试，<br>做一次检验</h1>
-  <p class="lede">我们给被测实现注入了 <em>72 种谎话</em>——谎报成功、伪造账单、冒充别人、偷偷挪走别人的订单。适用的 50 种里，断言当场抓住 48 种；漏掉的 2 种写在台账里，不在脚注里。</p>
+  <p class="lede">我们给被测实现注入了 <em>72 种谎话</em>——谎报成功、伪造账单、冒充别人、偷偷挪走别人的订单。适用的 46 种里，断言当场抓住 44 种；漏掉的 2 种写在台账里，不在脚注里。</p>
   <p class="cta-row"><a class="cta" href="coffee.dashboard.html">打开真实判决总览（13 条案例）</a></p>
 </header>
 
 <section class="sec-findings">
   <h2>检验结论</h2>
-  <div class="seal" aria-hidden="true"><span class="big">已验</span><span class="small">48 / 50</span></div>
+  <div class="seal" aria-hidden="true"><span class="big">已验</span><span class="small">44 / 46</span></div>
   <div class="findings">
     <div class="finding"><span class="label">注入的变异体（谎话）</span><span class="dots"></span><span class="val">72</span></div>
-    <div class="finding"><span class="label">适用口径下的分母</span><span class="dots"></span><span class="val">50 种</span></div>
-    <div class="finding"><span class="label">断言当场抓住</span><span class="dots"></span><span class="val hit">48/50</span></div>
-    <div class="finding"><span class="label">抓获率</span><span class="dots"></span><span class="val hit">96.0%</span></div>
+    <div class="finding"><span class="label">适用口径下的分母</span><span class="dots"></span><span class="val">46 种</span></div>
+    <div class="finding"><span class="label">断言当场抓住</span><span class="dots"></span><span class="val hit">44/46</span></div>
+    <div class="finding"><span class="label">抓获率</span><span class="dots"></span><span class="val hit">95.7%</span></div>
     <div class="finding"><span class="label">漏网的 2 种</span><span class="dots"></span><span class="val">台账在案</span></div>
   </div>
-  <p class="note">22 个变异体在本域不适用，不进分母。漏掉的两种不是被四舍五入掉的，名字写在 <code>docs/LIMITS.md</code> 里。</p>
+  <p class="note">26 个变异体在本域不适用，不进分母。漏掉的两种不是被四舍五入掉的，名字写在 <code>docs/LIMITS.md</code> 里。</p>
 </section>
 
 <section>
@@ -187,7 +187,7 @@ strong{font-weight:600}
 </section>
 
 <footer class="foot">
-  <p class="colophon">口径：72 个变异体中 22 个在本域不适用，不进分母；48/50 = 96.0% 出自 <code>certify-baseline --emit-limits</code> 机器实测（v{{VERSION}}）。本页不使用无分母百分比。</p>
+  <p class="colophon">口径：72 个变异体中 26 个在本域不适用，不进分母；44/46 = 95.7% 出自 <code>certify-baseline --emit-limits</code> 机器实测（v{{VERSION}}）。本页不使用无分母百分比。</p>
   <div class="foot-links">
     <a href="https://github.com/liuzheng6621/agent-web">GitHub 仓库</a>
     <a href="https://gitee.com/liu-everything_impossble/agent-web">Gitee 仓库</a>

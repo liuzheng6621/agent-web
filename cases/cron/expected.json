@@ -1,4 +1,5 @@
 {
+  "cron/forbidden-write": "pass",
   "cron/recurrence-full": "pass",
   "cron/recurrence-gap": "pass",
   "cron/recurrence-drift": "pass"

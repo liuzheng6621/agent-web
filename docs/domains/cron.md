@@ -23,7 +23,7 @@
 | `cron-a` | 数组 `runs` + 已完成槽位 `Set`（`${jobId}#${slot}`） | 存 `nextDue` 时间戳，逐槽循环补齐 |
 | `cron-b` | `Map<slotKey, run>`（天然去重） | 只存 `lastSlot`，下次该跑的时刻现算 |
 
-`compare --adapters=cron-a,cron-b` 实测 **3/3 判决一致、2 个集合逐字相同**。
+`compare --adapters=cron-a,cron-b` 实测 **4/4 判决一致、2 个集合逐字相同**。
 
 ## 能力（6 个）
 
@@ -36,15 +36,16 @@
 
 `reset_strategy: 'snapshot'`，`events_complete: false`。
 
-## 三条案例
+## 四条案例
 
 | 案例 | 验什么 | 断言 |
 |---|---|---|
 | `recurrence-full` | 24 个槽位跑满，一次不漏不重 | `count_delta` 25 · `recurrence` 25 槽 · `field_equals` nextDueAt |
 | `recurrence-gap` | 暂停把时间线切成两段，每段各自跑满 | 两段 `recurrence`（4 + 3）· `count_delta` 7 · `unique` |
 | `recurrence-drift` | 容差 60s 内允许晚到 | `recurrence`（tolerance 60s）· `unique` · `count_delta` 5 |
+| `forbidden-write` | viewer 不能推进调度时钟 | 第二步行结局必须是 `rejected` · `unchanged runs` |
 
-三条在 `cron-a` 与 `cron-b` 上都是 pass，`compare` 一致率 100%。
+四条在 `cron-a` 与 `cron-b` 上都是 pass，`compare` 一致率 100%。
 
 ## 三个本域变异体
 
@@ -58,15 +59,17 @@
 `scripts/kind-necessity.mjs` 就靠它判 `recurrence` 是否必要——这是宪法第一条
 「新增一种断言必须能杀掉至少一个变异体，且至少有一个只有它能杀」的现场证据。
 
-`certify cases/cron --adapter=cron-a` 实测：适用 7、抓到 4（57.1%）、漏网 3。
+`certify cases/cron --adapter=cron-a` 实测：适用 6、抓到 6（100%）。
 
-漏网的 3 个是跨域通病（`m-no-reject` 该拒的不拒、`m-exec-role-ignore` 身份塌缩、
-`m-exec-drop-intermediate` 丢中间态），在这个域上连差异都造不出来——三条案例里没有
-一条走「该被拒的分支」或「两步迁移」。**这是案例没走到的欠账，不是尺子不够长。**
+新加的 `forbidden-write` 不是只为凑数：它让 viewer 真正走一次写能力的拒绝分支，
+`unchanged runs` 当场抓住 `m-exec-role-ignore`。`m-exec-duplicate-write` 则由
+`recurrence-drift` 的 `unique` 与 `count_delta` 抓住。`m-exec-drop-intermediate`
+只对真实迁移能力下药，cron 没有这类能力，现在按 `capabilities_any` 判为不适用，
+不再算作一条永远清不掉的漏网。
 
 v0.63.1 之前这里写的是「适用 19、抓到 4（21.1%）、漏网 15」：那 15 个里有 12 个是咖啡域
-的老变异体，没声明 `applies_to`，工具只能按「适用」算。补全声明后分母从 19 降到 7，
-抓获率从 21.1% 升到 57.1%——**分母虚高会把一个已经验得不错的域报成烂域。**
+的老变异体，没声明 `applies_to`，工具只能按「适用」算。补全声明后分母降到 7，
+这一轮又按能力形状收窄到 6 并补上负例——**分母虚高会把一个已经验得不错的域报成烂域。**
 
 ## 这个域验不到的东西
 

@@ -23,7 +23,7 @@ node bin/agent-web.mjs certify cases/lexicon --adapter=lexicon-a --detail
 ```
 
 实测：两个实现各 4/4 与预期一致；`compare` 判决一致率 100%、视图契约兼容；
-`certify` 词库域 16 个适用变异体里抓住 10 个（62.5%），最小充分集 6 条断言。
+`certify` 词库域 10 个适用变异体全部抓住（100%），最小充分集 7 条断言。
 
 ## 这个域抓到的东西
 

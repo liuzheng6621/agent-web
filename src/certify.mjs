@@ -263,12 +263,21 @@ export async function certifyCase(caseObj, adapterFactory, { adapterName = 'unkn
       // 漂移路径剔除：同一实现跑两遍都会变的字段，不能拿来当「这个变异体被看见了」的证据。
       .filter((w) => !drift.has(w.path));
     const suggestions = [];
+    const blockedReasons = new Set();
     for (const w of witnesses) {
-      if (w.path.startsWith('initial.')) continue;
-      const assertion = suggestFromWitness(w, base.ctx);
-      if (!assertion) continue;
+      if (w.path.startsWith('initial.')) {
+        blockedReasons.add('initial_state');
+        continue;
+      }
+      const proposal = analyzeWitness(w, base.ctx, p.ctx);
+      if (!proposal.assertion) {
+        blockedReasons.add(proposal.reason);
+        continue;
+      }
+      const assertion = proposal.assertion;
       const proof = verifySuggestion(assertion, base.ctx, p.ctx);
       if (proof.kills) suggestions.push({ assertion, proof, path: w.path });
+      else blockedReasons.add('verification_failed');
     }
     rows.push({
       mutation: m.id,
@@ -283,9 +292,10 @@ export async function certifyCase(caseObj, adapterFactory, { adapterName = 'unkn
       witness: witnesses[0] ?? null,
       witnessCount: witnesses.length,
       suggestions: suggestions.slice(0, 3),
-      // 差异看得见、但全落在 id / 时间 / pickupNo 这类不可移植字段上：
-      // 说明它杀得掉，只是没有能跨实现表达的断言。不记这一笔，读者会以为工具坏了。
-      suggestionBlocked: suggestions.length === 0 && witnesses.length > 0,
+      // 差异看得见，但没有能跨实现表达的断言。原因必须机读，不能全塞进
+      // 「不可移植字段」：纯重排是行序依赖，字段值本身未必不可移植。
+      suggestionBlocked: suggestions.length === 0 && blockedReasons.size > 0,
+      suggestionBlockedReason: suggestions.length === 0 ? primaryBlockReason(blockedReasons) : null,
     });
   }
   return {
@@ -315,8 +325,6 @@ export function diffLeaves(a, b, prefix = '', out = [], budget = 200) {
   return out;
 }
 
-const VIEW_COLLECTIONS = ['orders', 'menu', 'status_log'];
-
 /**
  * 把一处可观测差异翻成一条断言。返回 null 表示没有现成模板能表达它。
  * 只翻"正确实现上一定为真、坏实现上一定为假"的那种——翻不出来就不猜。
@@ -344,38 +352,96 @@ export function isPortablePath(path) {
 export function appliesTo(meta, manifest) {
   const need = meta && meta.applies_to;
   if (!need) return true;
-  const caps = new Set((manifest && manifest.capabilities || []).map((c) => c.id));
+  const capabilityList = manifest && manifest.capabilities || [];
+  const caps = new Set(capabilityList.map((c) => c.id));
   const scopes = new Set(manifest && manifest.scopes || []);
+  const adapterIds = new Set([manifest?.adapter].filter(Boolean));
+  const roles = new Set(manifest && manifest.roles || []);
+  const anyAdapters = need.adapters || [];
+  if (anyAdapters.length > 0 && !anyAdapters.some((a) => adapterIds.has(a))) return false;
   for (const c of need.capabilities || []) if (!caps.has(c)) return false;
+  const anyCaps = need.capabilities_any || [];
+  if (anyCaps.length > 0 && !anyCaps.some((c) => caps.has(c))) return false;
+  const kinds = new Set(capabilityList.map((c) => c.kind).filter(Boolean));
+  for (const k of need.capability_kinds || []) if (!kinds.has(k)) return false;
+  if (need.roles_min !== undefined && roles.size < need.roles_min) return false;
   for (const s of need.collections || []) if (!scopes.has(s)) return false;
   return true;
 }
 
-export function suggestFromWitness(witness, baseCtx) {
-  if (!isPortablePath(witness.path)) return null;
+function isPureReorder(before, after) {
+  if (!Array.isArray(before) || !Array.isArray(after) || before.length !== after.length) return false;
+  if (stableStringify(before) === stableStringify(after)) return false;
+  const counts = new Map();
+  for (const value of before) {
+    const key = stableStringify(value);
+    counts.set(key, (counts.get(key) || 0) + 1);
+  }
+  for (const value of after) {
+    const key = stableStringify(value);
+    const count = counts.get(key) || 0;
+    if (count === 0) return false;
+    if (count === 1) counts.delete(key);
+    else counts.set(key, count - 1);
+  }
+  return counts.size === 0;
+}
+
+function analyzeWitness(witness, baseCtx, mutantCtx = null) {
+  const witnessPath = String(witness.path);
+  const parts = witnessPath.split('.');
+  const collection = parts[0];
+  const baseRows = baseCtx?.final?.[collection];
+
+  // 纯重排会让 orders.0 指向另一条记录。此时把 orders.0.totalAmount 写成固定值，
+  // 只是把当前实现的行序钉死；换一个合法实现就可能判假，不能当建议。
+  // 这个判断必须先于字段可移植性：见证常先落在 orders.0.id 上，但真正的坏法是行序。
+  if (mutantCtx && isPureReorder(baseRows, mutantCtx.final?.[collection])) {
+    return { assertion: null, reason: 'row_order' };
+  }
+  if (!isPortablePath(witnessPath)) return { assertion: null, reason: 'non_portable' };
   // trace.3.xxx 是「第 3 步之后的状态」，只对这一条案例成立；要断言它得用 window/every_step，
   // 不是把步号写进 field_equals。这类见证照实报出来，但不给建议。
-  if (String(witness.path).startsWith('trace.')) return null;
-  const parts = String(witness.path).split('.');
-  const collection = parts[0];
-  if (!VIEW_COLLECTIONS.includes(collection)) return null;
+  if (witnessPath.startsWith('trace.')) return { assertion: null, reason: 'trace_path' };
+  if (!Array.isArray(baseRows)) return { assertion: null, reason: 'unsupported_shape' };
 
   // orders.length 这种：用 count_delta 表达增量
   if (parts[1] === 'length') {
     const initLen = Array.isArray(baseCtx?.initial?.[collection]) ? baseCtx.initial[collection].length : null;
-    if (initLen === null) return null;
-    return { kind: 'count_delta', selector: { collection }, delta: witness.correct - initLen };
+    if (initLen === null) return { assertion: null, reason: 'missing_initial' };
+    return {
+      assertion: { kind: 'count_delta', selector: { collection }, delta: witness.correct - initLen },
+      reason: null,
+    };
   }
 
   const index = Number(parts[1]);
-  if (!Number.isInteger(index) || index < 0) return null;
+  if (!Number.isInteger(index) || index < 0) return { assertion: null, reason: 'unsupported_shape' };
   const path = parts.slice(2).join('.');
-  if (path === '') return null;
+  if (path === '') return { assertion: null, reason: 'unsupported_shape' };
 
   const selector = { collection, index };
   const value = witness.correct;
-  if (value === undefined) return null;
-  return { kind: 'field_equals', selector, path, value };
+  if (value === undefined) return { assertion: null, reason: 'unsupported_shape' };
+  return { assertion: { kind: 'field_equals', selector, path, value }, reason: null };
+}
+
+const BLOCK_REASON_PRIORITY = [
+  'row_order',
+  'non_portable',
+  'trace_path',
+  'initial_state',
+  'missing_initial',
+  'unsupported_shape',
+  'verification_failed',
+];
+
+function primaryBlockReason(reasons) {
+  return BLOCK_REASON_PRIORITY.find((reason) => reasons.has(reason)) ?? null;
+}
+
+export function suggestFromWitness(witness, baseCtx, mutantCtx = null) {
+  return analyzeWitness(witness, baseCtx, mutantCtx).assertion;
 }
 
 /** 拿一条候选断言到两个实现上各跑一遍，确认它真的是杀手。 */
@@ -462,7 +528,7 @@ export async function certify({ cases, adapterFactory, adapterName = 'unknown', 
         id: m.id, title: m.title, layer: m.layer, symptom: m.symptom,
         caught: false, status: 'not_applicable',
         killedBy: [], blindBy: [], survivedIn: [], verdictKills: 0,
-        witnessCount: 0, suggestionBlocked: false,
+        witnessCount: 0, suggestionBlocked: false, suggestionBlockedReason: null,
         witness: null, suggestion: null, suggestionCount: 0,
         equivalence: m.equivalence_evidence ?? null,
       };
@@ -475,13 +541,13 @@ export async function certify({ cases, adapterFactory, adapterName = 'unknown', 
     // equivalent，得由投稿人给出可区分性证明（meta.equivalence_evidence）。
     const witnesses = [];
     const suggestions = [];
-    let blockedIn = 0;
+    const blockedReasons = new Set();
     for (const cr of per) {
       const row = cr.rows.find((r) => r.mutation === m.id);
       if (!row) continue;
       if (row.notApplicable) continue;
       if (row.witness) witnesses.push({ caseId: cr.caseId, ...row.witness });
-      if (row.suggestionBlocked) blockedIn += 1;
+      if (row.suggestionBlockedReason) blockedReasons.add(row.suggestionBlockedReason);
       for (const sg of row.suggestions) suggestions.push({ caseId: cr.caseId, path: sg.path, assertion: sg.assertion, proof: sg.proof });
     }
     const status = caught ? 'caught' : suggestions.length > 0 ? 'killable' : witnesses.length > 0 ? 'killable' : 'undetermined';
@@ -497,7 +563,8 @@ export async function certify({ cases, adapterFactory, adapterName = 'unknown', 
       survivedIn,
       verdictKills,
       witnessCount: witnesses.length,
-      suggestionBlocked: blockedIn > 0 && suggestions.length === 0,
+      suggestionBlocked: blockedReasons.size > 0 && suggestions.length === 0,
+      suggestionBlockedReason: suggestions.length === 0 ? primaryBlockReason(blockedReasons) : null,
       witness: witnesses[0] ?? null,
       suggestion: suggestions[0] ?? null,
       suggestionCount: suggestions.length,
@@ -576,10 +643,19 @@ export function formatSuggestions(report) {
   }
   const blocked = (report.mutations ?? []).filter((m) => !m.caught && m.suggestionBlocked);
   if (blocked.length > 0) {
-    out.push('// 以下变异体杀得掉，但差异全落在不可移植字段上（id / 时间 / 取餐号这类），');
-    out.push('// 没有能跨实现表达的断言 —— 换一个实现它就必然失败，写进去等于给自己造一条会红的假账：');
-    for (const m of blocked) out.push('//   ' + m.id + (m.witness ? '  ← ' + m.witness.path : ''));
-    out.push('');
+    const groups = new Map([
+      ['row_order', ['// 以下变异体杀得掉，但差异只表现为集合重排。用 orders.0 这类索引字段会依赖实现行序，', '// 换一个合法实现就可能红：']],
+      ['non_portable', ['// 以下变异体杀得掉，但差异全落在不可移植字段上（id / 时间 / 取餐号这类），', '// 没有能跨实现表达的断言 —— 写进去等于给自己造一条会红的假账：']],
+      [null, ['// 以下变异体杀得掉，但见证路径没有可用的断言模板：']],
+    ]);
+    for (const [reason, [heading, detail]] of groups) {
+      const rows = blocked.filter((m) => m.suggestionBlockedReason === reason);
+      if (rows.length === 0) continue;
+      out.push(heading);
+      if (detail) out.push(detail);
+      for (const m of rows) out.push('//   ' + m.id + (m.witness ? '  ← ' + m.witness.path : ''));
+      out.push('');
+    }
   }
   return out.join(String.fromCharCode(10)).replace(/,\s*$/, '');
 }

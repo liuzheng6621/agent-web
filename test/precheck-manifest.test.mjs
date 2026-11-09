@@ -83,5 +83,5 @@ test('certify 与 compare 同样在碰案例前拦住', () => {
 test('好 manifest 不受影响：cron-a 照旧跑通', () => {
   const r = run(['verify', 'cases/cron', '--adapter=cron-a']);
   assert.equal(r.code, 0);
-  assert.ok(r.stdout.includes('100.0% (3/3)'));
+  assert.ok(r.stdout.includes('100.0% (4/4)'));
 });

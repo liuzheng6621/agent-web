@@ -15,8 +15,8 @@
 | 断言 | 21 种 | `--help` 里的断言表 |
 | 命令 | 33 条 | 同上 |
 | 变异体 | 72 个 | `node bin/agent-web.mjs mutants` |
-| 测试 | 597 条 | `npm test` |
-| 判据准入 | 适用 50 / 抓到 48（96.0%） | `node scripts/certify-baseline.mjs --emit-limits` |
+| 测试 | 602 条 | `npm test` |
+| 判据准入 | 适用 46 / 抓到 44（95.7%） | `node scripts/certify-baseline.mjs --emit-limits` |
 | 计入的域 | **6 个** | `docs/LIMITS.md` L11 的计数判据 |
 | 台账状态 | L1/L2/L4/L5/L7/L8/L10/L11 mitigated · L3/L6/**L12** by-design · L9 withdrawn | `grep status docs/LIMITS.md` |
 

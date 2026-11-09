@@ -182,6 +182,32 @@ test('差异翻断言：字段用 field_equals，长度用 count_delta，认不�
   assert.equal(suggestFromWitness({ path: 'orders.0', correct: {} }, ctx), null, '整个实体不同不该硬翻成一条字段断言');
 });
 
+test('建议断言不把纯重排翻成行序断言，也不限制新域集合名', () => {
+  const first = { id: 1, totalAmount: 56 };
+  const second = { id: 2, totalAmount: 28 };
+  const ctx = {
+    initial: { orders: [] },
+    final: { orders: [first, second] },
+  };
+  const reordered = {
+    initial: { orders: [] },
+    final: { orders: [second, first] },
+  };
+  assert.equal(
+    suggestFromWitness({ path: 'orders.0.totalAmount', correct: 56 }, ctx, reordered),
+    null,
+    '数组只是换了顺序时，索引字段断言依赖实现行序，不能当可移植建议',
+  );
+  assert.deepEqual(
+    suggestFromWitness(
+      { path: 'jobs.0.status', correct: 'active' },
+      { initial: { jobs: [] }, final: { jobs: [{ status: 'active' }] } },
+    ),
+    { kind: 'field_equals', selector: { collection: 'jobs', index: 0 }, path: 'status', value: 'active' },
+    '集合是否可建议应由实际视图决定，不能靠六个域名的硬编码',
+  );
+});
+
 test('建议断言必须当场验过才允许出现；给不出的必须说明卡在哪', async () => {
   const report = await certify({ cases: all(), adapterFactory: () => createMemoryAdapter() });
   const uncaught = report.mutations.filter((m) => !m.caught && m.status !== 'not_applicable');
@@ -195,12 +221,47 @@ test('建议断言必须当场验过才允许出现；给不出的必须说明�
       assert.equal(m.suggestion.proof.onBase, 'true', `${m.id} 的建议断言在正确实现上不成立`);
       assert.equal(m.suggestion.proof.onMutant, 'false', `${m.id} 的建议断言杀不掉它`);
     } else {
-      // 给不出建议是允许的，但必须说清是「差异全落在不可移植字段上」，
-      // 不能什么都不说 —— 沉默会被读成「工具没找到洞」。
-      assert.equal(m.suggestionBlocked, true, `${m.id} 既没有建议也没有说是被不可移植字段挡住的`);
+      // 给不出建议是允许的，但必须说清结构化原因，不能什么都不说 ——
+      // 沉默会被读成「工具没找到洞」。
+      assert.equal(m.suggestionBlocked, true, `${m.id} 既没有建议也没有说明阻断原因`);
+      assert.ok(m.suggestionBlockedReason, `${m.id} 缺 suggestionBlockedReason`);
       assert.ok(m.witness, `${m.id} 连见证都没有，那就不该是 killable`);
     }
   }
+  const unsorted = report.mutations.find((m) => m.id === 'm-unsorted-orders');
+  assert.equal(unsorted.suggestion, null, '纯重排不能给出依赖行序的建议断言');
+  assert.equal(unsorted.suggestionBlocked, true, '纯重排没有可移植建议时也必须说明原因');
+  assert.equal(unsorted.suggestionBlockedReason, 'row_order', '纯重排应单独归为行序依赖');
+  const pickup = report.mutations.find((m) => m.id === 'm-pickup-no-offset');
+  assert.equal(pickup.suggestionBlockedReason, 'non_portable', '取餐号是不可移植字段，不是行序问题');
+});
+
+test('适用范围支持“任一能力 / 能力种类 / 最少角色数 / 适配器”，不能把不存在的故障算进分母', () => {
+  const manifest = {
+    adapter: 'job-runner',
+    capabilities: [
+      { id: 'job.create', kind: 'write' },
+      { id: 'jobs.list', kind: 'read' },
+    ],
+    scopes: ['jobs'],
+    roles: ['operator', 'viewer'],
+  };
+  assert.equal(appliesTo({ applies_to: { capabilities_any: ['job.create', 'job.pause'] } }, manifest), true);
+  assert.equal(appliesTo({ applies_to: { capabilities_any: ['job.pause', 'job.resume'] } }, manifest), false);
+  assert.equal(appliesTo({ applies_to: { capability_kinds: ['write'] } }, manifest), true);
+  assert.equal(appliesTo({ applies_to: { capability_kinds: ['delete'] } }, manifest), false);
+  assert.equal(appliesTo({ applies_to: { roles_min: 2 } }, manifest), true);
+  assert.equal(appliesTo({ applies_to: { roles_min: 3 } }, manifest), false);
+  assert.equal(appliesTo({ applies_to: { adapters: ['other-runner', 'job-runner'] } }, manifest), true);
+  assert.equal(appliesTo({ applies_to: { adapters: ['other-runner'] } }, manifest), false);
+});
+
+test('账本视图的字段差异能被翻成可移植断言', () => {
+  const ctx = { initial: { accounts: [] }, final: { accounts: [{ name: '现金' }] } };
+  assert.deepEqual(
+    suggestFromWitness({ path: 'accounts.0.name', correct: '现金' }, ctx),
+    { kind: 'field_equals', selector: { collection: 'accounts', index: 0 }, path: 'name', value: '现金' },
+  );
 });
 
 test('适用范围：声明了能力或集合的变异体，在别的域里不算漏网', async () => {
@@ -251,6 +312,8 @@ test('--suggest 的产出能直接粘进案例，并交代哪些给不出', asyn
   for (const m of report.mutations.filter((x) => !x.caught && x.suggestionBlocked && !x.suggestion)) {
     assert.ok(text.includes(m.id), `给不出的 ${m.id} 也要点名，不能沉默`);
   }
+  assert.match(text, /集合重排[\s\S]*m-unsorted-orders/, '行序依赖必须单独说明');
+  assert.match(text, /不可移植字段[\s\S]*m-pickup-no-offset/, '不可移植字段必须单独说明');
   if (withSuggestion.length > 0) {
     assert.ok(text.includes('field_equals') || text.includes('count_delta'));
   }

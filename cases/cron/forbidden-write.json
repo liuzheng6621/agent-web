@@ -1,0 +1,47 @@
+{
+  "schema_version": "agent-web/0.1",
+  "id": "cron/forbidden-write",
+  "environment": {
+    "adapter": "cron-a",
+    "seed": {}
+  },
+  "task": {
+    "natural_goal": "viewer 只能查看任务和运行记录，不能推进调度时钟。",
+    "goal_assertions": [
+      {
+        "kind": "unchanged",
+        "scopes": [
+          "runs"
+        ]
+      }
+    ]
+  },
+  "reference_trajectory": [
+    {
+      "id": "s1",
+      "capability": "job.create",
+      "as": "operator",
+      "expected_outcome": "applied",
+      "arguments": {
+        "name": "对账",
+        "everyMinutes": 15,
+        "startsAt": "2026-01-01T00:00:00Z"
+      }
+    },
+    {
+      "id": "s2",
+      "capability": "scheduler.advance",
+      "as": "viewer",
+      "expected_outcome": "rejected",
+      "arguments": {
+        "to": "2026-01-01T00:30:00Z"
+      }
+    }
+  ],
+  "observability": {
+    "declared_scopes": [
+      "jobs",
+      "runs"
+    ]
+  }
+}

@@ -29,6 +29,33 @@ test('applies_to 不是摆设：同一批变异体在不相干的域上必须判
   }
 });
 
+test('跨域执行变异体按能力形状收窄：读域、单角色域、无迁移域不进分母', () => {
+  const byId = new Map(mutants.map((m) => [m.id, m]));
+  const lexicon = {
+    adapter: 'lexicon-a',
+    capabilities: [
+      { id: 'lexicon.list', kind: 'read' },
+      { id: 'lexicon.segment', kind: 'read' },
+    ],
+    scopes: ['entries', 'segments'],
+    roles: ['reader'],
+  };
+  const cron = {
+    adapter: 'cron-a',
+    capabilities: [
+      { id: 'job.create', kind: 'write' },
+      { id: 'scheduler.advance', kind: 'write' },
+    ],
+    scopes: ['jobs', 'runs'],
+    roles: ['operator', 'viewer'],
+  };
+  assert.equal(appliesTo(byId.get('m-exec-duplicate-write'), lexicon), false, '纯读域不可能重复写');
+  assert.equal(appliesTo(byId.get('m-exec-duplicate-write'), cron), true, '有写能力的域仍然适用');
+  assert.equal(appliesTo(byId.get('m-exec-role-ignore'), lexicon), false, '单角色域没有身份塌缩空间');
+  assert.equal(appliesTo(byId.get('m-exec-role-ignore'), cron), true, '多角色域仍然适用');
+  assert.equal(appliesTo(byId.get('m-exec-drop-intermediate'), lexicon), false, '无迁移动作的域不进分母');
+});
+
 // ---------- 2. breed 生成器必须把目标集合写进去 ----------
 
 test('breed 生成的变异体自带 applies_to，而且指向它改的那个集合', () => {
