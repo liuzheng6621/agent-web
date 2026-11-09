@@ -14,9 +14,17 @@
 // 但「行在」不等于「行有证据」（v0.75.0 外部测评发现 1）：第二通道整列
 // unknown 时 agree/total 退化成幸存者比率，行照样绿。因此第 3 行自带
 // 可比分母：comparable = 两侧判决都不是 unknown 的对数。可比为 0 = 无
-// 独立证据 = 该行视同缺行（missing）。--min-comparable=N 再给一条可调
-// 下限：可比 < N 记入 violations（exit 1），默认 0 不设限——下限是策略，
-// 口径是事实，两者分开。
+// 独立证据 = 该行视同缺行（missing）。
+//
+// 下限（v0.78.2，v0.78.0 二次测评残留 1）：默认不再是 0。0 等于「1 对可比
+// 也放行」——12 条 unknown 加 1 条一致照样绿，把「几乎没证据」显示成
+// 「全部一致」。默认改为案例数的一半（向上取整）：可比证据不足一半时记
+// violations、exit 1，并在输出里点名差多少。--min-comparable=N 覆盖，
+// --min-comparable=0 显式关掉（关掉是显式决定，不是默认行为）。
+//
+// 旧格式（v0.78.2，v0.78.0 二次测评残留 2）：compare 结果缺 comparable
+// 字段时不再回退成 total。回退等于把「双 unknown 也算可比」的旧口径悄悄
+// 请回来，而那种口径正是这个字段要修的东西。缺字段一律记 violations。
 //
 // 名字：设计文档里叫 audit，但 audit 这个名字在本仓已被混淆矩阵工具
 // （src/audit.mjs，可信判决量被审判决）占用且语义已发布。门禁语义
@@ -34,9 +42,9 @@ export const GATE_VERSION = 'agent-web/gate-1';
  * @param {Array<{status:string}>} args.verdicts verify 的判决数组
  * @param {{agree:number,total:number,left:string,right:string}|null} args.compare 两通道对照
  * @param {{ok:boolean,total:number,mismatch:number}|null} args.policy policy-check 佐证（只进 detail）
- * @param {number} [args.minComparable] independent 行的可比证据下限（默认 0 = 不设限）
+ * @param {number} [args.minComparable] independent 行的可比证据下限；省略 = 案例数的一半（向上取整），0 = 显式不设限
  */
-export function gateReport({ coverage, certify, verdicts, compare, policy, minComparable = 0 } = {}) {
+export function gateReport({ coverage, certify, verdicts, compare, policy, minComparable } = {}) {
   const rows = {};
   const missing = [];
   const violations = [];
@@ -56,25 +64,40 @@ export function gateReport({ coverage, certify, verdicts, compare, policy, minCo
   }
 
   if (compare && compare.total > 0) {
-    const comparable = Number.isFinite(compare.comparable) ? compare.comparable : compare.total;
-    if (comparable <= 0) {
-      // 两侧判决全含 unknown：这行没有一份可对照的证据，等于没跑 compare。
+    if (!Number.isFinite(compare.comparable)) {
+      // 旧格式：compare 结果里没有可比分母。回退成 total 等于把「双 unknown
+      // 也算可比」请回来，而那正是这个字段要修的东西——所以宁可报格式错误。
+      violations.push(
+        `independent：compare 结果缺少 comparable 字段（旧格式），无法确认可比分母；`
+        + `用同一版本重跑 --compare 对照`,
+      );
       missing.push('independent');
     } else {
-      const detail = policy
-        ? (policy.ok ? `policy 佐证 ${policy.total}/${policy.total}` : `policy 佐证不齐（mismatch ${policy.mismatch}）`)
-        : null;
-      rows.independent = {
-        supported: compare.agree,
-        total: compare.total,
-        comparable,
-        value: compare.agree / compare.total,
-        left: compare.left,
-        right: compare.right,
-        detail,
-      };
-      if (Number.isFinite(minComparable) && minComparable > comparable) {
-        violations.push(`independent：可比证据 ${comparable}/${compare.total} 低于下限 ${minComparable}`);
+      const comparable = compare.comparable;
+      const floor = minComparable === undefined ? Math.ceil(compare.total / 2) : minComparable;
+      if (comparable <= 0) {
+        // 两侧判决全含 unknown：这行没有一份可对照的证据，等于没跑 compare。
+        missing.push('independent');
+      } else {
+        const detail = policy
+          ? (policy.ok ? `policy 佐证 ${policy.total}/${policy.total}` : `policy 佐证不齐（mismatch ${policy.mismatch}）`)
+          : null;
+        rows.independent = {
+          supported: compare.agree,
+          total: compare.total,
+          comparable,
+          floor,
+          value: compare.agree / compare.total,
+          left: compare.left,
+          right: compare.right,
+          detail,
+        };
+        if (Number.isFinite(floor) && floor > comparable) {
+          violations.push(
+            `independent：可比证据 ${comparable}/${compare.total} 低于下限 ${floor}`
+            + `（默认案例数的一半；--min-comparable=N 可改，=0 显式关掉）`,
+          );
+        }
       }
     }
   } else {
@@ -110,7 +133,7 @@ export function formatGate(report) {
   if (report.violations && report.violations.length > 0) {
     lines.push('');
     for (const v of report.violations) lines.push(`  红线：${v}`);
-    lines.push('  --min-comparable 设的可比证据下限被击穿（exit 1）。');
+    lines.push('  gate 不放行（exit 1）。');
     return lines.join('\n');
   }
   const r = report.rows;

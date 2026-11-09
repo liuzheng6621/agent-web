@@ -1,4 +1,4 @@
-# agent-web v0.78.1
+# agent-web v0.78.2
 
 <p align="center">
   <img src="docs/media/hero.png" alt="agent-web: integration tests an agent can be judged on" width="100%">
@@ -26,7 +26,7 @@
 </p>
 
 <p align="center">
-  <b>v0.78.1</b> · 21 assertion kinds · 33 commands · 72 mutants
+  <b>v0.78.2</b> · 21 assertion kinds · 33 commands · 72 mutants
 </p>
 
 <p align="center">
@@ -69,19 +69,24 @@ What it is not, stated plainly: no performance testing, no UI testing, no securi
 
 <img src="docs/media/terminal.png" alt="agent-web: selftest first, then record traffic to grow an adapter" width="100%">
 
-The first command needs no preparation. The npm package is named `agent-case` (the repo and the CLI are both called agent-web — same thing). One line, no clone:
-
-```bash
-npx agent-case selftest
-```
-
-Or run it straight from the repo:
+The first command needs no preparation and no install. Run it straight from the repo:
 
 ```bash
 git clone https://gitee.com/liu-everything_impossble/agent-web.git
 cd agent-web
 node bin/agent-web.mjs selftest
 ```
+
+> **The npm package is not published yet.** The name `agent-case` is settled (the repo and the CLI are both
+> agent-web — same thing), `package.json`, the two bin names and the `files` whitelist are in place, and
+> `npm pack` was installed into a clean directory where `--version` and `selftest` both ran. What blocks it is
+> publishing credentials (`npm whoami` on this machine still says need auth; the registry returns 404 for
+> `agent-case`). So the line below **will 404 today** and only becomes true once the package is published —
+> when that happens this block and the matching entry in `docs/LIMITS.md` get deleted:
+>
+> ```bash
+> npx agent-case selftest   # 404 until published
+> ```
 
 `selftest` runs built-in cases against the built-in memory implementation: pass, fail, unknown — one of each.
 The fail tells you "order 1001 is currently MAKING, cannot jump straight to PICKED" — not just "test failed".
@@ -468,10 +473,10 @@ Two layers. These capabilities already have code and tests and should not be cou
 - **`negatives`** derives candidate negative cases from the manifest's declarations (missing required args, role violations, wrong types, boundary violations, absent entities, duplicate submits); everything stays `disputed` and only a review sheet is produced.
 - **`discover` / `tap` / `learn` / `import hurl`** grow adapters and case drafts from a URL, recorded traffic, or an existing suite.
 
-The remaining boundaries are numbered to match L1–L12 in [docs/LIMITS.md](docs/LIMITS.md).
+The remaining boundaries are numbered to match L1–L13 in [docs/LIMITS.md](docs/LIMITS.md).
 **Each entry states only the unsolved part** — what already works is in the list above and is not repeated here:
 
-A word on evidence grades: every number in this README (catch rates, agreement rates, timings) comes from this repo's own CI. The scripts are reproducible — but **reproduction runs the same scripts**, and as of v0.78.1 no third party has reproduced them independently. "Reproducible" is a machine fact, not external validity. The `knowledge/` and `docs/mutants/` contribution channels exist to turn self-attestation into outside evidence, one accepted submission at a time; until one arrives, read the numbers here as "the author's proof that his own ruler is self-consistent", not as correctness rates.
+A word on evidence grades: every number in this README (catch rates, agreement rates, timings) comes from this repo's own CI. The scripts are reproducible — but **reproduction runs the same scripts**, and as of v0.78.2 no third party has reproduced them independently. "Reproducible" is a machine fact, not external validity. The `knowledge/` and `docs/mutants/` contribution channels exist to turn self-attestation into outside evidence, one accepted submission at a time; until one arrives, read the numbers here as "the author's proof that his own ruler is self-consistent", not as correctness rates.
 **If you cannot wait for the contribution channel, there is a faster route** — the [blind kit](scripts/build-blind-kit.mjs):
 one command builds a self-contained zip (every adapter plus the five zero-dependency case domains, **with no verdicts inside**).
 Run two commands on your own machine, send the results back, and we reconcile them case by case against the baseline
@@ -490,6 +495,7 @@ the builder saw — the minimal form of "independent reproduction", already repr
 10. **Difficulty estimates depend on sample sources (L10).** Multiple independent submitters/batches are needed to interpret the result as external difficulty rather than self-test performance.
 11. **Real-backend validation covers only six domains (L11).** The threshold is two independent implementations plus 100% `compare` agreement. The first four domains each got a second implementation; the fifth (RealWorld) arrived in v0.55.0, the sixth (scheduled jobs) in v0.60.0. Adding more is still manual work.
 12. **The semantic layer covers one domain (L12).** `policy/coffee.rego` is a second, independent declaration of the coffee shop rules; 11 fixtures (1 allow, 10 deny) are judged by `conftest`. The other six domains have no rule copy, and editing the Java rules does not notify Rego — only a failing fixture reveals the drift. Rejection codes and cross-order ordering are out of scope.
+13. **The npm package is not published (L13).** `package.json`'s `name`, both bin names and the `files` whitelist are settled, and `npm pack` installed into a clean directory where `--version` and `selftest` both ran; what is missing is publishing credentials — `npm whoami` here still says need auth and the registry returns 404 for `agent-case`. So the `npx agent-case selftest` line in the tour above 404s today, and both places say so plainly.
 <!-- limits:end -->
 
 ## Docs

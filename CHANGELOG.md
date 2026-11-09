@@ -6,6 +6,26 @@
 CI 也在查。这条规则是买来的：这个仓库曾经同时存在 `package.json` 0.16、README 0.9、
 Gitee Release v0.6.0 三个数，谁看都是三个项目。
 
+## 0.78.2
+
+v0.78.0 二次测评留下的三条残留，加一条更硬的：**README 第一行上手命令是坏的**。
+
+- **npm 入口不再假装能跑（新台账 L13，`open`）**：`npx agent-case selftest` 一直是 404——包名、
+  `bin` 双命令名、`files` 白名单、`npm pack` 装包验收全都做完了，卡在发布凭据。
+  现在两份 README 与 Pages 封面都显式写明「尚未发布，这行会 404」，并给出等价的仓库跑法；
+  `docs/LIMITS.md` 新增 L13 记这条，`docs/ROADMAP.md` 把它排成 P10（唯一 open，按排序原则第一条排最前）。
+  新增两条守卫：三处声明必须同时在、且不许再出现「连仓库都不用 clone」这类肯定句。
+  **把一个仓库的第一行命令标成坏的，比没有那行更伤**——这是可安装性问题，不是包装问题。
+- **`--min-comparable` 默认不再是 0**（二次测评残留 1）：默认改成案例数的一半（向上取整），
+  可比证据不足一半记红线 exit 1，并在输出里点名差多少；`--min-comparable=N` 覆盖，`=0` 是显式关掉。
+  0 的旧默认等于「12 条 unknown 加 1 条一致照样绿」，把「几乎没证据」显示成「全部一致」。
+- **`compare` 缺 `comparable` 字段不再回退成 `total`**（二次测评残留 2）：回退等于把「双 unknown
+  也算可比」的旧口径悄悄请回来，而那正是这个字段要修的东西。现在缺字段记红线 + 缺行，要求用同一版本重跑。
+- **CHANGELOG 的测试数不再写死分解**（二次测评残留 3）：改成「N 个测试用例（skip 数随后端是否就绪浮动）」——
+  `599 pass + 4 skip` 这种写法在别人的机器上会被自己的环境推翻，而它本来不该依赖环境。
+- 608 个测试用例（skip 数随后端与 conftest 是否就绪浮动），gate 13 条、fact-drift 6 条；
+  72 个变异体口径不变（适用 46 / 抓到 44 = 95.7%）；六守卫 rc=0。
+
 ## 0.78.1
 
 修一个只在 CI 上露过一次头的失败，顺手把它的成因变成可确定复现的测试。
@@ -13,7 +33,7 @@ Gitee Release v0.6.0 三个数，谁看都是三个项目。
 - **`examples/realworld/fake-server.mjs` 的时钟改成单调递增**（和 `fake-server-b.mjs` 早就一致的写法）。原来用 `new Date().toISOString()` 取真实毫秒，两次创建落在同一毫秒时 `createdAt` 相等；列表按 `createdAt` 倒序，相等时 `sort` 退化成插入序，「翻页拿到刚建的那条」就错一页，`realworld/pagination` 判 `assertion_false`。本地两次 HTTP 往返超过 1ms，所以本地永远不复现——这类 bug 只在机器够快的时候出现。
 - **夹具新增 `REALWORLD_FIXTURE_FROZEN_MS` 开关**，把「现在」钉死在某个毫秒上。时钟不走的时候，连建三条也必须拿到三个严格递增的时间戳，于是「同毫秒」从偶发变成必然。
 - **新增 `test/realworld-clock.test.mjs`**：先断言夹具真的吃了冻结开关（否则真实时钟会让下面那条断言白白通过——第一版守卫就有这个漏洞，旧代码也能过），再断言三个时间戳互不相同且严格递增，最后端到端跑一遍 `pagination` 必须判 `pass`。拿旧实现跑这条测试会红在「夹具没吃开关」上，拿新实现跑绿。
-- 603 测试（599 pass + 4 skip），72 个变异体口径不变（适用 46 / 抓到 44 = 95.7%）。
+- 603 个测试用例（skip 数随后端与 conftest 是否就绪浮动），72 个变异体口径不变（适用 46 / 抓到 44 = 95.7%）。
 
 ## 0.78.0
 
@@ -40,7 +60,7 @@ Gitee Release v0.6.0 三个数，谁看都是三个项目。
 - 文档：`docs/SPEC.md` 12.8.1 补四个新字段的判据与 AND 组合、12.9 补 `suggestionBlockedReason` 全表；
   `docs/LIMITS.md` L5 口径与 L11 各域数字同步；`docs/mutants/README.md` 把「v0.63.1 之前」改成「曾经有两层漏洞」；
   `docs/domains/cron.md` 四条案例、`docs/domains/lexicon.md` 100%。
-- `602` 测试全绿（598 pass + 4 skip）；六守卫 rc=0。
+- `602` 个测试用例全绿（skip 数随后端是否就绪浮动）；六守卫 rc=0。
 
 ## 0.77.0
 
@@ -50,7 +70,7 @@ npm 包上线：包名 `agent-case`（npm 上的 agent-web 已被无关项目占
 - 两份 README「六十秒上手 / Sixty-second tour」加 `npx agent-case selftest` 一行入口。
 - Pages 封面加同款 npx 行。
 - 版本联动 v0.77.0（VERSION / package.json / CITATION / ROADMAP / CHANGELOG / 两 README）。
-- `597` 测试全绿（594 pass + 3 skip），72 个变异体口径不变（适用 50 抓到 48 = 96.0%）。
+- `597` 个测试用例全绿（skip 数随后端是否就绪浮动），72 个变异体口径不变（适用 50 抓到 48 = 96.0%）。
 
 
 外部测评报告（v0.75.0 测评，综合 7.8/10）的四项发现，逐条核实为真、逐条修复：
@@ -71,7 +91,7 @@ npm 包上线：包名 `agent-case`（npm 上的 agent-web 已被无关项目占
   并加 `test/fact-drift.test.mjs` 四条守卫（磁盘测试文件数==名单数、README selftest 条数==实测、
   zh/en L5 口径==LIMITS、docs/README 变异体数==LIMITS），数字再漂 CI 即红。
 
-597 测试（594 pass + 3 skip），gate 9 条、fact-drift 4 条、coffee-divergence 1 条（后端在线才跑，守卫把解析出的 BASE_URL 显式传给 compare 子进程——适配器默认 8080 会打到无关容器）。
+597 个测试用例（skip 数随后端是否就绪浮动），gate 9 条、fact-drift 4 条、coffee-divergence 1 条（后端在线才跑，守卫把解析出的 BASE_URL 显式传给 compare 子进程——适配器默认 8080 会打到无关容器）。
 ## 0.75.0
 
 **十处算法修复：断言层七洞与资源浪费三处。**

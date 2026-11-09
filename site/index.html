@@ -175,9 +175,10 @@ strong{font-weight:600}
 
 <section>
   <div class="try">
-    <p class="try-label">三十秒，亲手跑一次（不用 clone）：</p>
-    <pre tabindex="0"><code>npx agent-case selftest</code></pre>
-    <p class="try-note">内置内存实现跑内置案例，四种谎话当场被抓。npm 包名叫 agent-case，仓库和命令都叫 agent-web——同一份东西。</p>
+    <p class="try-label">三十秒，亲手跑一次（零依赖，不装任何东西）：</p>
+    <pre tabindex="0"><code>git clone https://gitee.com/liu-everything_impossble/agent-web.git
+cd agent-web &amp;&amp; node bin/agent-web.mjs selftest</code></pre>
+    <p class="try-note">内置内存实现跑内置案例，三种判决各出现一次，fail 那条会直接说出坏在哪。npm 包名 <code>agent-case</code> 已定好但尚未发布（<code>npx agent-case selftest</code> 现在会 404），所以这里给的是仓库跑法——同一份东西。</p>
   </div>
   <h2>这一页是活的</h2>
   <div class="prose">

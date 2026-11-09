@@ -8,7 +8,8 @@ const goodCertify = { summary: { caught: 48, applicable: 50, caughtRate: 48 / 50
 const goodVerdicts = [
   { status: 'pass' }, { status: 'fail' }, { status: 'unknown' }, { status: 'pass' },
 ];
-const goodCompare = { agree: 3, total: 4, left: 'a', right: 'b' };
+// comparable 是必需字段（v0.78.2）：缺了不再回退成 total，而是记红线。
+const goodCompare = { agree: 3, total: 4, comparable: 3, left: 'a', right: 'b' };
 
 test('gate-1：四行齐全时 sound=true，rows 四键都在', () => {
   const r = gateReport({ coverage: goodCoverage, certify: goodCertify, verdicts: goodVerdicts, compare: goodCompare });
@@ -128,4 +129,47 @@ test('可比 < total 时行里显式报 unknown 对数（不冒充一致）', ()
   const t = formatGate(r);
   assert.ok(t.includes('可比 11/13'), t);
   assert.ok(t.includes('2 对判决里含 unknown'), t);
+});
+
+// ---- 默认下限与旧格式（v0.78.2，v0.78.0 二次测评残留 1、2）----
+
+test('默认下限 = 案例数的一半：13 条里只有 1 对可比 → 红线（不再放行）', () => {
+  const r = gateReport({
+    coverage: goodCoverage,
+    certify: goodCertify,
+    verdicts: goodVerdicts,
+    compare: { agree: 1, total: 13, comparable: 1, left: 'memory', right: 'taixianglian' },
+  });
+  assert.equal(r.sound, false, '默认必须拦下「几乎没证据」');
+  assert.equal(r.missing.length, 0, '有可比判决就不是缺行');
+  assert.equal(r.violations.length, 1);
+  assert.ok(r.violations[0].includes('1/13'), r.violations[0]);
+  assert.ok(r.violations[0].includes('7'), `默认下限应是 ceil(13/2)=7：${r.violations[0]}`);
+  assert.equal(r.rows.independent.floor, 7);
+});
+
+test('--min-comparable=0 是显式关掉：同样 1/13 可比也放行', () => {
+  const r = gateReport({
+    coverage: goodCoverage,
+    certify: goodCertify,
+    verdicts: goodVerdicts,
+    compare: { agree: 1, total: 13, comparable: 1, left: 'memory', right: 'taixianglian' },
+    minComparable: 0,
+  });
+  assert.equal(r.sound, true);
+  assert.equal(r.violations.length, 0);
+});
+
+test('compare 缺 comparable 字段（旧格式）→ 红线 + 缺行，不回退成 total', () => {
+  const r = gateReport({
+    coverage: goodCoverage,
+    certify: goodCertify,
+    verdicts: goodVerdicts,
+    compare: { agree: 3, total: 4, left: 'a', right: 'b' },
+  });
+  assert.equal(r.sound, false);
+  assert.ok(r.missing.includes('independent'));
+  assert.equal(r.violations.length, 1);
+  assert.ok(r.violations[0].includes('comparable'), r.violations[0]);
+  assert.ok(r.violations[0].includes('旧格式'), r.violations[0]);
 });

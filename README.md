@@ -1,4 +1,4 @@
-# agent-web v0.78.1
+# agent-web v0.78.2
 
 <p align="center">
   <img src="docs/media/hero.png" alt="agent-web：给 Agent 写机器可判的集成测试" width="100%">
@@ -24,7 +24,7 @@
 </p>
 
 <p align="center">
-  <b>当前版本 0.78.1</b> · 21 种断言 · 33 条命令 · 72 个变异体
+  <b>当前版本 0.78.2</b> · 21 种断言 · 33 条命令 · 72 个变异体
 </p>
 
 <p align="center">
@@ -67,19 +67,22 @@
 
 <img src="docs/media/terminal.png" alt="agent-web：先 selftest，再录一段流量长出适配器" width="100%">
 
-第一条命令不需要任何准备。npm 上的包名叫 `agent-case`（仓库与命令都叫 agent-web，同一份东西），一行就够，连仓库都不用 clone：
-
-```bash
-npx agent-case selftest
-```
-
-也可以直接从仓库跑：
+第一条命令不需要任何准备，也不用装依赖。从仓库跑：
 
 ```bash
 git clone https://gitee.com/liu-everything_impossble/agent-web.git
 cd agent-web
 node bin/agent-web.mjs selftest
 ```
+
+> **npm 包尚未发布。** 包名 `agent-case` 已定好（仓库与命令都叫 agent-web，同一份东西），
+> `package.json`、`bin` 双命令名、`files` 白名单都就位，`npm pack` 装到干净目录里跑过 `--version` 与 `selftest`。
+> 卡在发布凭据（本机 `npm whoami` 仍是 need auth，registry 上 `agent-case` 现在返回 404）。
+> 所以下面这行**现在跑会 404**，发布完成后它才成立——届时本段与 `docs/LIMITS.md` 的对应条目一并删掉：
+>
+> ```bash
+> npx agent-case selftest   # 发布前会 404
+> ```
 
 `selftest` 用内置内存实现跑内置案例：pass、fail、unknown 三种判决各出现一次。
 fail 的那条会直接告诉你「订单 1001 当前 MAKING，不允许直接变成 PICKED」——不是「测试失败」四个字。
@@ -507,11 +510,11 @@ node bin/agent-web.mjs verify cases/realworld --adapter=realworld --detail
   全部标 `disputed`，只出审阅表。
 - **`discover` / `tap` / `learn` / `import hurl`** 能从网址、流量或现成套件长出适配器与案例草稿。
 
-剩下的边界，编号与 [docs/LIMITS.md](docs/LIMITS.md) 的 L1–L12 一一对应。
+剩下的边界，编号与 [docs/LIMITS.md](docs/LIMITS.md) 的 L1–L13 一一对应。
 **每条只写没解决的那部分**——已经做到的在上面的清单里，这里不再重复：
 
 先交代证据的等级：本 README 里的一切数字（抓获率、一致率、耗时）全部出自本仓自己的 CI，
-脚本可复现——但**复现跑的是同一套脚本**，到 v0.78.1 为止没有第三方独立复现过。
+脚本可复现——但**复现跑的是同一套脚本**，到 v0.78.2 为止没有第三方独立复现过。
 「可复现」是机器事实，不是外部效度。`knowledge/` 与 `docs/mutants/` 的投稿通道
 就是为把自证变成他证开的，进来一单算一单；在那之前，把这里的数字读作
 「作者对他自己这把尺子的自洽性证明」，比读作「正确率」诚实。
@@ -533,6 +536,7 @@ node bin/agent-web.mjs verify cases/realworld --adapter=realworld --detail
 10. **难度仍受样本来源限制（L10）。** 需要多个独立提交者/批次，才可把统计解释为外部难度，而不只是自测结果。
 11. **真实后端只覆盖六个领域（L11）。** 门槛是「两个独立实现 + `compare` 一致率 100%」。前四个域各自补上了第二实现，第五个（RealWorld）在 v0.55.0 补齐，第六个（定时任务）在 v0.60.0 补齐；再往上加域仍然是手工活。
 12. **语义层只覆盖一域（L12）。** `policy/coffee.rego` 是咖啡店规则的第二次声明，11 条判例（1 好 10 坏）由 `conftest` 判 allow/deny；其余六域没有规则副本，且 Java 改了规则 Rego 不会自动知道——只有判例红了才暴露。不判拒绝码，也不判跨订单时序。
+13. **npm 包还没发出去（L13）。** `package.json` 的 `name`、`bin` 双命令名、`files` 白名单都就位，`npm pack` 装到干净目录里 `--version` 与 `selftest` 跑通过；缺的是发布凭据——本机 `npm whoami` 仍是 need auth，registry 上 `agent-case` 返回 404。所以上面「六十秒上手」里那行 `npx agent-case selftest` 现在会 404，两处都照实标了。
 <!-- limits:end -->
 
 ## 文档

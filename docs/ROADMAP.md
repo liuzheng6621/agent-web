@@ -7,21 +7,22 @@
 
 ---
 
-## 0. 现在的实际状态（v0.78.1，全部实测）
+## 0. 现在的实际状态（v0.78.2，全部实测）
 
 | 项 | 数字 | 怎么核 |
 |---|---|---|
-| 版本 | 0.78.1 | `node bin/agent-web.mjs version` |
+| 版本 | 0.78.2 | `node bin/agent-web.mjs version` |
 | 断言 | 21 种 | `--help` 里的断言表 |
 | 命令 | 33 条 | 同上 |
 | 变异体 | 72 个 | `node bin/agent-web.mjs mutants` |
-| 测试 | 603 条 | `npm test` |
+| 测试 | 608 条 | `npm test` |
 | 判据准入 | 适用 46 / 抓到 44（95.7%） | `node scripts/certify-baseline.mjs --emit-limits` |
 | 计入的域 | **6 个** | `docs/LIMITS.md` L11 的计数判据 |
-| 台账状态 | L1/L2/L4/L5/L7/L8/L10/L11 mitigated · L3/L6/**L12** by-design · L9 withdrawn | `grep status docs/LIMITS.md` |
+| 台账状态 | L1/L2/L4/L5/L7/L8/L10/L11 mitigated · L3/L6/**L12** by-design · L9 withdrawn · **L13** open | `grep status docs/LIMITS.md` |
 
-**v0.54.0 起台账上不再有 `open` 的条目。**这不是说其余十条解决了，是说它们都降到了
-「有明确边界、有验收命令、边界写在文档里」的状态。
+**v0.78.2 起台账上重新有了一条 `open`（L13）。** v0.54.0 到 v0.78.1 之间没有过；
+这条是发布凭据问题，不是原理边界——凭据到手就是一条命令，所以它按排序原则第 1 条排在最前（见 P10）。
+其余十二条都处在「有明确边界、有验收命令、边界写在文档里」的状态。
 
 ---
 
@@ -43,7 +44,41 @@
 
 ---
 
-## 2. P6 — 交叉复核（L8）✅ 已完成（v0.54.0）
+## 2. P10 — 把 npm 包发出去（L13）🔴 唯一 open
+
+台账上唯一 `open` 的一条，按排序原则第 1 条必须排第一。
+
+代码侧已经做完并验过：`package.json` 的 `name` 是 `agent-case`（npm 上 `agent-web` 被无关项目占用），
+`bin` 同时给 `agent-case` 与 `agent-web`，`files` 白名单剔掉了 `docs/media`（2.7M）；
+`npm pack` 之后装进干净目录，`./node_modules/.bin/agent-case --version` 与 `selftest` 都跑通。
+卡住的是发布凭据：本机 `npm whoami --registry=https://registry.npmjs.org` 返回 `need auth`，
+`https://registry.npmjs.org/agent-case` 返回 404。
+
+**为什么这算路线图上的事**：README 与封面现在都把 `npx agent-case selftest` 标成「会 404」。
+一个仓库把自己的第一行上手命令标成坏的，比没有那行更伤——这是**可安装性**，不是包装。
+
+### 2.1 验收
+
+三条全绿才算完成，然后把 L13 从台账里删掉、README 与封面两处声明一并删：
+
+```bash
+npm view agent-case version --registry=https://registry.npmjs.org   # 现在 E404
+npx agent-case selftest                                             # 干净目录里跑通
+node scripts/npm-liveness.mjs                                        # CI 里的存活检查（待实现）
+```
+
+第三条现在还不存在——它要等前两条成立才有意义。CI 里加它的时候，
+判据是「registry 上的版本 >= 仓库 VERSION 的次版本」，这样包发旧了也会红。
+
+### 2.2 怎么证明它没做到
+
+- `npm view agent-case version` 仍返回 `E404`：包没发出去，这条没做。
+- `npx agent-case selftest` 在干净目录里 404 或跑到别的包：发的是别的东西，或者名字被别人抢注了。
+- README 与封面那两段「尚未发布 / 会 404」的声明还在：等于台账在说没做完，文档却已经按做完写了。
+- 发了但版本落后于仓库 `VERSION`：`npm-liveness.mjs` 会红——**发旧版比不发更坏**，
+  因为别人装到的是旧行为，而 README 描述的是新行为。
+
+## 3. P6 — 交叉复核（L8）✅ 已完成（v0.54.0）
 
 **结果**：L8 `open` → **`mitigated`**。`agent-web crosscheck --adapter=SPEC` 已上线，
 三类结论 `consistent` / `divergent` / `uncheckable`，`uncheckable` 单列且不算通过。
@@ -107,7 +142,7 @@ agent-web crosscheck --adapter=memory
 
 ---
 
-## 3. P7 — 给 RealWorld 补第二个实现（L11）✅ 已完成（v0.55.0）
+## 4. P7 — 给 RealWorld 补第二个实现（L11）✅ 已完成（v0.55.0）
 
 **目标**：域数 4 → 5，L11 从 `ongoing` 变成「已验五域」。
 
@@ -175,7 +210,7 @@ npm test                                               # 377 → 增加 realworl
 
 ---
 
-## 4. P8 — 计数不等于评分（L3）✅ 已完成（v0.56.0）
+## 5. P8 — 计数不等于评分（L3）✅ 已完成（v0.56.0）
 
 **目标**：L3 保持 `by-design`，但把「能数的东西」真的数出来。
 
@@ -219,7 +254,7 @@ agent-web report .tmp-r.jsonl --counts   # 输出五个计数，没有第六个�
 
 ---
 
-## 5. P9 — 第五、第六个域（L11 的长期工作）✅ 已完成（v0.55.0 / v0.57.0 / v0.60.0）
+## 6. P9 — 第五、第六个域（L11 的长期工作）✅ 已完成（v0.55.0 / v0.57.0 / v0.60.0）
 
 P7 清完 RealWorld 是第五个域。第六个应该选**形状与前五个都不同**的：
 
@@ -247,7 +282,7 @@ agent-web certify cases/<新域> --adapter=<新域>
 
 ---
 
-## 6. 明确不做（写在这里，防止以后再讨论）
+## 7. 明确不做（写在这里，防止以后再讨论）
 
 | 不做 | 为什么 |
 |---|---|
@@ -261,7 +296,7 @@ agent-web certify cases/<新域> --adapter=<新域>
 
 ---
 
-## 7. 顺序与预计
+## 8. 顺序与预计
 
 | 顺序 | 项 | 预计 | 完成后台账变化 |
 |---|---|---|---|
@@ -278,7 +313,7 @@ agent-web certify cases/<新域> --adapter=<新域>
 
 ---
 
-## 8. 这份路线图本身怎么维护
+## 9. 这份路线图本身怎么维护
 
 - 每条完成时，**同时**更新 `docs/LIMITS.md` 与这里。两处不一致会被
   `test/limits.test.mjs` 抓（它比对台账条目与 README 的十一条）。

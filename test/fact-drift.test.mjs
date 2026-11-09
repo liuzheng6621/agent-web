@@ -71,3 +71,36 @@ test('docs/README.md 的变异体数与 LIMITS L5 一致', () => {
   assert.ok(m, 'docs/README.md 变异体行格式变了');
   assert.equal(Number(m[1]), l5.total, 'docs/README.md 变异体数漂移');
 });
+
+// ---- L13：npm 包没发布时，README/封面/CHANGELOG 都不许假装能跑（v0.78.2）----
+
+test('L13：只要 registry 上还没有这个包，README 与封面就必须显式声明「会 404」', () => {
+  // 这条守卫不联网：它守的是「本地有没有把话说清」，联网检查在 CI 的另一条里。
+  const zh = read('README.md');
+  const en = read('README.en.md');
+  const site = read('site/index.html');
+  for (const [name, text, marks] of [
+    ['README.md', zh, ['npm 包尚未发布', '404']],
+    ['README.en.md', en, ['not published yet', '404']],
+    ['site/index.html', site, ['尚未发布', '404']],
+  ]) {
+    for (const m of marks) {
+      assert.ok(text.includes(m), `${name} 少了「${m}」——包没发出去时不许把 npx 那行当真`);
+    }
+  }
+  // 反过来：三处都不许出现「一行就够，连仓库都不用 clone」这类肯定句。
+  for (const [name, text] of [['README.md', zh], ['README.en.md', en]]) {
+    assert.ok(!text.includes('连仓库都不用 clone'), `${name} 仍在说不用 clone`);
+    assert.ok(!text.includes('One line, no clone'), `${name} still says "no clone"`);
+  }
+});
+
+test('L13：LIMITS 里必须有一条 open，且它点的验收命令是 npm view', () => {
+  const limits = read('docs/LIMITS.md');
+  const m = limits.match(/^## (L\d+) npm 包名已定，包还没发出去$/m);
+  assert.ok(m, 'L13 标题不见了');
+  const id = m[1];
+  const block = limits.slice(limits.indexOf(m[0]), limits.indexOf('\n## ', limits.indexOf(m[0]) + 5) > 0 ? limits.indexOf('\n## ', limits.indexOf(m[0]) + 5) : undefined);
+  assert.ok(/`status: open`/.test(block), `${id} 必须仍是 open——包没发出去就是没做完`);
+  assert.ok(block.includes('npm view agent-case version'), `${id} 的验收命令必须是 npm view`);
+});

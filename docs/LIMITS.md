@@ -32,6 +32,7 @@ README 的「边界：已实现与仍未解决」是这份清单的摘要。**�
 | L10 | 难度标签只是统计 | `mitigated` | `node bin/agent-web.mjs drill stats --min-attempts=5` |
 | L11 | 只在六个域上验过 | `mitigated` | `node bin/agent-web.mjs compare cases/<域> --adapters=A,B` |
 | L12 | 语义层只覆盖一域 | `by-design` | `node scripts/policy-check.mjs` |
+| L13 | npm 包名已定，包还没发出去 | `open` | `npm view agent-case version --registry=https://registry.npmjs.org` |
 
 ## L1 写操作的语义仍然要人给
 
@@ -384,3 +385,25 @@ v0.63.1 补全 `applies_to` 后，本域适用 8 个（四个 `m-lab-*` + 四个
 
 验收：`node scripts/policy-check.mjs` 全绿；`npm test` 里 8 条 `policy:` 守卫全绿
 （缺 conftest 时执行守卫 skip 并显式报告，不静默通过）。
+
+## L13 npm 包名已定，包还没发出去
+
+`status: open`
+
+`package.json` 的 `name` 是 `agent-case`（npm 上 `agent-web` 被无关项目占用，2026-01-22 发的废弃包），
+`bin` 同时提供 `agent-case` 与 `agent-web`，`files` 白名单剔掉了 `docs/media`（2.7M）。
+`npm pack` 之后装进一个干净目录，`./node_modules/.bin/agent-case --version` 与 `selftest` 都跑通了。
+
+**没做到的是发出去这一步**：本机 `npm whoami --registry=https://registry.npmjs.org` 返回 `need auth`，
+`https://registry.npmjs.org/agent-case` 返回 404。发布需要账号凭据（Classic Automation token，
+或带 OTP 的交互登录），这一步由仓库所有者完成，不是代码问题。
+
+后果是可数的：README 与 Pages 封面上那行 `npx agent-case selftest` 现在会 404。
+两处都标了「尚未发布 / 会 404」，不假装能跑；`CHANGELOG` 的 0.77.0 条目写的是「包名与装包验收完成、待发布」。
+
+**为什么是 open 而不是 by-design**：这不是原理性边界，是一条待办——凭据到手就是一条命令的事，
+之后本条目、README 里那段声明、`docs/LIMITS.md` 的总表行一起删掉。
+
+验收：`npm view agent-case version --registry=https://registry.npmjs.org` 返回版本号
+（现在是 `E404`）；`npx agent-case selftest` 在干净目录里跑通；CI 里加一条存活检查
+（`npm view` 拿到版本且 `>=` 仓库 VERSION 里的大版本）。
