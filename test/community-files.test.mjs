@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { KINDS } from '../src/assert/index.mjs';
+import { mutants } from '../docs/mutants/index.mjs';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
@@ -71,6 +73,24 @@ test('AGENTS.md 的五条硬约束与实现一一对应', () => {
   // 约束 5 说的脚本必须真的存在
   assert.match(a, /kind-necessity\.mjs/);
   assert.ok(exists('scripts/kind-necessity.mjs'));
+});
+
+test('AGENTS.md 的代码地图数字与仓库实测一致 —— 目录说明写错数字比没写更糟', () => {
+  const a = read('AGENTS.md');
+  const bin = read('bin/agent-web.mjs');
+  const commands = new Set([...bin.matchAll(/case '([a-z0-9-]+)':/g)].map((m) => m[1])).size;
+  const count = (dir, re) => fs.readdirSync(path.join(ROOT, dir)).filter((f) => re.test(f)).length;
+  const want = [
+    [`${commands} 条命令的入口`, '命令数'],
+    [`${count('test', /\.test\.mjs$/)} 个测试文件`, '测试文件数'],
+    [`${count('scripts', /\.mjs$/)} 个自检脚本`, '自检脚本数'],
+    [`${count('docs/museum', /^e\d+.*\.mjs$/)} 件展品`, '博物馆展品数'],
+    [`${count('docs/mutants', /^m-.*\.mjs$/)} 个变异体`, '变异体数'],
+    [`${KINDS.length} 种断言`, '断言数'],
+    [`${(read('docs/LIMITS.md').match(/^## L\d+ /gm) || []).length} 条限制的台账`, '台账条数'],
+  ];
+  const bad = want.filter(([needle]) => !a.includes(needle)).map(([, label]) => label);
+  assert.deepEqual(bad, [], `AGENTS.md 的代码地图数字过期：${bad.join('、')}`);
 });
 
 test('AGENTS.md 里提到的源码路径都存在 —— 说明书指错路比没有说明书更糟', () => {

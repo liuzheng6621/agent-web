@@ -184,6 +184,13 @@ jobs:
         run: |
           node bin/agent-web.mjs verify cases/ledger --adapter=ledger-a
           node bin/agent-web.mjs compare cases/ledger --adapters=ledger-a,ledger-b
+
+      # gate 代码写得再细，只要 CI 不调用，它就只是本地命令。
+      # ledger 只有 4 条案例，所以当前可证明的上限就是 4/4；
+      # 下限调到 5 会按预期红，反向验证见 test/gate.test.mjs。
+      - name: 口径门禁：ledger 的可比证据必须达到 4/4
+        run: node bin/agent-web.mjs gate cases/ledger --adapter=ledger-a --compare=ledger-b --min-comparable=4
+
       # RealWorld 的案例是 import hurl 从官方 13 个套件生成的派生文件：
       # 断言来自 hurl 原文，不许手改。这条步骤证明「转换器 + 适配器 + 夹具」三者仍然自洽。
       # 同一份契约的第二份实现（数组存储、不同 slug 规则、增量计数器、单调时钟）。

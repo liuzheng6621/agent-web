@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (p) => readFileSync(join(ROOT, p), 'utf8');
@@ -72,35 +72,98 @@ test('docs/README.md 的变异体数与 LIMITS L5 一致', () => {
   assert.equal(Number(m[1]), l5.total, 'docs/README.md 变异体数漂移');
 });
 
-// ---- L13：npm 包没发布时，README/封面/CHANGELOG 都不许假装能跑（v0.78.2）----
+// ---- L13：npm 包状态必须与 registry 真相对齐（v0.78.3）----
 
-test('L13：只要 registry 上还没有这个包，README 与封面就必须显式声明「会 404」', () => {
-  // 这条守卫不联网：它守的是「本地有没有把话说清」，联网检查在 CI 的另一条里。
-  const zh = read('README.md');
-  const en = read('README.en.md');
-  const site = read('site/index.html');
-  for (const [name, text, marks] of [
-    ['README.md', zh, ['npm 包尚未发布', '404']],
-    ['README.en.md', en, ['not published yet', '404']],
-    ['site/index.html', site, ['尚未发布', '404']],
-  ]) {
-    for (const m of marks) {
-      assert.ok(text.includes(m), `${name} 少了「${m}」——包没发出去时不许把 npx 那行当真`);
+const PUBLICATION_MARKERS = [
+  ['README.md', ['npm 包尚未发布', '发布前会 404']],
+  ['README.en.md', ['The npm package is not published yet', '404 until published']],
+  ['site/index.html', ['尚未发布', 'npx agent-case selftest</code> 现在会 404']],
+];
+
+function publicationTexts() {
+  return PUBLICATION_MARKERS.map(([file]) => [file, read(file)]);
+}
+
+test('L13：本地声明必须与台账状态一致，不许在 open 时假装能跑', () => {
+  const limits = read('docs/LIMITS.md');
+  const start = limits.indexOf('## L13 ');
+  if (start < 0) return;
+  const next = limits.indexOf('\n## ', start + 4);
+  const block = limits.slice(start, next > 0 ? next : limits.length);
+  const open = /`status: open`/.test(block);
+  for (const [name, text] of publicationTexts()) {
+    const marks = PUBLICATION_MARKERS.find(([file]) => file === name)[1];
+    for (const mark of marks) {
+      assert.equal(text.includes(mark), open,
+        open ? `${name} 少了「${mark}」——L13 还是 open，不许把 npx 那行当真`
+          : `${name} 仍含「${mark}」——L13 已关闭，过期声明必须删掉`);
     }
   }
-  // 反过来：三处都不许出现「一行就够，连仓库都不用 clone」这类肯定句。
-  for (const [name, text] of [['README.md', zh], ['README.en.md', en]]) {
+  for (const [name, text] of publicationTexts().slice(0, 2)) {
     assert.ok(!text.includes('连仓库都不用 clone'), `${name} 仍在说不用 clone`);
     assert.ok(!text.includes('One line, no clone'), `${name} still says "no clone"`);
   }
 });
 
-test('L13：LIMITS 里必须有一条 open，且它点的验收命令是 npm view', () => {
+const registryProbe = (() => {
+  const args = ['view', 'agent-case', 'version', '--registry=https://registry.npmjs.org'];
+  // npm.cmd 在 Windows 上不能由 spawnSync 直接 exec（EINVAL）。
+  // 优先复用正在运行 npm test 的 npm-cli.js；直接 node 跑测试时走已安装的 npm-cli.js。
+  const npmCli = process.env.npm_execpath;
+  const candidates = [
+    npmCli,
+    process.platform === 'win32' && join(dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js'),
+  ].filter(Boolean);
+  let r;
+  for (const cli of candidates) {
+    r = spawnSync(process.execPath, [cli, ...args], { encoding: 'utf8', timeout: 20000 });
+    if (r.status === 0 || /E404|404 Not Found|is not in this registry|Not found/i.test(`${r.stdout || ''}\n${r.stderr || ''}`)) break;
+  }
+  if (!r || r.error) {
+    r = spawnSync('npm', args, { encoding: 'utf8', timeout: 20000, shell: process.platform === 'win32' });
+  }
+  const output = `${r.stdout || ''}\n${r.stderr || ''}`.trim();
+  if (r.status === 0 && output) return { kind: 'published', version: output.split(/\s+/).pop() };
+  if (/E404|404 Not Found|is not in this registry|Not found/i.test(output)) return { kind: 'absent' };
+  return { kind: 'unreachable', detail: output || r.error?.message || `npm view exit ${r.status}` };
+})();
+
+test('L13：registry 上已有包时，三处必须删掉「尚未发布 / 404」', {
+  skip: registryProbe.kind === 'unreachable' ? `npm registry 不可达：${registryProbe.detail.slice(0, 160)}` : false,
+}, () => {
+  for (const [name, text] of publicationTexts()) {
+    const marks = PUBLICATION_MARKERS.find(([file]) => file === name)[1];
+    if (registryProbe.kind === 'published') {
+      for (const mark of marks) {
+        assert.ok(!text.includes(mark), `${name} 仍含「${mark}」，但 registry 已发布 ${registryProbe.version}`);
+      }
+    } else {
+      for (const mark of marks) {
+        assert.ok(text.includes(mark), `${name} 少了「${mark}」，但 registry 仍是 E404`);
+      }
+    }
+  }
+});
+
+test('L13：台账状态必须与 registry 对齐，发布后允许删除该条', {
+  skip: registryProbe.kind === 'unreachable' ? `npm registry 不可达：${registryProbe.detail.slice(0, 160)}` : false,
+}, () => {
   const limits = read('docs/LIMITS.md');
   const m = limits.match(/^## (L\d+) npm 包名已定，包还没发出去$/m);
-  assert.ok(m, 'L13 标题不见了');
+  if (registryProbe.kind === 'published') {
+    assert.ok(!m, `registry 已发布 ${registryProbe.version}，L13 应从台账删除`);
+    return;
+  }
+  assert.ok(m, 'registry 仍是 E404，但 L13 标题不见了');
   const id = m[1];
   const block = limits.slice(limits.indexOf(m[0]), limits.indexOf('\n## ', limits.indexOf(m[0]) + 5) > 0 ? limits.indexOf('\n## ', limits.indexOf(m[0]) + 5) : undefined);
   assert.ok(/`status: open`/.test(block), `${id} 必须仍是 open——包没发出去就是没做完`);
   assert.ok(block.includes('npm view agent-case version'), `${id} 的验收命令必须是 npm view`);
+});
+
+test('CI 必须真的调用 gate，而不是只把 gate 代码留在仓库里', () => {
+  const ci = read('.github/workflows/ci.yml');
+  assert.match(ci,
+    /node bin\/agent-web\.mjs gate cases\/ledger\s+--adapter=ledger-a\s+--compare=ledger-b\s+--min-comparable=4/,
+    'ci.yml 没有用 ledger 的真实 4 条案例跑 gate；可比证据下限只在本地存在');
 });

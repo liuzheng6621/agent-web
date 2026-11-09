@@ -1,4 +1,4 @@
-# 限制清单（L1–L11）
+# 限制清单（L1–L14）
 
 README 的「边界：已实现与仍未解决」是这份清单的摘要。**两边条目必须一一对应**：数量不等、
 编号对不上、或某条在 README 里被删掉而这里还留着，`test/limits.test.mjs` 会红。
@@ -33,6 +33,7 @@ README 的「边界：已实现与仍未解决」是这份清单的摘要。**�
 | L11 | 只在六个域上验过 | `mitigated` | `node bin/agent-web.mjs compare cases/<域> --adapters=A,B` |
 | L12 | 语义层只覆盖一域 | `by-design` | `node scripts/policy-check.mjs` |
 | L13 | npm 包名已定，包还没发出去 | `open` | `npm view agent-case version --registry=https://registry.npmjs.org` |
+| L14 | coffee 两通道对照不在 CI 覆盖 | `by-design` | `node bin/agent-web.mjs compare cases/coffee --adapters=memory,taixianglian` |
 
 ## L1 写操作的语义仍然要人给
 
@@ -405,5 +406,24 @@ v0.63.1 补全 `applies_to` 后，本域适用 8 个（四个 `m-lab-*` + 四个
 之后本条目、README 里那段声明、`docs/LIMITS.md` 的总表行一起删掉。
 
 验收：`npm view agent-case version --registry=https://registry.npmjs.org` 返回版本号
-（现在是 `E404`）；`npx agent-case selftest` 在干净目录里跑通；CI 里加一条存活检查
-（`npm view` 拿到版本且 `>=` 仓库 VERSION 里的大版本）。
+（现在是 `E404`）；`npx agent-case selftest` 在干净目录里跑通。`npm test` 里有一条联网守卫：
+registry 返回版本时，README / README.en / 封面三处必须已删掉「尚未发布 / 404」；
+返回 `E404` 时三处声明必须仍在；网络不可达时跳过，不把网络故障冒充发布事实。
+
+## L14 coffee 两通道对照不在 CI 覆盖
+
+`status: by-design`
+
+咖啡域的 `compare cases/coffee --adapters=memory,taixianglian` 需要一份运行中的 Spring Boot
+真实后端。CI 只有内存与零依赖夹具，没有这个服务，所以这条对照在 CI 里**不跑**；
+`test/coffee-divergence.test.mjs` 在后端不在线时明确 skip，而不是假装咖啡域已被 CI 覆盖。
+
+CI 里仍有两条真正的跨实现对照：账本 `ledger-a vs ledger-b` 与 RealWorld
+`realworld vs realworld-b`。咖啡域的两条已知受控分歧（`happy-path` / `linkage-events`）
+只在本机起后端时回归；出现第三条分歧会判红。
+
+这是环境边界，不是未实现的代码路径：没有真实后端时，跨通道对照要么两边都真，要么就不做。
+
+验收：`node bin/agent-web.mjs compare cases/coffee --adapters=memory,taixianglian`
+（需要 `TAIXIANGLIAN_BASE_URL` 或 `127.0.0.1:8099`）。看不到后端时，测试必须 skip，
+不能记成 consistent。

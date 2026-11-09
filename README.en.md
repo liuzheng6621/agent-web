@@ -1,4 +1,4 @@
-# agent-web v0.78.2
+# agent-web v0.78.3
 
 <p align="center">
   <img src="docs/media/hero.png" alt="agent-web: integration tests an agent can be judged on" width="100%">
@@ -26,7 +26,7 @@
 </p>
 
 <p align="center">
-  <b>v0.78.2</b> · 21 assertion kinds · 33 commands · 72 mutants
+  <b>v0.78.3</b> · 21 assertion kinds · 33 commands · 72 mutants
 </p>
 
 <p align="center">
@@ -473,10 +473,10 @@ Two layers. These capabilities already have code and tests and should not be cou
 - **`negatives`** derives candidate negative cases from the manifest's declarations (missing required args, role violations, wrong types, boundary violations, absent entities, duplicate submits); everything stays `disputed` and only a review sheet is produced.
 - **`discover` / `tap` / `learn` / `import hurl`** grow adapters and case drafts from a URL, recorded traffic, or an existing suite.
 
-The remaining boundaries are numbered to match L1–L13 in [docs/LIMITS.md](docs/LIMITS.md).
+The remaining boundaries are numbered to match L1–L14 in [docs/LIMITS.md](docs/LIMITS.md).
 **Each entry states only the unsolved part** — what already works is in the list above and is not repeated here:
 
-A word on evidence grades: every number in this README (catch rates, agreement rates, timings) comes from this repo's own CI. The scripts are reproducible — but **reproduction runs the same scripts**, and as of v0.78.2 no third party has reproduced them independently. "Reproducible" is a machine fact, not external validity. The `knowledge/` and `docs/mutants/` contribution channels exist to turn self-attestation into outside evidence, one accepted submission at a time; until one arrives, read the numbers here as "the author's proof that his own ruler is self-consistent", not as correctness rates.
+A word on evidence grades: every number in this README (catch rates, agreement rates, timings) comes from this repo's own CI. The scripts are reproducible — but **reproduction runs the same scripts**, and as of v0.78.3 no third party has reproduced them independently. "Reproducible" is a machine fact, not external validity. The `knowledge/` and `docs/mutants/` contribution channels exist to turn self-attestation into outside evidence, one accepted submission at a time; until one arrives, read the numbers here as "the author's proof that his own ruler is self-consistent", not as correctness rates.
 **If you cannot wait for the contribution channel, there is a faster route** — the [blind kit](scripts/build-blind-kit.mjs):
 one command builds a self-contained zip (every adapter plus the five zero-dependency case domains, **with no verdicts inside**).
 Run two commands on your own machine, send the results back, and we reconcile them case by case against the baseline
@@ -496,6 +496,7 @@ the builder saw — the minimal form of "independent reproduction", already repr
 11. **Real-backend validation covers only six domains (L11).** The threshold is two independent implementations plus 100% `compare` agreement. The first four domains each got a second implementation; the fifth (RealWorld) arrived in v0.55.0, the sixth (scheduled jobs) in v0.60.0. Adding more is still manual work.
 12. **The semantic layer covers one domain (L12).** `policy/coffee.rego` is a second, independent declaration of the coffee shop rules; 11 fixtures (1 allow, 10 deny) are judged by `conftest`. The other six domains have no rule copy, and editing the Java rules does not notify Rego — only a failing fixture reveals the drift. Rejection codes and cross-order ordering are out of scope.
 13. **The npm package is not published (L13).** `package.json`'s `name`, both bin names and the `files` whitelist are settled, and `npm pack` installed into a clean directory where `--version` and `selftest` both ran; what is missing is publishing credentials — `npm whoami` here still says need auth and the registry returns 404 for `agent-case`. So the `npx agent-case selftest` line in the tour above 404s today, and both places say so plainly.
+14. **Coffee's two-channel comparison is not in CI (L14).** `memory vs taixianglian` needs a running Spring Boot backend, so CI does not run it; the test skips explicitly when the backend is offline. CI still compares ledger and RealWorld implementations, but coffee must not be counted as CI-covered.
 <!-- limits:end -->
 
 ## Docs
@@ -505,7 +506,7 @@ the builder saw — the minimal form of "independent reproduction", already repr
 - [docs/GUIDE.md](docs/GUIDE.md) — How to use it: start from a URL, from logs to formal grading, connect your own app
 - [docs/SPEC.md](docs/SPEC.md) — Spec: case format, 21 assertion kinds and phases, verdict order table, per-mechanism rules
 - [docs/ADAPTER-GUIDE.md](docs/ADAPTER-GUIDE.md) — Connect your own app: three-tier paths, change only four places, verification order
-- [docs/LIMITS.md](docs/LIMITS.md) — Ledger of the 11 limits: status, acceptance command, why it stays
+- [docs/LIMITS.md](docs/LIMITS.md) — Ledger of the 14 limits: status, acceptance command, why it stays
 - [docs/ROADMAP.md](docs/ROADMAP.md) — What comes next, in what order, and how each item is verified
 - [docs/domains/](docs/domains/) — measured details of four domains: animal, lexicon, cron, labaccess
 - [docs/museum/](docs/museum/README.md) — the false-verdict museum: 12 exhibits, each a hole this repo actually fell into

@@ -7,22 +7,22 @@
 
 ---
 
-## 0. 现在的实际状态（v0.78.2，全部实测）
+## 0. 现在的实际状态（v0.78.3，全部实测）
 
 | 项 | 数字 | 怎么核 |
 |---|---|---|
-| 版本 | 0.78.2 | `node bin/agent-web.mjs version` |
+| 版本 | 0.78.3 | `node bin/agent-web.mjs version` |
 | 断言 | 21 种 | `--help` 里的断言表 |
 | 命令 | 33 条 | 同上 |
 | 变异体 | 72 个 | `node bin/agent-web.mjs mutants` |
-| 测试 | 608 条 | `npm test` |
+| 测试 | 613 条 | `npm test` |
 | 判据准入 | 适用 46 / 抓到 44（95.7%） | `node scripts/certify-baseline.mjs --emit-limits` |
 | 计入的域 | **6 个** | `docs/LIMITS.md` L11 的计数判据 |
-| 台账状态 | L1/L2/L4/L5/L7/L8/L10/L11 mitigated · L3/L6/**L12** by-design · L9 withdrawn · **L13** open | `grep status docs/LIMITS.md` |
+| 台账状态 | L1/L2/L4/L5/L7/L8/L10/L11 mitigated · L3/L6/L12/L14 by-design · L9 withdrawn · L13 open | `grep status docs/LIMITS.md` |
 
 **v0.78.2 起台账上重新有了一条 `open`（L13）。** v0.54.0 到 v0.78.1 之间没有过；
 这条是发布凭据问题，不是原理边界——凭据到手就是一条命令，所以它按排序原则第 1 条排在最前（见 P10）。
-其余十二条都处在「有明确边界、有验收命令、边界写在文档里」的状态。
+其余十三条都处在「有明确边界、有验收命令、边界写在文档里」的状态。
 
 ---
 
@@ -59,24 +59,23 @@
 
 ### 2.1 验收
 
-三条全绿才算完成，然后把 L13 从台账里删掉、README 与封面两处声明一并删：
+两条全绿才算完成，然后把 L13 从台账里删掉、README 与封面两处声明一并删：
 
 ```bash
 npm view agent-case version --registry=https://registry.npmjs.org   # 现在 E404
 npx agent-case selftest                                             # 干净目录里跑通
-node scripts/npm-liveness.mjs                                        # CI 里的存活检查（待实现）
 ```
 
-第三条现在还不存在——它要等前两条成立才有意义。CI 里加它的时候，
-判据是「registry 上的版本 >= 仓库 VERSION 的次版本」，这样包发旧了也会红。
+发布后的状态由 `npm test` 里的联网守卫检查：registry 一旦返回版本，README / README.en /
+封面三处必须已删掉「尚未发布 / 404」；registry 仍是 `E404` 时三处声明必须保留。
 
 ### 2.2 怎么证明它没做到
 
 - `npm view agent-case version` 仍返回 `E404`：包没发出去，这条没做。
 - `npx agent-case selftest` 在干净目录里 404 或跑到别的包：发的是别的东西，或者名字被别人抢注了。
 - README 与封面那两段「尚未发布 / 会 404」的声明还在：等于台账在说没做完，文档却已经按做完写了。
-- 发了但版本落后于仓库 `VERSION`：`npm-liveness.mjs` 会红——**发旧版比不发更坏**，
-  因为别人装到的是旧行为，而 README 描述的是新行为。
+- 发了但三处仍写「尚未发布 / 404」：`npm test` 的联网守卫会红——**发旧声明比不发更坏**，
+  因为别人看到的仍是「不能用」。
 
 ## 3. P6 — 交叉复核（L8）✅ 已完成（v0.54.0）
 

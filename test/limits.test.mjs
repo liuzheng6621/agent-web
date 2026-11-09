@@ -35,6 +35,14 @@ function limitsEntries() {
   return { raw: s, ids };
 }
 
+test('限制清单：标题区间上界与正文条目数一致', () => {
+  const { raw, ids } = limitsEntries();
+  const m = raw.match(/^# 限制清单（L1[–-]L(\d+)）/m);
+  assert.ok(m, 'docs/LIMITS.md 标题不是「# 限制清单（L1–LNN）」');
+  assert.equal(Number(m[1]), ids.length,
+    `标题写 L1–L${m[1]}，正文却有 ${ids.length} 条 —— 标题范围漂了`);
+});
+
 test('限制清单：README 中英条数，与 docs/LIMITS.md 的条目数一一对应', () => {
   const zh = readmeItems('zh');
   const en = readmeItems('en');

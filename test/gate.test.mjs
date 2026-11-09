@@ -173,3 +173,28 @@ test('compare 缺 comparable 字段（旧格式）→ 红线 + 缺行，不回�
   assert.ok(r.violations[0].includes('comparable'), r.violations[0]);
   assert.ok(r.violations[0].includes('旧格式'), r.violations[0]);
 });
+
+test('CI 用的 ledger gate 真能通过；下限超过 4 条时必须点名「低于下限」', async () => {
+  const { execFileSync } = await import('node:child_process');
+  const path = await import('node:path');
+  const { fileURLToPath } = await import('node:url');
+  const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+  const base = [path.join(ROOT, 'bin', 'agent-web.mjs'), 'gate', 'cases/ledger',
+    '--adapter=ledger-a', '--compare=ledger-b'];
+  const run = (floor) => {
+    try {
+      const stdout = execFileSync(process.execPath, [...base, `--min-comparable=${floor}`], {
+        encoding: 'utf8', cwd: ROOT, timeout: 120000,
+      });
+      return { status: 0, output: stdout };
+    } catch (e) {
+      return { status: e.status, output: String(e.stdout || '') + String(e.stderr || '') };
+    }
+  };
+  const pass = run(4);
+  assert.equal(pass.status, 0, `ledger 的 4/4 可比证据应通过：${pass.output.slice(0, 500)}`);
+  assert.ok(pass.output.includes('可比 4/4'), '通过时必须写明可比分母');
+  const fail = run(5);
+  assert.equal(fail.status, 1, `下限 5 超过 4 条案例时必须 exit 1：${fail.output.slice(0, 500)}`);
+  assert.ok(fail.output.includes('低于下限 5'), `失败时必须点名低于下限 5：${fail.output.slice(0, 500)}`);
+});

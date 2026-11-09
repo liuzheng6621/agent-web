@@ -27,8 +27,8 @@
 | [docs/GUIDE.md](GUIDE.md) | 怎么用：网址起步、录流量、判分、审计 | 约 1000 行 |
 | [docs/SPEC.md](SPEC.md) | 规范唯一出处：案例、断言、判决、探针、命令 | 约 2000 行 |
 | [docs/ADAPTER-GUIDE.md](ADAPTER-GUIDE.md) | 接自己的应用：三档路径、只改四处 | 129 行 |
-| [docs/LIMITS.md](LIMITS.md) | L1–L12 台账：状态、验收命令、为什么 | 332 行 |
-| [docs/ROADMAP.md](ROADMAP.md) | 路线图：做完什么、下一条怎么验收 | 288 行 |
+| [docs/LIMITS.md](LIMITS.md) | L1–L14 台账：状态、验收命令、为什么 | 430 行 |
+| [docs/ROADMAP.md](ROADMAP.md) | 路线图：做完什么、下一条怎么验收 | 323 行 |
 | [CHANGELOG.md](../CHANGELOG.md) | 每个版本做了什么、因为什么 | 随版本增长 |
 | [docs/domains/](domains/) | 四个域的实测细节 | 每域一份 |
 | [docs/museum/](museum/README.md) | 假判决博物馆：12 件可运行的展品 | 每件一个 .mjs |

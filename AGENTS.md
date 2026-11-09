@@ -128,22 +128,22 @@ type(scope): 一句话说清做了什么
 ## 目录速查
 
 ```
-bin/agent-web.mjs     32 条命令的入口（CRLF）
+bin/agent-web.mjs     33 条命令的入口（CRLF）
 src/runner.mjs        判决主循环（判决顺序表在这里）
 src/step-outcome.mjs  步骤分类的唯一实现
 src/reasons.mjs       四张理由码登记表
 src/certify.mjs       变异体抓获率（快路径 + 重放）
-src/probe.mjs         十二项机械性质探针
+src/probe.mjs         十五项机械性质探针
 src/traps.mjs         盲区/作废判决的判据（UNUSABLE_CODES）
 src/adapter/          适配器契约与内置适配器
 src/assert/           21 种断言
 cases/<domain>/       案例（一条案例 = 一次真实业务操作）
-docs/mutants/         63 个变异体
-docs/museum/          11 件展品（每个真 bug 一件，带 naive/caught 对照）
-docs/SPEC.md          规范（2070 行，判决顺序、断言语义、理由码）
-docs/LIMITS.md        11 条限制的台账
-test/                 50 个测试文件
-scripts/              9 个自检脚本
+docs/mutants/         72 个变异体
+docs/museum/          12 件展品（每个真 bug 一件，带 naive/caught 对照）
+docs/SPEC.md          规范（2109 行，判决顺序、断言语义、理由码）
+docs/LIMITS.md        14 条限制的台账
+test/                 62 个测试文件
+scripts/              12 个自检脚本
 ```
 
 ## 最后一条

@@ -6,6 +6,27 @@
 CI 也在查。这条规则是买来的：这个仓库曾经同时存在 `package.json` 0.16、README 0.9、
 Gitee Release v0.6.0 三个数，谁看都是三个项目。
 
+## 0.78.3
+
+这一轮修的是「守卫声称存在，但实际没在跑」：npm 发布状态、CI 的 gate 调用、台账标题范围和
+coffee 两通道的 CI 边界。四条都不是新功能，而是让已有声明能被证伪。
+
+- **L13 真联网校验**：`test/fact-drift.test.mjs` 现在真跑 `npm view agent-case version`。
+  registry 返回版本时，README / README.en / Pages 三处必须已删掉「尚未发布 / 404」；
+  返回 `E404` 时三处声明必须仍在；网络不可达时 skip，不把网络故障冒充发布事实。
+  原注释声称「联网检查在 CI 的另一条里」，实际没有任何一处查询 registry——这句已改成真实行为。
+- **CI 真的调用 gate**：`.github/workflows/ci.yml` 增加 ledger 的
+  `gate --adapter=ledger-a --compare=ledger-b --min-comparable=4`。ledger 只有 4 条案例，
+  所以当前真实上限是 4/4；`test/gate.test.mjs` 同时验证下限 4 通过、下限 5 必须红。
+  `test/fact-drift.test.mjs` 再守 CI 文件里确实存在这条命令，防止门禁代码留在仓库却没人调用。
+- **台账标题范围入锁**：`docs/LIMITS.md` 标题从 L1–L11 改为 L1–L14，
+  `test/limits.test.mjs` 新增「标题上界 == 正文条目数」守卫。
+- **L14 记录 coffee 环境边界**：`memory vs taixianglian` 需要运行中的 Spring Boot，
+  CI 不跑；后端不在线时测试明确 skip。README 中英与 ROADMAP 台账状态同步到 L14。
+
+测试 613 个用例（skip 数随后端与 conftest 是否就绪浮动）；72 个变异体口径不变
+（适用 46 / 抓到 44 = 95.7%）。
+
 ## 0.78.2
 
 v0.78.0 二次测评留下的三条残留，加一条更硬的：**README 第一行上手命令是坏的**。
